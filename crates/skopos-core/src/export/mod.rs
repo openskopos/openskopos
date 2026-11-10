@@ -5,7 +5,7 @@
 //!
 //! | [`Tool`] | Files |
 //! |---|---|
-//! | [`Tool::OpenSpec`] | `openspec/changes/<name>/`: `proposal.md`, `design.md` and `specs/<name>/spec.md` |
+//! | [`Tool::OpenSpec`] | `openspec/changes/<name>-v<version>/`: `proposal.md`, `design.md` and a spec delta for each capability that changes |
 //! | [`Tool::Kiro`] | `.kiro/specs/<name>/`: `requirements.md` and `design.md` |
 //! | [`Tool::SpecKit`] | `specs/<NNN>-<name>/`: `spec.md`, `plan.md` and `research.md` |
 //!
@@ -36,6 +36,7 @@ use crate::model::ItemType;
 
 mod kiro;
 mod openspec;
+mod openspec_specs;
 mod speckit;
 
 /// A spec-driven development tool.
@@ -113,6 +114,13 @@ pub struct Options {
     /// Without it, the number is 1. The `skopos` CLI uses the next free
     /// number in the `specs/` folder.
     pub number: Option<u32>,
+    /// Files of the project that the exporter reads, with paths from the
+    /// root of the project. OpenSpec only: the main specs
+    /// (`openspec/specs/**/spec.md`) and the files of the open changes
+    /// (`openspec/changes/<change>/**`). With them, the exporter writes
+    /// MODIFIED and REMOVED requirements for items that an earlier export
+    /// put into the specs. Without them, every requirement is ADDED.
+    pub existing: Vec<File>,
 }
 
 /// One file that an exporter writes.
@@ -146,11 +154,37 @@ pub struct Export {
     /// The items that are not in the files, in document order.
     pub not_exported: Vec<NotExported>,
     /// Every path that this exporter can write in `folder` for this name,
-    /// also the paths that are not in `files` this time. A tool that writes
-    /// the files again can remove the paths that are in `owned` but not in
+    /// also the paths that are not in `files` this time. A path that ends
+    /// with `/` stands for every file under that folder. A tool that writes
+    /// the files again can remove the files that are in `owned` but not in
     /// `files`: they are left over from an earlier export.
     pub owned: Vec<String>,
+    /// Things that the person who exports must know, for example that an
+    /// export replaces a hand edit in the tool's files.
+    pub warnings: Vec<String>,
 }
+
+/// Why an export cannot be made. Nothing is written.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ExportError {
+    pub message: String,
+}
+
+impl ExportError {
+    pub(crate) fn new(message: impl Into<String>) -> Self {
+        ExportError {
+            message: message.into(),
+        }
+    }
+}
+
+impl fmt::Display for ExportError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(&self.message)
+    }
+}
+
+impl std::error::Error for ExportError {}
 
 /// Exports a document to the files of a tool.
 ///
@@ -172,37 +206,51 @@ pub struct Export {
 ///          "category": "gap", "evidence": [{"kind": "discussion", "text": "?"}]}
 ///     ]
 /// });
-/// let out = export(&doc, Tool::Kiro, &Options::default());
+/// let out = export(&doc, Tool::Kiro, &Options::default()).unwrap();
 /// assert_eq!(out.folder, ".kiro/specs/seat-limits");
 /// assert!(out.files[0].text.contains("pa_7Hk2mQ9xR4tV8wZ1@2#FR1"));
 /// assert_eq!(out.not_exported[0].id, "CR1");
 /// ```
-pub fn export(doc: &Value, tool: Tool, options: &Options) -> Export {
+///
+/// The export fails only for OpenSpec, when [`Options::existing`] shows that
+/// it cannot be made safely: an earlier export of the artifact is still an
+/// open change, or the artifact's requirements are spread evenly over two
+/// capabilities and [`Options::name`] does not choose one.
+pub fn export(doc: &Value, tool: Tool, options: &Options) -> Result<Export, ExportError> {
     let source = Source::new(doc);
     let name = name(doc, options);
-    match tool {
-        Tool::OpenSpec => openspec::export(&source, &name),
+    Ok(match tool {
+        Tool::OpenSpec => openspec::export(&source, &name, options)?,
         Tool::Kiro => kiro::export(&source, &name),
         Tool::SpecKit => speckit::export(&source, &name, options.number.unwrap_or(1)),
-    }
+    })
 }
 
-/// The name that [`export`] uses for the change, feature or capability:
-/// [`Options::name`] in kebab case, or a name from the title of the document.
+/// The name that [`export`] uses for the change or feature folder:
+/// [`Options::name`] in kebab case, or a name from the title of the
+/// document. A `/` in the option becomes `-`.
 pub fn name(doc: &Value, options: &Options) -> String {
-    options
-        .name
-        .as_deref()
-        .map(slug)
-        .filter(|n| !n.is_empty())
-        .unwrap_or_else(|| {
-            let name = slug(doc.get("title").and_then(Value::as_str).unwrap_or(""));
-            if name.is_empty() {
-                "change".to_string()
-            } else {
-                name
-            }
-        })
+    capability_path(doc, options).replace('/', "-")
+}
+
+/// The name as a capability path: [`name`], but a `/` in [`Options::name`]
+/// stays, for a nested OpenSpec capability such as `billing/seat-limits`.
+pub(crate) fn capability_path(doc: &Value, options: &Options) -> String {
+    let from_option = options.name.as_deref().map(|n| {
+        n.split('/')
+            .map(slug)
+            .filter(|s| !s.is_empty())
+            .collect::<Vec<_>>()
+            .join("/")
+    });
+    from_option.filter(|n| !n.is_empty()).unwrap_or_else(|| {
+        let name = slug(doc.get("title").and_then(Value::as_str).unwrap_or(""));
+        if name.is_empty() {
+            "change".to_string()
+        } else {
+            name
+        }
+    })
 }
 
 /// Runs a function that writes into a new string. Writing to a `String`
@@ -314,9 +362,9 @@ struct Entry<'a> {
 
 /// The document, ready for the exporters.
 pub(crate) struct Source<'a> {
+    pub doc: &'a Value,
     pub artifact: &'a str,
     pub version: Option<u64>,
-    doc: &'a Value,
     /// Every item with an ID, in document order. If two items have the same
     /// ID, only the first one is here.
     entries: Vec<Entry<'a>>,
@@ -417,6 +465,19 @@ impl<'a> Source<'a> {
     /// The accepted items of one type, in document order.
     pub fn of(&self, t: ItemType) -> Vec<Item<'a>> {
         self.accepted().filter(|i| i.item_type == Some(t)).collect()
+    }
+
+    /// The `status` of the item with this ID, accepted or not.
+    pub fn status_of(&self, id: &str) -> Option<&'a str> {
+        let entry = &self.entries[*self.index.get(id)?];
+        Some(entry.item.str("status"))
+    }
+
+    /// The accepted items that supersede this item ID, in document order.
+    pub fn superseded_by(&self, id: &str) -> Vec<Item<'a>> {
+        self.accepted()
+            .filter(|i| i.links("supersedes", self.artifact).contains(&id))
+            .collect()
     }
 
     /// The accepted item with this ID.

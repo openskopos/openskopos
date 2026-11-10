@@ -50,6 +50,7 @@ pub(super) fn export(source: &Source, name: &str, number: u32) -> Export {
         files,
         not_exported,
         owned: vec![spec_path, plan_path, research_path],
+        warnings: Vec::new(),
     }
 }
 

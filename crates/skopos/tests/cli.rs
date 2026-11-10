@@ -438,8 +438,8 @@ fn export_writes_the_files_of_each_tool() {
     for (tool, file, note) in [
         (
             "openspec",
-            "openspec/changes/seat-limits/specs/seat-limits/spec.md",
-            "openspec/changes/seat-limits/proposal.md",
+            "openspec/changes/seat-limits-v3/specs/seat-limits/spec.md",
+            "openspec/changes/seat-limits-v3/proposal.md",
         ),
         (
             "kiro",
@@ -595,7 +595,7 @@ fn export_with_force_removes_files_of_an_earlier_export() {
     };
     let run = |a: Vec<String>| skopos(&a.iter().map(String::as_str).collect::<Vec<_>>());
     assert!(run(args(&full)).status.success());
-    let change = dir.join("openspec/changes/seats");
+    let change = dir.join("openspec/changes/seats-v3");
     assert!(change.join("specs/seats/spec.md").exists());
 
     // The next version has no requirements and no design items.
@@ -672,4 +672,130 @@ fn export_and_diff_read_markdown() {
         String::from_utf8_lossy(&out.stderr)
     );
     assert!(String::from_utf8_lossy(&out.stdout).ends_with("no changes\n"));
+}
+
+/// Copies a folder and everything in it.
+fn copy_tree(from: &Path, to: &Path) {
+    fs::create_dir_all(to).unwrap();
+    for entry in fs::read_dir(from).unwrap() {
+        let path = entry.unwrap().path();
+        let target = to.join(path.file_name().unwrap());
+        if path.is_dir() {
+            copy_tree(&path, &target);
+        } else {
+            fs::copy(&path, &target).unwrap();
+        }
+    }
+}
+
+/// A project with the OpenSpec specs that the real OpenSpec CLI wrote after
+/// it archived the export of version `v`.
+fn openspec_project(name: &str, v: u32) -> PathBuf {
+    let dir = temp_dir(name);
+    let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("../skopos-core/tests/fixtures/openspec/after-v{v}"));
+    copy_tree(&fixture, &dir);
+    dir
+}
+
+#[test]
+fn export_to_openspec_reads_the_specs_of_earlier_exports() {
+    let dir = openspec_project("openspec-reexport", 4);
+    let root = dir.to_str().unwrap();
+    let out = skopos(&[
+        "export",
+        &fixture("spec-v5.json"),
+        "--to",
+        "openspec",
+        "-o",
+        root,
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let change = dir.join("openspec/changes/spec-seat-limits-on-plan-changes-v5");
+    let delta = fs::read_to_string(change.join("specs/seat-limits/spec.md")).unwrap();
+    assert!(
+        delta.contains("## ADDED Requirements\n\n### Requirement: FR6 - "),
+        "{delta}"
+    );
+    assert!(delta.contains("## REMOVED Requirements"), "{delta}");
+    assert!(!change.join("specs/notifications").exists());
+}
+
+#[test]
+fn export_to_openspec_refuses_while_an_earlier_export_is_open() {
+    let dir = openspec_project("openspec-open-change", 3);
+    let root = dir.to_str().unwrap();
+    let v4 = skopos(&[
+        "export",
+        &fixture("spec-v4.json"),
+        "--to",
+        "openspec",
+        "-o",
+        root,
+    ]);
+    assert!(
+        v4.status.success(),
+        "{}",
+        String::from_utf8_lossy(&v4.stderr)
+    );
+
+    // v4 is not archived, so v5 must wait.
+    let v5 = skopos(&[
+        "export",
+        &fixture("spec-v5.json"),
+        "--to",
+        "openspec",
+        "-o",
+        root,
+    ]);
+    assert_eq!(v5.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&v5.stderr);
+    assert!(
+        stderr.contains("openspec archive spec-seat-limits-on-plan-changes-v4"),
+        "{stderr}"
+    );
+    assert!(!dir
+        .join("openspec/changes/spec-seat-limits-on-plan-changes-v5")
+        .exists());
+}
+
+#[test]
+fn export_to_openspec_warns_about_a_hand_edit() {
+    let dir = openspec_project("openspec-hand-edit", 4);
+    let spec = dir.join("openspec/specs/seat-limits/spec.md");
+    let text = fs::read_to_string(&spec).unwrap();
+    fs::write(
+        &spec,
+        text.replace(
+            "The change is blocked.",
+            "The change is blocked and logged.",
+        ),
+    )
+    .unwrap();
+    let out = skopos(&[
+        "export",
+        &fixture("spec-v5.json"),
+        "--to",
+        "openspec",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        stderr.contains("warning: openspec/specs/seat-limits/spec.md:"),
+        "{stderr}"
+    );
+    assert!(
+        stderr.contains("(FR4) changed after it was exported"),
+        "{stderr}"
+    );
 }

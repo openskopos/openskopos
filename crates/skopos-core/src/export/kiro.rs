@@ -40,6 +40,7 @@ pub(super) fn export(source: &Source, name: &str) -> Export {
         files,
         not_exported,
         owned: vec![requirements_path, design_path],
+        warnings: Vec::new(),
     }
 }
 

@@ -200,7 +200,11 @@ fn main() -> ExitCode {
             &file,
             to.into(),
             &output,
-            Options { name, number },
+            Options {
+                name,
+                number,
+                existing: Vec::new(),
+            },
             force,
             dry_run,
         ),
@@ -552,6 +556,62 @@ fn read_valid(path: &Path) -> Option<Value> {
     None
 }
 
+/// Every file under a folder, as paths from `root` with `/` between folders,
+/// in sorted order. A missing folder has no files.
+fn files_under(root: &Path, folder: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.join(folder)];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if let Ok(rel) = path.strip_prefix(root) {
+                let parts: Vec<String> = rel
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().to_string())
+                    .collect();
+                out.push(parts.join("/"));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// The paths of `Export::owned`, with each folder (a path that ends with
+/// `/`) replaced by the files under it.
+fn owned_files(root: &Path, owned: &[String]) -> Vec<String> {
+    owned
+        .iter()
+        .flat_map(|p| match p.strip_suffix('/') {
+            Some(folder) => files_under(root, folder),
+            None => vec![p.clone()],
+        })
+        .collect()
+}
+
+/// The OpenSpec files that an export reads: the main specs and the Markdown
+/// files of the open changes. Archived changes are not read.
+fn openspec_files(root: &Path) -> Vec<export::File> {
+    let specs = files_under(root, "openspec/specs")
+        .into_iter()
+        .filter(|p| p.ends_with("/spec.md"));
+    let changes = files_under(root, "openspec/changes")
+        .into_iter()
+        .filter(|p| !p.starts_with("openspec/changes/archive/") && p.ends_with(".md"));
+    specs
+        .chain(changes)
+        .filter_map(|path| {
+            let text = fs::read_to_string(root.join(&path)).ok()?;
+            Some(export::File { path, text })
+        })
+        .collect()
+}
+
 /// The sequence number of a Spec Kit feature folder such as `004-billing`:
 /// three or more digits and `-`. A folder with a timestamp prefix, such as
 /// `20261110-093000-login`, has no sequence number. Spec Kit reads the
@@ -603,14 +663,22 @@ fn run_export(
     if tool == Tool::SpecKit && options.number.is_none() {
         options.number = Some(speckit_number(root, &export::name(&doc, &options)));
     }
-    let out = export::export(&doc, tool, &options);
+    if tool == Tool::OpenSpec {
+        options.existing = openspec_files(root);
+    }
+    let out = match export::export(&doc, tool, &options) {
+        Ok(out) => out,
+        Err(e) => {
+            eprintln!("{}: {e}", file.display());
+            return false;
+        }
+    };
 
     // Files of an earlier export that this export does not write. They hold
     // old items, so they must go.
-    let stale: Vec<PathBuf> = out
-        .owned
-        .iter()
-        .filter(|p| !out.files.iter().any(|f| &f.path == *p))
+    let stale: Vec<PathBuf> = owned_files(root, &out.owned)
+        .into_iter()
+        .filter(|p| !out.files.iter().any(|f| f.path == *p))
         .map(|p| root.join(p))
         .filter(|p| p.exists())
         .collect();
@@ -683,6 +751,9 @@ fn run_export(
                 ok = false;
             }
         }
+    }
+    for w in &out.warnings {
+        eprintln!("warning: {w}");
     }
     if !out.not_exported.is_empty() {
         eprintln!(

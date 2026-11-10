@@ -81,23 +81,68 @@ constraints and no decisions gives no Kiro `design.md`.
 
 ## OpenSpec
 
-Checked against OpenSpec 1.17.0 (released 2026-11-09) and the templates of
-its `spec-driven` schema.
+Checked against OpenSpec 1.17.0 (released 2026-11-09): the templates of its
+`spec-driven` schema, its parser and validator, and `openspec archive`. A CI
+job runs the real OpenSpec CLI on four exports of one artifact (see
+"Tests" below).
 
-The exporter writes one change folder, `openspec/changes/<name>/`:
+OpenSpec keeps the agreed behavior of a project in main specs,
+`openspec/specs/<capability>/spec.md`. A change folder holds deltas to them.
+`openspec archive` applies the deltas to the main specs. So the exporter
+writes one change folder, `openspec/changes/<name>-v<version>/`:
 
 | File | Content |
 |---|---|
-| `.openspec.yaml` | `schema: spec-driven` and `created`. If the document has no requirements, also `skip_specs: true`, so that `openspec validate` accepts a change with no spec delta. |
-| `proposal.md` | Why (summary, goals, other success signals), What Changes (stories), Capabilities, Impact, and the "Not exported" note. |
+| `.openspec.yaml` | `schema: spec-driven` and `created`. If the change has no spec delta, also `skip_specs: true`, so that `openspec validate` accepts it. |
+| `proposal.md` | Why (summary, goals, other success signals), What Changes (the deltas and the stories), Capabilities, Impact, and the "Not exported" note. |
 | `design.md` | Context (constraints and assumptions), Goals / Non-Goals, Decisions, Risks / Trade-offs, Open Questions. |
-| `specs/<name>/spec.md` | The spec delta: Purpose, then each requirement under "ADDED Requirements". |
+| `specs/<capability>/spec.md` | One spec delta for each capability that changes. |
 
-Notes:
+### The first export
 
-- The name of a requirement is its ID and the start of its text, for example
-  `FR4 - A plan change that leaves more seats in use than the new...`. The ID
-  keeps the names unique.
+The first export of an artifact ADDs every requirement to a new capability.
+Its name comes from `--name`, or from the title of the document. The delta
+starts with a Purpose, as OpenSpec wants for a new capability.
+
+### Later exports
+
+`skopos export` reads the main specs and the open changes of the project.
+Each exported requirement block holds the reference string of its item, so
+the exporter finds the blocks that earlier exports of the same artifact
+wrote. The team can rename a capability or move it, for example to
+`billing/seat-limits`: the exporter finds the blocks where they are now.
+
+Then it compares each accepted requirement with its block:
+
+| The requirement | The delta |
+|---|---|
+| Has no block | ADDED, to the capability that holds the most requirements of the artifact. `--name` chooses another capability. |
+| Has the same content as its block | None. The block keeps the reference string of the export that wrote it. |
+| Changed | MODIFIED, with the name of the block. A team can rename a requirement in OpenSpec, and the export keeps the new name. |
+| Changed and lost a scenario | REMOVED and ADDED again under a new name, for example `FR4 - ... (v4)`. `openspec archive` refuses a MODIFIED requirement that drops a scenario. |
+| Is dropped, rejected or only proposed | REMOVED, with the reason. If an accepted item supersedes it, the Migration names that item. |
+
+The exporter refuses to export, and writes nothing, in two cases:
+
+- An earlier export of the artifact is a change that is not archived yet.
+  Its deltas are not in the main specs, so a new delta would be wrong. Run
+  `openspec archive <change>`, or delete the change, and export again. An
+  export of the same version writes over its own open change.
+- The requirements of the artifact are in two or more capabilities, with the
+  same number in each. Use `--name` to choose the capability for new
+  requirements.
+
+Each exported requirement block ends with a comment such as
+`<!-- skopos-export: 9f3a1c2b7d4e6f80 -->`: a hash of the block as the
+exporter wrote it. If someone changes the block in OpenSpec after the export,
+the next export sees it. It replaces the block and writes a warning that
+names the requirement. A block with no comment is replaced with no warning.
+
+### Notes
+
+- The name of a new requirement is its ID and the start of its text, for
+  example `FR4 - A plan change that leaves more seats in use than the new...`.
+  The ID keeps the names unique.
 - `openspec validate` gives an error for a requirement with no scenario. So
   each requirement gets a scenario from each example and each success signal
   that verifies it. A requirement with none of these gets one scenario that
@@ -106,8 +151,8 @@ Notes:
   a requirement has no SHALL or MUST. The exporter does not change the words
   of the team. Write the requirement with SHALL or MUST if you use
   `--strict`.
-- Every requirement is under "ADDED Requirements". The exporter does not yet
-  make MODIFIED or REMOVED deltas from `skopos diff`.
+- The exporter does not write `tasks.md`. OpenSpec makes the tasks from the
+  proposal, the design and the specs, and its apply step needs them.
 - OpenSpec has no place for terms. Add them to `openspec/config.yaml` under
   `context` if the agent needs them.
 
@@ -177,6 +222,20 @@ Notes:
   constitution applies to the whole project, and an export is for one
   feature.
 - Spec Kit has no place for risks.
+
+## Tests
+
+The golden tests in `crates/skopos-core/tests/golden.rs` cover each tool.
+For OpenSpec, `crates/skopos/tests/openspec_roundtrip.sh` runs the real
+OpenSpec CLI. In a new project, with one capability that a team wrote by
+hand, it exports versions 2 to 5 of one artifact. Each export runs
+`openspec validate` and `openspec archive`. The versions add, change,
+replace, supersede, reject and drop requirements. The script compares each
+change with the golden files and each archived state with the fixtures in
+`crates/skopos-core/tests/fixtures/openspec/`. The golden tests read the same
+fixtures, so they test the exporter against main specs that OpenSpec itself
+wrote. More tests change those fixtures: a hand edit, a renamed and nested
+capability, requirements split over two capabilities, and an open change.
 
 ## Import is planned
 

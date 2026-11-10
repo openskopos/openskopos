@@ -195,7 +195,7 @@ skopos export spec.skopos.json --to speckit -o ../billing
 
 | Tool | Files |
 |---|---|
-| `openspec` | `openspec/changes/<name>/`: `.openspec.yaml`, `proposal.md`, `design.md` and `specs/<name>/spec.md` |
+| `openspec` | `openspec/changes/<name>-v<version>/`: `.openspec.yaml`, `proposal.md`, `design.md` and a spec delta in `specs/<capability>/spec.md` |
 | `kiro` | `.kiro/specs/<name>/`: `requirements.md` and `design.md` |
 | `speckit` | `specs/<NNN>-<name>/`: `spec.md`, `plan.md` and `research.md` |
 
@@ -209,6 +209,10 @@ skopos export spec.skopos.json --to speckit -o ../billing
   over it. With `--force`, the tool also removes the files of an earlier
   export that this export does not write, so that no old items stay behind.
 - `--dry-run` names the files and writes nothing.
+- For OpenSpec, the tool reads `openspec/specs/` and the open changes. A
+  later export writes MODIFIED and REMOVED requirements for the items that
+  earlier exports put into the specs. It refuses while an earlier export is
+  not archived yet. See [docs/exporters.md](../../docs/exporters.md#openspec).
 - For Spec Kit, the tool names the `.specify/feature.json` setting that makes
   Spec Kit work on the exported feature. It does not change that file.
 

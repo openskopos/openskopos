@@ -57,6 +57,23 @@ jobs:
       - name: Build skopos-core for WebAssembly
         run: cargo build -p skopos-core --target wasm32-unknown-unknown --locked
 
+  # Exports four versions of one artifact to OpenSpec, and runs the real
+  # OpenSpec CLI on each: validate, then archive. The archived specs must be
+  # the fixtures that the golden tests read.
+  openspec:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install OpenSpec
+        run: npm install --global @fission-ai/openspec@1.17.0
+      - name: Install the skopos CLI
+        run: cargo install --locked --path crates/skopos
+      - name: Export, validate and archive versions 2 to 5
+        run: sh crates/skopos/tests/openspec_roundtrip.sh
+
   install:
     runs-on: ubuntu-latest
     steps:
