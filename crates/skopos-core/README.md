@@ -34,6 +34,58 @@ field, so a value gives the same value after a round trip through `Document`.
 
 The module `rules` has the names of the four rules in section 9.
 
+## Markdown
+
+The module `markdown` reads and writes Markdown, as section 10 of the
+specification says. A Markdown file holds every field of a document.
+
+| Function | What it does |
+|---|---|
+| `markdown::write(&Value, &[Value]) -> String` | Writes a document as Markdown. The slice holds other documents to copy material from (section 10.7). Give an empty slice to copy nothing. |
+| `markdown::read(&str, Option<&str>) -> Result<(Value, Vec<Warning>), Vec<Error>>` | Reads a Markdown file into a document. The second argument is the file name, for the kind (`INTENT.md` gives `intent`). The reader needs no other file. |
+| `markdown::next_version(&Value, &Value) -> Value` | Gives the document to store after a person edits the Markdown of a stored version (section 10.8). The arguments are the stored version and the document from `read`. |
+| `markdown::same_content(&Value, &Value) -> bool` | Compares the content of two documents, as section 10.8 defines it. |
+
+The reader is generous. It accepts many ways to write the same thing, for
+example `## Out of scope` for the non-goals and `[FR2]` for an item ID. A
+warning is a case where the reader skips or changes something and continues.
+An error is a case where the reader cannot make a valid document. Section 10.6
+of the specification lists both. The reader checks the document with `check`,
+so a schema problem is also an error.
+
+`Warning` and `Error` are the same type, `markdown::Message`:
+
+| Field | Meaning |
+|---|---|
+| `line` | The line in the file, counted from 1. `None` if the message is about the whole file. |
+| `message` | What the reader found, and for an error, what to write. |
+| `problem` | For an error from `check`, the `Problem`. |
+
+If the file has no `id` or `created_at`, `read` gives a new random artifact ID
+and the current time. `next_version` uses the current time for a new version.
+To give these values, use `markdown::read_with` and
+`markdown::next_version_at`. The WebAssembly build has no clock, so it has only
+these two functions.
+
+```rust
+use skopos_core::markdown;
+
+let text = std::fs::read_to_string("INTENT.md")?;
+match markdown::read(&text, Some("INTENT.md")) {
+    Ok((doc, warnings)) => {
+        for w in warnings {
+            eprintln!("warning: {w}");
+        }
+        print!("{}", markdown::write(&doc, &[]));
+    }
+    Err(errors) => {
+        for e in errors {
+            eprintln!("{e}");
+        }
+    }
+}
+```
+
 ```rust
 use skopos_core::{check, parse, write, Format};
 

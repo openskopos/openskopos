@@ -18,7 +18,8 @@
 //! - [`assign_ids`] gives an ID to each item that has none and updates
 //!   `id_counters`.
 //!
-//! The [`model`] module has serde types for a valid document.
+//! The [`markdown`] module reads and writes Markdown (specification section
+//! 10). The [`model`] module has serde types for a valid document.
 //!
 //! ```
 //! let text = r#"{
@@ -43,6 +44,7 @@ use serde::{Deserialize, Serialize};
 pub use serde_json::Value;
 
 mod ids;
+pub mod markdown;
 pub mod model;
 mod order;
 pub mod rules;

@@ -72,9 +72,10 @@ request. It does these checks:
 The runner does not read or write Markdown. That is the job of the reference
 implementation in [`crates/`](../crates/).
 
-The tests of the reference implementation also run the cases in `valid/` and
-`invalid/`, through the library `skopos-core` and through the `skopos`
-command line tool. To run them, run `cargo test` from the root of the
+The tests of the reference implementation also run the cases in `valid/`,
+`invalid/` and `markdown/`, through the library `skopos-core` and through the
+`skopos` command line tool. They also write each document in `valid/` as
+Markdown and read it back. To run them, run `cargo test` from the root of the
 repository.
 
 To run the runner with Rust installed, run this command from the root of the
