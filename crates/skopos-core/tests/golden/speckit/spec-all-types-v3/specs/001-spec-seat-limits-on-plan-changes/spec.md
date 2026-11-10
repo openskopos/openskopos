@@ -1,8 +1,11 @@
 # Feature Specification: Spec: seat limits on plan changes
 
-**Feature Branch**: `001-spec-seat-limits-on-plan-changes`  
-**Created**: 2026-11-08  
-**Status**: Draft  
+**Feature Branch**: `001-spec-seat-limits-on-plan-changes`
+
+**Created**: 2026-11-08
+
+**Status**: Draft
+
 **Input**: OpenSkopos document `pa_2Xc5Rv8Tn1Mb4Kz7@3`. Each line ends with the reference string of its item.
 
 What happens to seats when an org moves to a plan with fewer seats.
@@ -41,7 +44,8 @@ As an org admin, I want to see which seats block a plan change, so that I can fr
   - Example: 12 seats in use, new limit 10. The change is blocked.
 - **FR-003**: The seat count never goes below zero. `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR3`
   - Priority: should
-  - An invariant. A property-based test fits it.
+
+  An invariant. A property-based test fits it.
 
 ### Key Entities
 

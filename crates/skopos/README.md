@@ -206,8 +206,11 @@ skopos export spec.skopos.json --to speckit -o ../billing
   the number of a folder in `specs/` with the same name, or the next free
   number.
 - The tool does not write over a file that exists. Use `--force` to write
-  over it.
+  over it. With `--force`, the tool also removes the files of an earlier
+  export that this export does not write, so that no old items stay behind.
 - `--dry-run` names the files and writes nothing.
+- For Spec Kit, the tool names the `.specify/feature.json` setting that makes
+  Spec Kit work on the exported feature. It does not change that file.
 
 The tool exports only accepted items. Each exported line ends with the
 reference string of its item, for example `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4`. Items
@@ -242,8 +245,8 @@ dropped    N2   Emails to members above the limit.
 | Line | Meaning |
 |---|---|
 | `added` | The ID is in the new version only. |
-| `changed` | The ID is in both versions, and the fields after it are different. A change of display order is not a change. |
-| `superseded` | The ID is in the old version only, and an item of the new version links to it with `supersedes`. |
+| `changed` | The ID is in both versions, and the fields after it are different. A change of display order, of items or of `refs`, is not a change. |
+| `superseded` | The ID is in the old version only, and an item of the new version links to it with `supersedes`. A rejected item supersedes nothing. |
 | `dropped` | The ID is in the old version only, and no item supersedes it. |
 | `envelope` | Fields of the document that are different, such as `title` or `summary`. The tool does not compare `version`, `status`, `parents`, `created_at`, `finalized_at`, `method`, `session` and `id_counters`. |
 

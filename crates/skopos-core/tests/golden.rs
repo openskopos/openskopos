@@ -200,3 +200,101 @@ fn diff_of_two_versions() {
     assert_eq!(back.added[0].id, "FR2");
     assert!(back.superseded.is_empty());
 }
+
+/// A document whose free text holds Markdown that could break the files of a
+/// tool: headings in `detail` and `summary`, and brackets in a question.
+fn tricky() -> Value {
+    serde_json::json!({
+        "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+        "id": "pa_7Hk2mQ9xR4tV8wZ1", "version": 1, "kind": "spec",
+        "title": "Tricky text", "status": "draft",
+        "summary": "# Overview\n\n## Background\nWhy we do it.",
+        "created_at": "2026-11-05T09:00:00Z",
+        "id_counters": {"FR": 1, "Q": 1, "T": 1},
+        "items": [
+            {"id": "FR1", "type": "requirement", "status": "accepted",
+             "text": "Support API v2.5 for all clients.",
+             "detail": "## Background\n\n1. First.\n\n```md\n## kept in the fence\n```",
+             "examples": [{"text": "A v2.5 client connects."}]},
+            {"id": "Q1", "type": "open_question", "status": "accepted",
+             "text": "Should limits apply to [legacy] plans?"},
+            {"id": "T1", "type": "term", "status": "accepted",
+             "text": "Seat*", "definition": "A user."}
+        ]
+    })
+}
+
+#[test]
+fn free_text_cannot_add_sections_to_the_files() {
+    let doc = tricky();
+    assert!(check(&doc).is_empty(), "{:?}", check(&doc));
+    for tool in Tool::ALL {
+        let out = export(&doc, tool, &Options::default());
+        for file in &out.files {
+            let mut fenced = false;
+            for line in file.text.lines() {
+                if line.starts_with("```") {
+                    fenced = !fenced;
+                }
+                assert!(
+                    fenced
+                        || !(line.starts_with("# Overview") || line.starts_with("## Background")),
+                    "{tool} {}: {line}",
+                    file.path
+                );
+            }
+        }
+    }
+
+    // OpenSpec: the scenario stays inside the requirement, after the detail.
+    let out = export(&doc, Tool::OpenSpec, &Options::default());
+    let spec = &out
+        .files
+        .iter()
+        .find(|f| f.path.ends_with("spec.md"))
+        .unwrap()
+        .text;
+    let added = spec.split("## ADDED Requirements").nth(1).unwrap();
+    let outside_fences: Vec<&str> = added
+        .split("```")
+        .step_by(2)
+        .flat_map(str::lines)
+        .filter(|l| l.starts_with("## "))
+        .collect();
+    assert!(outside_fences.is_empty(), "{outside_fences:?}");
+    assert!(added.contains("**Background**"));
+    assert!(added.find("**Background**") < added.find("#### Scenario: Example 1"));
+    assert!(spec.contains("### Requirement: FR1 - Support API v2.5 for all clients\n"));
+
+    // Spec Kit: the marker ends where the question ends.
+    let out = export(&doc, Tool::SpecKit, &Options::default());
+    assert!(out.files[0]
+        .text
+        .contains("- [NEEDS CLARIFICATION: Should limits apply to (legacy) plans?] `"));
+    assert!(out.files[0].text.contains("- **Seat\\***: A user."));
+
+    // Kiro: the detail list does not continue the criteria list.
+    let out = export(&doc, Tool::Kiro, &Options::default());
+    let req = &out.files[0].text;
+    assert!(
+        req.find("1. First.") < req.find("#### Acceptance Criteria"),
+        "{req}"
+    );
+}
+
+#[test]
+fn owned_paths_hold_every_written_file() {
+    for case in CASES {
+        let doc = conformance(case);
+        for tool in Tool::ALL {
+            let out = export(&doc, tool, &Options::default());
+            for f in &out.files {
+                assert!(
+                    out.owned.contains(&f.path),
+                    "{tool}: {} is not owned",
+                    f.path
+                );
+            }
+        }
+    }
+}

@@ -1,8 +1,11 @@
 # Feature Specification: Intent: self-serve plan downgrades
 
-**Feature Branch**: `001-intent-self-serve-plan-downgrades`  
-**Created**: 2026-11-05  
-**Status**: Draft  
+**Feature Branch**: `001-intent-self-serve-plan-downgrades`
+
+**Created**: 2026-11-05
+
+**Status**: Draft
+
 **Input**: OpenSkopos document `pa_7Hk2mQ9xR4tV8wZ1@2`. Each line ends with the reference string of its item.
 
 ## User Scenarios & Testing *(mandatory)*

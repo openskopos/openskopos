@@ -512,6 +512,10 @@ fn export_to_speckit_takes_the_next_feature_number() {
     let dir = temp_dir("export-speckit-number");
     fs::create_dir_all(dir.join("specs/001-login")).unwrap();
     fs::create_dir_all(dir.join("specs/004-billing")).unwrap();
+    // Spec Kit does not count timestamp folders or prefixes of fewer than
+    // three digits.
+    fs::create_dir_all(dir.join("specs/20261110-093000-login")).unwrap();
+    fs::create_dir_all(dir.join("specs/42-old")).unwrap();
     let root = dir.to_str().unwrap();
     let doc = valid("spec-all-types-v3.json");
     let out = skopos(&[
@@ -570,4 +574,74 @@ fn diff_names_items_by_id() {
     assert_eq!(json["superseded"][0]["id"], "FR2");
     assert_eq!(json["added"][0]["id"], "FR4");
     assert_eq!(json["changed"][0]["id"], "S2");
+}
+
+#[test]
+fn export_with_force_removes_files_of_an_earlier_export() {
+    let dir = temp_dir("export-stale");
+    let root = dir.to_str().unwrap();
+    let full = valid("spec-all-types-v3.json");
+    let args = |doc: &str| {
+        vec![
+            "export".to_string(),
+            doc.to_string(),
+            "--to".to_string(),
+            "openspec".to_string(),
+            "-o".to_string(),
+            root.to_string(),
+            "--name".to_string(),
+            "seats".to_string(),
+        ]
+    };
+    let run = |a: Vec<String>| skopos(&a.iter().map(String::as_str).collect::<Vec<_>>());
+    assert!(run(args(&full)).status.success());
+    let change = dir.join("openspec/changes/seats");
+    assert!(change.join("specs/seats/spec.md").exists());
+
+    // The next version has no requirements and no design items.
+    let mut doc: Value = serde_json::from_str(&fs::read_to_string(&full).unwrap()).unwrap();
+    doc["items"] = json!([{"id": "G2", "type": "goal", "text": "Why.", "status": "accepted"}]);
+    let next = dir.join("next.json");
+    fs::write(&next, serde_json::to_string(&doc).unwrap()).unwrap();
+    let next = next.to_str().unwrap().to_string();
+
+    let out = run(args(&next));
+    assert_eq!(out.status.code(), Some(1), "refuses without --force");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("left over from an earlier export"));
+
+    let mut forced = args(&next);
+    forced.push("--force".to_string());
+    let out = run(forced);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(!change.join("design.md").exists());
+    assert!(
+        !change.join("specs").exists(),
+        "OpenSpec counts any file under specs/"
+    );
+    let meta = fs::read_to_string(change.join(".openspec.yaml")).unwrap();
+    assert!(meta.contains("skip_specs: true"), "{meta}");
+}
+
+#[test]
+fn export_to_speckit_names_the_feature_json_setting() {
+    let dir = temp_dir("export-speckit-hint");
+    let out = skopos(&[
+        "export",
+        &valid("minimal-draft.json"),
+        "--to",
+        "speckit",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert!(out.status.success());
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(stderr.contains(".specify/feature.json"), "{stderr}");
+    assert!(
+        !dir.join(".specify").exists(),
+        "the tool does not change Spec Kit state"
+    );
 }

@@ -557,6 +557,23 @@ fn read_valid(path: &Path) -> Option<Value> {
     None
 }
 
+/// The sequence number of a Spec Kit feature folder such as `004-billing`:
+/// three or more digits and `-`. A folder with a timestamp prefix, such as
+/// `20261110-093000-login`, has no sequence number. Spec Kit reads the
+/// folders in the same way.
+fn speckit_folder_number(folder: &str) -> Option<(u32, &str)> {
+    let digits = folder.bytes().take_while(u8::is_ascii_digit).count();
+    let rest = folder[digits..].strip_prefix('-')?;
+    if digits < 3 {
+        return None;
+    }
+    let time = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 8 && time == 6 && rest[time..].starts_with('-') {
+        return None;
+    }
+    Some((folder[..digits].parse().ok()?, rest))
+}
+
 /// The Spec Kit feature number: the number of the folder `NNN-<name>` in
 /// `specs/` if there is one, or one more than the highest number there.
 fn speckit_number(root: &Path, name: &str) -> u32 {
@@ -566,10 +583,7 @@ fn speckit_number(root: &Path, name: &str) -> u32 {
     };
     for entry in entries.flatten() {
         let folder = entry.file_name().to_string_lossy().to_string();
-        let Some((number, rest)) = folder.split_once('-') else {
-            continue;
-        };
-        let Ok(n) = number.parse::<u32>() else {
+        let Some((n, rest)) = speckit_folder_number(&folder) else {
             continue;
         };
         if rest == name {
@@ -577,7 +591,7 @@ fn speckit_number(root: &Path, name: &str) -> u32 {
         }
         highest = highest.max(n);
     }
-    highest + 1
+    highest.saturating_add(1)
 }
 
 fn run_export(
@@ -596,16 +610,31 @@ fn run_export(
     }
     let out = export::export(&doc, tool, &options);
 
+    // Files of an earlier export that this export does not write. They hold
+    // old items, so they must go.
+    let stale: Vec<PathBuf> = out
+        .owned
+        .iter()
+        .filter(|p| !out.files.iter().any(|f| &f.path == *p))
+        .map(|p| root.join(p))
+        .filter(|p| p.exists())
+        .collect();
     let existing: Vec<PathBuf> = out
         .files
         .iter()
         .map(|f| root.join(&f.path))
         .filter(|p| p.exists())
         .collect();
-    if !existing.is_empty() && !force && !dry_run {
+    if !force && !dry_run && (!existing.is_empty() || !stale.is_empty()) {
         for p in &existing {
             eprintln!(
                 "{}: the file exists. Use --force to write over it.",
+                p.display()
+            );
+        }
+        for p in &stale {
+            eprintln!(
+                "{}: the file is left over from an earlier export. Use --force to remove it.",
                 p.display()
             );
         }
@@ -632,6 +661,34 @@ fn run_export(
             ok = false;
         }
     }
+    for path in &stale {
+        if dry_run {
+            emit(&format!("{} (remove)\n", path.display()));
+            continue;
+        }
+        match fs::remove_file(path) {
+            Ok(()) => {
+                eprintln!(
+                    "removed {}: this export has no content for it",
+                    path.display()
+                );
+                // Remove the folders that are now empty, up to the export
+                // folder. OpenSpec counts any file under specs/.
+                let top = root.join(&out.folder);
+                let mut dir = path.parent();
+                while let Some(d) = dir.filter(|d| *d != top && d.starts_with(&top)) {
+                    if fs::remove_dir(d).is_err() {
+                        break;
+                    }
+                    dir = d.parent();
+                }
+            }
+            Err(e) => {
+                eprintln!("{}: cannot remove the file: {e}", path.display());
+                ok = false;
+            }
+        }
+    }
     if !out.not_exported.is_empty() {
         eprintln!(
             "Not exported to {} ({}):",
@@ -641,6 +698,14 @@ fn run_export(
         for n in &out.not_exported {
             eprintln!("  {} ({}): {}", n.reference, n.item_type, n.reason);
         }
+    }
+    if tool == Tool::SpecKit && !dry_run && ok {
+        // Spec Kit finds the feature to work on in .specify/feature.json, not
+        // in the folder name. The tool does not change that file.
+        eprintln!(
+            "To work on this feature with Spec Kit, set \"feature_directory\" to \"{}\" in .specify/feature.json, or set SPECIFY_FEATURE_DIRECTORY.",
+            out.folder
+        );
     }
     ok
 }

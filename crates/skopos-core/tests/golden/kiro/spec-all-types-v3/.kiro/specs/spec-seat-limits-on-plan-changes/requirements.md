@@ -34,11 +34,11 @@ Goals:
 
 ### Requirement 2: The seat count never goes below zero
 
+An invariant. A property-based test fits it.
+
 #### Acceptance Criteria
 
 1. The seat count never goes below zero. `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR3` (priority: should)
-
-An invariant. A property-based test fits it.
 
 ## Not exported
 

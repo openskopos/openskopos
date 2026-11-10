@@ -7,11 +7,11 @@
 //! - **Changed**: the ID is in both versions, and a field of the item is
 //!   different. A change of display order is not a change.
 //! - **Superseded**: the ID is in the old version only, and an item of the new
-//!   version links to it with `supersedes`.
+//!   version that is not rejected links to it with `supersedes`.
 //! - **Dropped**: the ID is in the old version only, and no item supersedes it.
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
@@ -117,57 +117,69 @@ impl Diff {
     /// dropped    Q3   Should guests count as seats?
     /// ```
     pub fn to_text(&self) -> String {
-        let mut out = format!("{} -> {}\n", label(&self.from), label(&self.to));
+        let mut out = String::new();
+        self.write_text(&mut out)
+            .expect("writing to a String cannot fail");
+        out
+    }
+
+    fn write_text(&self, out: &mut String) -> fmt::Result {
+        writeln!(
+            out,
+            "{} -> {}",
+            crate::version_label(&self.from.artifact, self.from.version),
+            crate::version_label(&self.to.artifact, self.to.version)
+        )?;
         if !self.same_artifact {
-            out.push_str(
-                "note: the documents are different artifacts, so the same ID can mean different items\n",
-            );
+            writeln!(
+                out,
+                "note: the documents are different artifacts, so the same ID can mean different items"
+            )?;
         }
         if self.is_empty() {
-            out.push_str("no changes\n");
-            return out;
+            return writeln!(out, "no changes");
         }
         if !self.envelope.is_empty() {
-            let _ = writeln!(out, "envelope   {}", self.envelope.join(", "));
+            writeln!(out, "envelope   {}", self.envelope.join(", "))?;
         }
         let width = self
             .added
             .iter()
+            .chain(&self.dropped)
             .map(|i| i.id.len())
             .chain(self.changed.iter().map(|i| i.id.len()))
-            .chain(self.dropped.iter().map(|i| i.id.len()))
             .chain(self.superseded.iter().map(|i| i.id.len()))
             .max()
             .unwrap_or(0);
         for item in &self.added {
-            let _ = writeln!(out, "added      {:width$}  {}", item.id, item.text);
+            let text = crate::one_line(&item.text);
+            writeln!(out, "added      {:width$}  {text}", item.id)?;
         }
         for item in &self.changed {
-            let mut fields = item.fields.join(", ");
+            write!(
+                out,
+                "changed    {:width$}  {}",
+                item.id,
+                item.fields.join(", ")
+            )?;
             if let (Some(from), Some(to)) = (&item.status_from, &item.status_to) {
-                let _ = write!(fields, " (status {from} -> {to})");
+                write!(out, " (status {from} -> {to})")?;
             }
-            let _ = writeln!(out, "changed    {:width$}  {fields}", item.id);
+            writeln!(out)?;
         }
         for item in &self.superseded {
-            let _ = writeln!(
+            writeln!(
                 out,
                 "superseded {:width$}  by {}",
                 item.id,
                 item.by.join(", ")
-            );
+            )?;
         }
         for item in &self.dropped {
-            let _ = writeln!(out, "dropped    {:width$}  {}", item.id, item.text);
+            let text = crate::one_line(&item.text);
+            writeln!(out, "dropped    {:width$}  {text}", item.id)?;
         }
-        out
-    }
-}
-
-fn label(v: &VersionRef) -> String {
-    match v.version {
-        Some(n) => format!("{}@{n}", v.artifact),
-        None => v.artifact.clone(),
+        Ok(())
     }
 }
 
@@ -215,20 +227,40 @@ fn summary(id: &str, item: &Map<String, Value>) -> ItemSummary {
 }
 
 /// Keys whose values are different in two objects, in alphabetical order.
+/// The order of `refs` does not matter: a change of order is not a change.
 fn different_keys(a: &Map<String, Value>, b: &Map<String, Value>, skip: &[&str]) -> Vec<String> {
     let keys: BTreeSet<&String> = a.keys().chain(b.keys()).collect();
     keys.into_iter()
         .filter(|k| !skip.contains(&k.as_str()))
-        .filter(|k| !same(a.get(*k), b.get(*k)))
+        .filter(|k| match (k.as_str(), a.get(*k), b.get(*k)) {
+            ("refs", Some(Value::Array(x)), Some(Value::Array(y))) => !same_set(x, y),
+            (_, x, y) => !same(x, y),
+        })
         .cloned()
         .collect()
 }
 
-/// JSON values are equal. `3` and `3.0` are equal, as in JSON Schema.
+/// Two lists hold the same values, in any order.
+fn same_set(x: &[Value], y: &[Value]) -> bool {
+    let mut unmatched: Vec<&Value> = y.iter().collect();
+    x.len() == y.len()
+        && x.iter().all(
+            |v| match unmatched.iter().position(|w| same(Some(v), Some(w))) {
+                Some(i) => {
+                    unmatched.swap_remove(i);
+                    true
+                }
+                None => false,
+            },
+        )
+}
+
+/// JSON values are equal. `3` and `3.0` are equal, as in JSON Schema. Two
+/// integers are compared exactly.
 fn same(a: Option<&Value>, b: Option<&Value>) -> bool {
     match (a, b) {
         (Some(Value::Number(x)), Some(Value::Number(y))) => {
-            x == y || (x.as_f64().is_some() && x.as_f64() == y.as_f64())
+            x == y || ((x.is_f64() || y.is_f64()) && x.as_f64() == y.as_f64())
         }
         (Some(Value::Array(x)), Some(Value::Array(y))) => {
             x.len() == y.len() && x.iter().zip(y).all(|(x, y)| same(Some(x), Some(y)))
@@ -288,13 +320,16 @@ pub fn diff(a: &Value, b: &Value) -> Diff {
     // For each old ID, the new items that supersede it.
     let mut superseders: BTreeMap<&str, Vec<String>> = BTreeMap::new();
     for (id, item) in &new {
+        // A rejected item replaces nothing: the team decided against it.
+        let rejected = item.get("status").and_then(Value::as_str) == Some("rejected");
         for r in item
             .get("refs")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
         {
-            if r.get("rel").and_then(Value::as_str) == Some("supersedes")
+            if !rejected
+                && r.get("rel").and_then(Value::as_str) == Some("supersedes")
                 && local_ref(r, &to.artifact)
             {
                 if let Some(target) = r.get("item").and_then(Value::as_str) {
@@ -432,6 +467,58 @@ mod tests {
         let d = diff(&a, &b);
         assert_eq!(d.dropped[0].id, "FR1");
         assert!(d.superseded.is_empty());
+    }
+
+    #[test]
+    fn a_rejected_item_does_not_supersede() {
+        let a = json!({"id": "pa_1", "items": [
+            {"id": "FR1", "type": "requirement", "text": "Old.", "status": "accepted"}
+        ]});
+        let b = json!({"id": "pa_1", "items": [
+            {"id": "FR2", "type": "requirement", "text": "New.", "status": "rejected",
+             "refs": [{"item": "FR1", "rel": "supersedes"}]}
+        ]});
+        let d = diff(&a, &b);
+        assert_eq!(d.dropped[0].id, "FR1");
+        assert!(d.superseded.is_empty());
+    }
+
+    #[test]
+    fn ref_order_is_not_a_change_but_a_new_ref_is() {
+        let refs = |r: Value| {
+            json!({"id": "pa_1", "items": [
+                {"id": "D1", "type": "decision", "text": "x", "status": "accepted", "refs": r}
+            ]})
+        };
+        let a =
+            refs(json!([{"item": "Q1", "rel": "resolves"}, {"item": "A1", "rel": "depends_on"}]));
+        let b =
+            refs(json!([{"item": "A1", "rel": "depends_on"}, {"item": "Q1", "rel": "resolves"}]));
+        let c =
+            refs(json!([{"item": "A1", "rel": "depends_on"}, {"item": "A1", "rel": "depends_on"}]));
+        assert!(diff(&a, &b).is_empty());
+        assert_eq!(diff(&a, &c).changed[0].fields, vec!["refs"]);
+    }
+
+    #[test]
+    fn large_integers_are_compared_exactly() {
+        let n = |v: Value| json!({"id": "pa_1", "x-n": v, "items": []});
+        let d = diff(
+            &n(json!(9_007_199_254_740_993_u64)),
+            &n(json!(9_007_199_254_740_992_u64)),
+        );
+        assert_eq!(d.envelope, vec!["x-n"]);
+    }
+
+    #[test]
+    fn text_lines_stay_on_one_line() {
+        let a = json!({"id": "pa_1", "items": []});
+        let b = json!({"id": "pa_1", "items": [
+            {"id": "FR1", "type": "requirement", "text": "Block it.\nShow members.", "status": "accepted"}
+        ]});
+        assert!(diff(&a, &b)
+            .to_text()
+            .contains("added      FR1  Block it. Show members.\n"));
     }
 
     #[test]

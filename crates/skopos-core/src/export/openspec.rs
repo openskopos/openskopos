@@ -1,54 +1,65 @@
 //! OpenSpec: one change folder, `openspec/changes/<name>/`.
 //!
-//! Checked against OpenSpec 1.17.0 and its `spec-driven` schema templates.
+//! Checked against OpenSpec 1.17.0: the templates of its `spec-driven`
+//! schema, and its parser and validator.
+
+use std::fmt::{self, Write as _};
 
 use super::{
-    constraint, decision, example_label, goal, indent, not_exported_note, signal, signals_for,
-    Export, File, Item, Source, Tool,
+    constraint, decision, example_label, goal, indent, not_exported_note, plural, render, signal,
+    Export, File, Item, NotExported, Source, Tool,
 };
 use crate::model::ItemType;
 
 pub(super) fn export(source: &Source, name: &str) -> Export {
     let folder = format!("openspec/changes/{name}");
     let requirements = source.of(ItemType::Requirement);
-    let not_exported = source.skipped(Tool::OpenSpec, &[ItemType::Term, ItemType::Critique]);
+    let not_exported = source.skipped(Tool::OpenSpec, &[ItemType::Term]);
 
     // Success signals that verify a requirement become its scenarios. The
     // others go under "Why", next to the goals.
     let req_ids: Vec<&str> = requirements.iter().map(|r| r.id).collect();
-    let scenario_signals = signals_for(source, &req_ids);
+    let scenario_signals = source.signals_for(&req_ids);
     let other_signals: Vec<Item> = source
         .of(ItemType::SuccessSignal)
         .into_iter()
         .filter(|s| !scenario_signals.iter().any(|x| x.id == s.id))
         .collect();
 
-    let mut meta = format!(
-        "schema: spec-driven\ncreated: \"{}\"\n",
-        date(source.str("created_at"))
-    );
-    if requirements.is_empty() {
-        meta.push_str("skip_specs: true\n");
-    }
+    let meta = format!("{folder}/.openspec.yaml");
+    let proposal_path = format!("{folder}/proposal.md");
+    let design_path = format!("{folder}/design.md");
+    let spec_path = format!("{folder}/specs/{name}/spec.md");
 
-    let mut files = vec![File {
-        path: format!("{folder}/.openspec.yaml"),
-        text: meta,
-    }];
-    files.push(File {
-        path: format!("{folder}/proposal.md"),
-        text: proposal(source, name, &requirements, &other_signals, &not_exported),
-    });
+    let mut files = vec![
+        File {
+            path: meta.clone(),
+            text: render(|out| metadata(out, source, requirements.is_empty())),
+        },
+        File {
+            path: proposal_path.clone(),
+            text: render(|out| {
+                proposal(
+                    out,
+                    source,
+                    name,
+                    &requirements,
+                    &other_signals,
+                    &not_exported,
+                )
+            }),
+        },
+    ];
     if let Some(text) = design(source) {
         files.push(File {
-            path: format!("{folder}/design.md"),
+            path: design_path.clone(),
             text,
         });
     }
     if !requirements.is_empty() {
         files.push(File {
-            path: format!("{folder}/specs/{name}/spec.md"),
-            text: spec(source, &requirements),
+            path: spec_path.clone(),
+            text: render(|out| spec(out, source, &requirements)),
         });
     }
     Export {
@@ -56,93 +67,101 @@ pub(super) fn export(source: &Source, name: &str) -> Export {
         folder,
         files,
         not_exported,
+        owned: vec![meta, proposal_path, design_path, spec_path],
     }
 }
 
-/// The date part of an RFC 3339 date and time.
-fn date(timestamp: &str) -> &str {
-    timestamp.get(..10).unwrap_or(timestamp)
+fn metadata(out: &mut String, source: &Source, no_requirements: bool) -> fmt::Result {
+    writeln!(out, "schema: spec-driven")?;
+    writeln!(out, "created: \"{}\"", source.date())?;
+    if no_requirements {
+        // `openspec validate` accepts a change with no spec delta only with
+        // this marker.
+        writeln!(out, "skip_specs: true")?;
+    }
+    Ok(())
 }
 
 fn proposal(
+    out: &mut String,
     source: &Source,
     name: &str,
     requirements: &[Item],
     signals: &[Item],
-    not_exported: &[super::NotExported],
-) -> String {
-    let mut out = format!("# Proposal: {}\n\n", source.title());
-    out.push_str(&format!(
-        "Exported from the OpenSkopos document `{}`. Each item ends with its reference string.\n\n",
+    not_exported: &[NotExported],
+) -> fmt::Result {
+    writeln!(out, "# Proposal: {}\n", source.title())?;
+    writeln!(
+        out,
+        "Exported from the OpenSkopos document `{}`. Each item ends with its reference string.\n",
         source.label()
-    ));
+    )?;
 
-    out.push_str("## Why\n\n");
+    writeln!(out, "## Why\n")?;
     if let Some(summary) = source.summary() {
-        out.push_str(summary);
-        out.push_str("\n\n");
+        writeln!(out, "{summary}\n")?;
     }
     let goals = source.of(ItemType::Goal);
     if !goals.is_empty() {
-        out.push_str("Goals:\n\n");
+        writeln!(out, "Goals:\n")?;
         for g in &goals {
-            out.push_str(&goal(source, g));
+            goal(out, source, g)?;
         }
-        out.push('\n');
+        writeln!(out)?;
     }
     if !signals.is_empty() {
-        out.push_str("Success signals:\n\n");
+        writeln!(out, "Success signals:\n")?;
         for s in signals {
-            out.push_str(&signal(source, s));
+            signal(out, source, s)?;
         }
-        out.push('\n');
+        writeln!(out)?;
     }
 
-    out.push_str("## What Changes\n\n");
+    writeln!(out, "## What Changes\n")?;
     if requirements.is_empty() {
-        out.push_str("- No requirements. This change has no spec delta.\n");
+        writeln!(out, "- No requirements. This change has no spec delta.")?;
     } else {
         let ids: Vec<&str> = requirements.iter().map(|r| r.id).collect();
-        out.push_str(&format!(
-            "- Adds {} to `specs/{name}/spec.md`: {}.\n",
+        writeln!(
+            out,
+            "- Adds {} to `specs/{name}/spec.md`: {}.",
             plural(requirements.len(), "requirement"),
             ids.join(", ")
-        ));
+        )?;
     }
-    let stories = source.of(ItemType::Story);
-    for st in &stories {
-        out.push_str(&story(source, st));
+    for st in source.of(ItemType::Story) {
+        story(out, source, &st)?;
     }
-    out.push('\n');
+    writeln!(out)?;
 
-    out.push_str("## Capabilities\n\n### New Capabilities\n\n");
-    out.push_str(&format!("- `{name}`: {}\n\n", source.title()));
+    writeln!(out, "## Capabilities\n\n### New Capabilities\n")?;
+    writeln!(out, "- `{name}`: {}\n", source.title())?;
 
-    out.push_str("## Impact\n\n");
-    out.push_str(&format!(
-        "- Source: OpenSkopos `{}`. A reference string `<artifact>@<version>#<item>` names the item that a line comes from.\n",
+    writeln!(out, "## Impact\n")?;
+    writeln!(
+        out,
+        "- Source: OpenSkopos `{}`. A reference string `<artifact>@<version>#<item>` names the item that a line comes from.",
         source.label()
-    ));
-    out.push_str(&not_exported_note(source, not_exported, "##"));
-    out
+    )?;
+    not_exported_note(out, source, not_exported, "##")
 }
 
-fn story(source: &Source, st: &Item) -> String {
-    let mut out = format!("- Story: {} {}\n", st.text(), source.tag(st.id));
+fn story(out: &mut String, source: &Source, st: &Item) -> fmt::Result {
+    writeln!(out, "- Story: {} {}", st.text(), source.tag(st.id))?;
     let refines = st.links("refines", source.artifact);
     if !refines.is_empty() {
-        out.push_str(&format!("  - Refines: {}\n", refines.join(", ")));
+        writeln!(out, "  - Refines: {}", refines.join(", "))?;
     }
     for ac in st.list("acceptance_criteria") {
-        out.push_str(&format!("  - Acceptance: {ac}\n"));
+        writeln!(out, "  - Acceptance: {ac}")?;
     }
     for (kind, text) in st.examples() {
-        out.push_str(&format!("  - {}: {text}\n", example_label(kind)));
+        writeln!(out, "  - {}: {text}", example_label(kind))?;
     }
     if let Some(d) = st.detail() {
-        out.push_str(&format!("\n{}\n", indent(d, "  ")));
+        writeln!(out, "\n{}", indent(&d, "  "))?;
     }
-    out
+    Ok(())
 }
 
 fn design(source: &Source) -> Option<String> {
@@ -152,127 +171,141 @@ fn design(source: &Source) -> Option<String> {
     let decisions = source.of(ItemType::Decision);
     let risks = source.of(ItemType::Risk);
     let questions = source.of(ItemType::OpenQuestion);
-    if constraints.is_empty()
-        && assumptions.is_empty()
-        && non_goals.is_empty()
-        && decisions.is_empty()
-        && risks.is_empty()
-        && questions.is_empty()
+    if [
+        &constraints,
+        &assumptions,
+        &non_goals,
+        &decisions,
+        &risks,
+        &questions,
+    ]
+    .iter()
+    .all(|list| list.is_empty())
     {
         return None;
     }
 
-    let mut out = format!("# Design: {}\n\n", source.title());
-    if !constraints.is_empty() || !assumptions.is_empty() {
-        out.push_str("## Context\n\n");
-        if !constraints.is_empty() {
-            out.push_str("Constraints:\n\n");
-            for c in &constraints {
-                out.push_str(&constraint(source, c));
+    let mut text = render(|out| {
+        writeln!(out, "# Design: {}\n", source.title())?;
+        if !constraints.is_empty() || !assumptions.is_empty() {
+            writeln!(out, "## Context\n")?;
+            if !constraints.is_empty() {
+                writeln!(out, "Constraints:\n")?;
+                for c in &constraints {
+                    constraint(out, source, c)?;
+                }
+                writeln!(out)?;
             }
-            out.push('\n');
-        }
-        if !assumptions.is_empty() {
-            out.push_str("Assumptions:\n\n");
-            for a in &assumptions {
-                out.push_str(&assumption(source, a));
+            if !assumptions.is_empty() {
+                writeln!(out, "Assumptions:\n")?;
+                for a in &assumptions {
+                    assumption(out, source, a)?;
+                }
+                writeln!(out)?;
             }
-            out.push('\n');
         }
-    }
 
-    out.push_str("## Goals / Non-Goals\n\n**Goals:**\n\n- See \"Why\" in proposal.md.\n\n");
-    if !non_goals.is_empty() {
-        out.push_str("**Non-Goals:**\n\n");
-        for n in &non_goals {
-            out.push_str(&format!("- {} {}\n", n.text(), source.tag(n.id)));
-            if let Some(r) = n.field("reason") {
-                out.push_str(&format!("  - Reason: {r}\n"));
+        writeln!(
+            out,
+            "## Goals / Non-Goals\n\n**Goals:**\n\n- See \"Why\" in proposal.md.\n"
+        )?;
+        if !non_goals.is_empty() {
+            writeln!(out, "**Non-Goals:**\n")?;
+            for n in &non_goals {
+                writeln!(out, "- {} {}", n.text(), source.tag(n.id))?;
+                if let Some(r) = n.field("reason") {
+                    writeln!(out, "  - Reason: {r}")?;
+                }
+                if n.bool("deferred") {
+                    writeln!(out, "  - Deferred: later, not never.")?;
+                }
             }
-            if n.bool("deferred") {
-                out.push_str("  - Deferred: later, not never.\n");
-            }
+            writeln!(out)?;
         }
-        out.push('\n');
-    }
 
-    if !decisions.is_empty() {
-        out.push_str("## Decisions\n\n");
-        for d in &decisions {
-            out.push_str(&decision(source, d, "###"));
-            out.push('\n');
+        if !decisions.is_empty() {
+            writeln!(out, "## Decisions\n")?;
+            for d in &decisions {
+                decision(out, source, d, "###")?;
+                writeln!(out)?;
+            }
         }
-    }
 
-    if !risks.is_empty() {
-        out.push_str("## Risks / Trade-offs\n\n");
-        for r in &risks {
-            let mitigation = r
-                .field("mitigation")
-                .unwrap_or_else(|| "no mitigation yet".to_string());
-            out.push_str(&format!(
-                "- [Risk] {} → {mitigation} {}\n",
-                r.text(),
-                source.tag(r.id)
-            ));
-            let mut rating = Vec::new();
-            if let Some(l) = r.field("likelihood") {
-                rating.push(format!("likelihood {l}"));
+        if !risks.is_empty() {
+            writeln!(out, "## Risks / Trade-offs\n")?;
+            for r in &risks {
+                risk(out, source, r)?;
             }
-            if let Some(i) = r.field("impact") {
-                rating.push(format!("impact {i}"));
-            }
-            if !rating.is_empty() {
-                out.push_str(&format!("  - {}\n", rating.join(", ")));
-            }
+            writeln!(out)?;
         }
-        out.push('\n');
-    }
 
-    if !questions.is_empty() {
-        out.push_str("## Open Questions\n\n");
-        for q in &questions {
-            out.push_str(&question(source, q));
+        if !questions.is_empty() {
+            writeln!(out, "## Open Questions\n")?;
+            for q in &questions {
+                question(out, source, q)?;
+            }
         }
-        out.push('\n');
-    }
-    out.truncate(out.trim_end().len());
-    out.push('\n');
-    Some(out)
+        Ok(())
+    });
+    text.truncate(text.trim_end().len());
+    text.push('\n');
+    Some(text)
 }
 
-fn assumption(source: &Source, a: &Item) -> String {
+fn assumption(out: &mut String, source: &Source, a: &Item) -> fmt::Result {
     let confirmation = a
         .field("confirmation")
         .unwrap_or_else(|| "unconfirmed".to_string());
-    let mut out = format!("- {} ({confirmation}) {}\n", a.text(), source.tag(a.id));
+    writeln!(out, "- {} ({confirmation}) {}", a.text(), source.tag(a.id))?;
     if let Some(by) = a.field("confirm_by") {
-        out.push_str(&format!("  - Confirm by: {by}\n"));
+        writeln!(out, "  - Confirm by: {by}")?;
     }
-    out
+    Ok(())
 }
 
-fn question(source: &Source, q: &Item) -> String {
-    let mut out = format!("- {} {}\n", q.text(), source.tag(q.id));
-    if q.bool("blocking") {
-        out.push_str("  - Blocking: the work cannot continue without an answer.\n");
+fn risk(out: &mut String, source: &Source, r: &Item) -> fmt::Result {
+    let mitigation = r
+        .field("mitigation")
+        .unwrap_or_else(|| "no mitigation yet".to_string());
+    writeln!(
+        out,
+        "- [Risk] {} → {mitigation} {}",
+        r.text(),
+        source.tag(r.id)
+    )?;
+    let rating: Vec<String> = ["likelihood", "impact"]
+        .into_iter()
+        .filter_map(|key| Some(format!("{key} {}", r.field(key)?)))
+        .collect();
+    if !rating.is_empty() {
+        writeln!(out, "  - {}", rating.join(", "))?;
     }
-    let options = q.list("options");
-    if !options.is_empty() {
-        out.push_str(&format!("  - Options: {}\n", options.join("; ")));
+    Ok(())
+}
+
+fn question(out: &mut String, source: &Source, q: &Item) -> fmt::Result {
+    writeln!(out, "- {} {}", q.text(), source.tag(q.id))?;
+    if q.bool("blocking") {
+        writeln!(
+            out,
+            "  - Blocking: the work cannot continue without an answer."
+        )?;
+    }
+    if let Some(options) = q.joined("options", "; ") {
+        writeln!(out, "  - Options: {options}")?;
     }
     if let Some(answer) = q.field("answer") {
-        out.push_str(&format!("  - Answer: {answer}\n"));
+        writeln!(out, "  - Answer: {answer}")?;
     }
-    out
+    Ok(())
 }
 
-fn spec(source: &Source, requirements: &[Item]) -> String {
-    let mut out = String::from("# Spec Delta\n\n## Purpose\n\n");
+fn spec(out: &mut String, source: &Source, requirements: &[Item]) -> fmt::Result {
+    writeln!(out, "# Spec Delta\n\n## Purpose\n")?;
+    // OpenSpec wants a purpose of 50 characters or more.
     let purpose = source
         .summary()
-        .and_then(|s| s.split("\n\n").next())
-        .map(super::one_line)
+        .and_then(|s| s.split("\n\n").next().map(crate::one_line))
         .filter(|p| p.chars().count() >= 50)
         .unwrap_or_else(|| {
             format!(
@@ -281,64 +314,58 @@ fn spec(source: &Source, requirements: &[Item]) -> String {
                 source.label()
             )
         });
-    out.push_str(&purpose);
-    out.push_str("\n\n## ADDED Requirements\n");
+    writeln!(out, "{purpose}\n\n## ADDED Requirements")?;
 
     for r in requirements {
-        out.push_str(&format!("\n### Requirement: {} - {}\n\n", r.id, r.short()));
-        out.push_str(&format!("{}\n\n", r.text()));
-        let mut line = format!("Reference: {}", source.tag(r.id));
+        // The ID keeps the names unique: OpenSpec rejects two ADDED
+        // requirements with the same name.
+        writeln!(out, "\n### Requirement: {} - {}\n", r.id, r.short())?;
+        writeln!(out, "{}\n", r.text())?;
+        write!(out, "Reference: {}", source.tag(r.id))?;
         if let Some(p) = r.field("priority") {
-            line.push_str(&format!(". Priority: {p}"));
+            write!(out, ". Priority: {p}")?;
         }
-        out.push_str(&line);
-        out.push('\n');
+        writeln!(out)?;
         if let Some(d) = r.detail() {
-            out.push_str(&format!("\n{d}\n"));
+            writeln!(out, "\n{d}")?;
         }
 
-        let mut scenarios = Vec::new();
+        let mut scenarios = 0;
         for (n, (kind, text)) in r.examples().into_iter().enumerate() {
             let then = match kind {
                 "forbidden" => "this MUST NOT happen",
                 _ => "the system behaves as the example says",
             };
-            scenarios.push(format!(
-                "#### Scenario: {} {}\n\n- **WHEN** {text}\n- **THEN** {then}\n",
+            writeln!(
+                out,
+                "\n#### Scenario: {} {}\n\n- **WHEN** {text}\n- **THEN** {then}",
                 example_label(kind),
                 n + 1
-            ));
+            )?;
+            scenarios += 1;
         }
-        for s in signals_for(source, &[r.id]) {
+        for s in source.signals_for(&[r.id]) {
             let when = s
                 .field("verification")
                 .unwrap_or_else(|| "the team checks the change".to_string());
-            scenarios.push(format!(
-                "#### Scenario: Success signal {}\n\n- **WHEN** {when}\n- **THEN** {} {}\n",
+            writeln!(
+                out,
+                "\n#### Scenario: Success signal {}\n\n- **WHEN** {when}\n- **THEN** {} {}",
                 s.id,
                 s.text(),
                 source.tag(s.id)
-            ));
+            )?;
+            scenarios += 1;
         }
-        if scenarios.is_empty() {
-            scenarios.push(format!(
-                "#### Scenario: {} holds\n\n- **WHEN** the change is done\n- **THEN** {}\n",
+        if scenarios == 0 {
+            // OpenSpec rejects an ADDED requirement with no scenario.
+            writeln!(
+                out,
+                "\n#### Scenario: {} holds\n\n- **WHEN** the change is done\n- **THEN** {}",
                 r.id,
                 r.text()
-            ));
-        }
-        for s in scenarios {
-            out.push('\n');
-            out.push_str(&s);
+            )?;
         }
     }
-    out
-}
-
-fn plural(n: usize, word: &str) -> String {
-    if n == 1 {
-        format!("1 {word}")
-    } else {
-        format!("{n} {word}s")
-    }
+    Ok(())
 }

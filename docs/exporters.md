@@ -35,10 +35,20 @@ This page tells where each item type goes in each tool. The code is in
 4. **The output is the same each time.** The same document gives the same
    bytes. The files hold no date of the export. Where a tool wants a date, the
    exporter uses the date of `created_at`.
-5. **Not every field is exported.** Evidence, votes, `proposed_by`, refs and
+5. **Free text cannot change the layout of a file.** `detail` and `summary`
+   are Markdown. Each heading in them, such as `## Background`, becomes a bold
+   line, because tools read the headings of their files: for example, OpenSpec
+   ends a requirement at a `##` heading. Headings in code fences stay as they
+   are. A text that starts with `#` gets a backslash.
+6. **Not every field is exported.** Evidence, votes, `proposed_by`, refs and
    `x-` keys stay in the OpenSkopos document. Follow the reference string to
    read them. Refs are used to place items: for example, a story goes with the
    requirement that it `refines`.
+
+When `skopos export --force` writes the files again, it also removes the
+files of an earlier export that this export does not write, for example a
+`design.md` for a version that has no decisions any more. Without `--force`,
+it names those files and writes nothing.
 
 The name of the change or feature comes from the title of the document, in
 kebab case, for example `spec-seat-limits-on-plan-changes`. Use `--name` to
@@ -131,8 +141,8 @@ Notes:
 
 ## Spec Kit
 
-Checked against Spec Kit 1.3.3 (released 2026-11-09) and its
-`spec-template.md` and `plan-template.md`.
+Checked against Spec Kit 1.3.3 (released 2026-11-09): its
+`spec-template.md`, `plan-template.md` and scripts.
 
 The exporter writes one feature folder, `specs/<NNN>-<name>/`:
 
@@ -150,9 +160,17 @@ Notes:
   `must` is P1, `should` is P2 and `could` is P3. A story with no such
   requirement is P2.
 - `skopos export` takes the feature number of a folder in `specs/` with the
-  same name, or the next free number. Use `--number` to choose it.
-- `/speckit.plan` writes `plan.md` again from its template. Run it before the
-  export, or copy the Summary and Constraints into the new plan.
+  same name, or the next free number. Like Spec Kit, it counts only prefixes
+  of three or more digits, and it ignores folders with a timestamp prefix
+  such as `20261110-093000-login`. Use `--number` to choose the number.
+- Spec Kit finds the feature to work on in `.specify/feature.json` (the key
+  `feature_directory`) or in the variable `SPECIFY_FEATURE_DIRECTORY`, not in
+  the folder name. `skopos export` does not change Spec Kit's state. It
+  writes the setting to use on standard error. Set it before you run
+  `/speckit.plan`, or Spec Kit works on another feature.
+- `/speckit.plan` keeps a `plan.md` that exists and does not copy its
+  template over it. The plan step then adds its own sections to the exported
+  Summary and Technical Context.
 - Spec Kit has no "Out of scope" section. Its template puts the limits of
   scope in "Assumptions", so non-goals go there.
 - The exporter does not change `.specify/memory/constitution.md`. The

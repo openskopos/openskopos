@@ -25,7 +25,8 @@
 //! The output is deterministic: the same document always gives the same
 //! bytes. No date or time of the export goes into the files.
 
-use std::fmt;
+use std::collections::HashMap;
+use std::fmt::{self, Write as _};
 use std::str::FromStr;
 
 use serde::{Deserialize, Serialize};
@@ -144,6 +145,11 @@ pub struct Export {
     pub files: Vec<File>,
     /// The items that are not in the files, in document order.
     pub not_exported: Vec<NotExported>,
+    /// Every path that this exporter can write in `folder` for this name,
+    /// also the paths that are not in `files` this time. A tool that writes
+    /// the files again can remove the paths that are in `owned` but not in
+    /// `files`: they are left over from an earlier export.
+    pub owned: Vec<String>,
 }
 
 /// Exports a document to the files of a tool.
@@ -199,31 +205,40 @@ pub fn name(doc: &Value, options: &Options) -> String {
         })
 }
 
+/// Runs a function that writes into a new string. Writing to a `String`
+/// cannot fail.
+pub(crate) fn render(f: impl FnOnce(&mut String) -> fmt::Result) -> String {
+    let mut out = String::new();
+    f(&mut out).expect("writing to a String cannot fail");
+    out
+}
+
 /// One item of the document.
 #[derive(Clone, Copy)]
 pub(crate) struct Item<'a> {
     pub id: &'a str,
     pub item_type: Option<ItemType>,
-    pub map: &'a Map<String, Value>,
+    map: &'a Map<String, Value>,
 }
 
 impl<'a> Item<'a> {
-    /// A string field, or "".
+    /// A string field as it is stored, or "".
     pub fn str(&self, key: &str) -> &'a str {
         self.map.get(key).and_then(Value::as_str).unwrap_or("")
     }
 
-    /// The text on one line.
+    /// The text, safe for one line of Markdown.
     pub fn text(&self) -> String {
-        one_line(self.str("text"))
+        inline(self.str("text"))
     }
 
-    /// A string field on one line, if it is present and not empty.
+    /// A string field, safe for one line of Markdown, if it is present and
+    /// not empty.
     pub fn field(&self, key: &str) -> Option<String> {
-        Some(one_line(self.map.get(key)?.as_str()?)).filter(|s| !s.is_empty())
+        Some(inline(self.map.get(key)?.as_str()?)).filter(|s| !s.is_empty())
     }
 
-    /// A list of strings, each on one line.
+    /// A list of strings, each safe for one line of Markdown.
     pub fn list(&self, key: &str) -> Vec<String> {
         self.map
             .get(key)
@@ -231,17 +246,23 @@ impl<'a> Item<'a> {
             .into_iter()
             .flatten()
             .filter_map(Value::as_str)
-            .map(one_line)
+            .map(inline)
             .collect()
+    }
+
+    /// The items of a list field joined with `sep`, if there are any.
+    pub fn joined(&self, key: &str, sep: &str) -> Option<String> {
+        Some(self.list(key).join(sep)).filter(|s| !s.is_empty())
     }
 
     pub fn bool(&self, key: &str) -> bool {
         self.map.get(key).and_then(Value::as_bool).unwrap_or(false)
     }
 
-    /// `detail`, a Markdown text, with surrounding blank lines removed.
-    pub fn detail(&self) -> Option<&'a str> {
-        Some(self.str("detail").trim()).filter(|d| !d.is_empty())
+    /// `detail`, a Markdown text, as a block that cannot start a section of
+    /// the tool's file (see [`block`]).
+    pub fn detail(&self) -> Option<String> {
+        Some(block(self.str("detail"))).filter(|d| !d.is_empty())
     }
 
     /// The examples: (kind, text). A missing kind is `normal`.
@@ -254,7 +275,7 @@ impl<'a> Item<'a> {
             .filter_map(|e| {
                 let text = e.get("text")?.as_str()?;
                 let kind = e.get("kind").and_then(Value::as_str).unwrap_or("normal");
-                Some((kind, one_line(text)))
+                Some((kind, inline(text)))
             })
             .collect()
     }
@@ -284,37 +305,41 @@ impl<'a> Item<'a> {
     }
 }
 
+/// One item and whether it is exported.
+struct Entry<'a> {
+    item: Item<'a>,
+    /// Why the item is never exported, or `None` for an accepted item.
+    held: Option<&'static str>,
+}
+
 /// The document, ready for the exporters.
 pub(crate) struct Source<'a> {
-    pub doc: &'a Value,
     pub artifact: &'a str,
     pub version: Option<u64>,
-    /// Accepted items, in document order.
-    pub items: Vec<Item<'a>>,
-    /// Proposed, rejected and other items that are never exported.
-    pub held_back: Vec<NotExported>,
+    doc: &'a Value,
+    /// Every item with an ID, in document order. If two items have the same
+    /// ID, only the first one is here.
+    entries: Vec<Entry<'a>>,
+    /// Item ID to its position in `entries`.
+    index: HashMap<&'a str, usize>,
+    /// Item ID to the accepted success signals that verify it, in document
+    /// order.
+    verified_by: HashMap<&'a str, Vec<Item<'a>>>,
 }
 
 impl<'a> Source<'a> {
     fn new(doc: &'a Value) -> Self {
         let artifact = doc.get("id").and_then(Value::as_str).unwrap_or("");
-        let version = doc.get("version").and_then(crate::whole_number);
         let mut source = Source {
-            doc,
             artifact,
-            version,
-            items: Vec::new(),
-            held_back: Vec::new(),
+            version: doc.get("version").and_then(crate::whole_number),
+            doc,
+            entries: Vec::new(),
+            index: HashMap::new(),
+            verified_by: HashMap::new(),
         };
-        for value in doc
-            .get("items")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            let Some(map) = value.as_object() else {
-                continue;
-            };
+        let items = doc.get("items").and_then(Value::as_array);
+        for map in items.into_iter().flatten().filter_map(Value::as_object) {
             let Some(id) = map
                 .get("id")
                 .and_then(Value::as_str)
@@ -322,23 +347,27 @@ impl<'a> Source<'a> {
             else {
                 continue;
             };
+            if source.index.contains_key(id) {
+                continue;
+            }
             let item_type = map
                 .get("type")
                 .and_then(Value::as_str)
-                .and_then(|t| ItemType::ALL.into_iter().find(|x| x.as_str() == t));
+                .and_then(|t| t.parse::<ItemType>().ok());
             let item = Item { id, item_type, map };
-            match map.get("status").and_then(Value::as_str) {
-                Some("accepted") => source.items.push(item),
-                Some("proposed") => source.held_back.push(
-                    source.not_exported(&item, "proposed: the team has not agreed to it yet"),
-                ),
-                Some("rejected") => source
-                    .held_back
-                    .push(source.not_exported(&item, "rejected: an agent must not act on it")),
-                _ => source
-                    .held_back
-                    .push(source.not_exported(&item, "the item has no valid status")),
+            let held = match map.get("status").and_then(Value::as_str) {
+                Some("accepted") => None,
+                Some("proposed") => Some("proposed: the team has not agreed to it yet"),
+                Some("rejected") => Some("rejected: an agent must not act on it"),
+                _ => Some("the item has no valid status"),
+            };
+            if held.is_none() && item_type == Some(ItemType::SuccessSignal) {
+                for target in item.links("verifies", artifact) {
+                    source.verified_by.entry(target).or_default().push(item);
+                }
             }
+            source.index.insert(id, source.entries.len());
+            source.entries.push(Entry { item, held });
         }
         source
     }
@@ -346,10 +375,7 @@ impl<'a> Source<'a> {
     /// The reference string of an item ID, for example
     /// `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4`.
     pub fn reference(&self, id: &str) -> String {
-        match self.version {
-            Some(v) => format!("{}@{v}#{id}", self.artifact),
-            None => format!("{}#{id}", self.artifact),
-        }
+        crate::reference_string(self.artifact, self.version, id)
     }
 
     /// The reference string in backticks, for the end of a line.
@@ -359,10 +385,7 @@ impl<'a> Source<'a> {
 
     /// The artifact and version, for example `pa_2Xc5Rv8Tn1Mb4Kz7@3`.
     pub fn label(&self) -> String {
-        match self.version {
-            Some(v) => format!("{}@{v}", self.artifact),
-            None => self.artifact.to_string(),
-        }
+        crate::version_label(self.artifact, self.version)
     }
 
     pub fn str(&self, key: &str) -> &'a str {
@@ -370,100 +393,110 @@ impl<'a> Source<'a> {
     }
 
     pub fn title(&self) -> String {
-        one_line(self.str("title"))
+        inline(self.str("title"))
     }
 
-    /// The summary, a Markdown text, if there is one.
-    pub fn summary(&self) -> Option<&'a str> {
-        Some(self.str("summary").trim()).filter(|s| !s.is_empty())
+    /// The date of `created_at`, for example `2026-11-08`.
+    pub fn date(&self) -> &'a str {
+        crate::date_of(self.str("created_at"))
+    }
+
+    /// The summary, as a Markdown block (see [`block`]), if there is one.
+    pub fn summary(&self) -> Option<String> {
+        Some(block(self.str("summary"))).filter(|s| !s.is_empty())
+    }
+
+    /// The accepted items, in document order.
+    fn accepted(&self) -> impl Iterator<Item = Item<'a>> + '_ {
+        self.entries
+            .iter()
+            .filter(|e| e.held.is_none())
+            .map(|e| e.item)
     }
 
     /// The accepted items of one type, in document order.
     pub fn of(&self, t: ItemType) -> Vec<Item<'a>> {
-        self.items
-            .iter()
-            .filter(|i| i.item_type == Some(t))
-            .copied()
-            .collect()
+        self.accepted().filter(|i| i.item_type == Some(t)).collect()
     }
 
     /// The accepted item with this ID.
     pub fn get(&self, id: &str) -> Option<Item<'a>> {
-        self.items.iter().find(|i| i.id == id).copied()
+        let entry = &self.entries[*self.index.get(id)?];
+        entry.held.is_none().then_some(entry.item)
     }
 
-    pub fn not_exported(&self, item: &Item, reason: &str) -> NotExported {
+    /// The accepted success signals that verify one of these item IDs, in
+    /// document order, each one once.
+    pub fn signals_for(&self, ids: &[&str]) -> Vec<Item<'a>> {
+        let mut out: Vec<Item<'a>> = Vec::new();
+        for id in ids {
+            for s in self.verified_by.get(id).into_iter().flatten() {
+                if !out.iter().any(|x| x.id == s.id) {
+                    out.push(*s);
+                }
+            }
+        }
+        out.sort_by_key(|s| self.index[s.id]);
+        out
+    }
+
+    fn not_exported(&self, item: &Item, reason: String) -> NotExported {
         NotExported {
             reference: self.reference(item.id),
             id: item.id.to_string(),
             item_type: item.str("type").to_string(),
-            reason: reason.to_string(),
+            reason,
         }
     }
 
-    /// The items that are never exported, and the accepted items of the
-    /// given types, which the tool has no place for. In document order.
+    /// The items that are not exported, in document order: items that are
+    /// not accepted, critiques, items of an unknown type and accepted items
+    /// of the given types, which the tool has no place for.
     pub fn skipped(&self, tool: Tool, types: &[ItemType]) -> Vec<NotExported> {
-        let mut out = Vec::new();
-        for value in self
-            .doc
-            .get("items")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            let Some(id) = value.get("id").and_then(Value::as_str) else {
-                continue;
-            };
-            if let Some(held) = self.held_back.iter().find(|n| n.id == id) {
-                if !out.iter().any(|n: &NotExported| n.id == id) {
-                    out.push(held.clone());
-                }
-                continue;
-            }
-            let Some(item) = self.get(id) else { continue };
-            let skip = match item.item_type {
-                Some(t) => types.contains(&t),
-                None => true,
-            };
-            if skip && !out.iter().any(|n: &NotExported| n.id == id) {
-                let reason = match item.item_type {
-                    Some(ItemType::Critique) => {
+        self.entries
+            .iter()
+            .filter_map(|e| {
+                let reason = match (e.held, e.item.item_type) {
+                    (Some(held), _) => held.to_string(),
+                    (None, None) => "the item has no known type".to_string(),
+                    (None, Some(ItemType::Critique)) => {
                         "critiques are not exported: they are about an input, not about what to build"
                             .to_string()
                     }
-                    Some(t) => format!(
+                    (None, Some(t)) if types.contains(&t) => format!(
                         "{} has no place for {}",
                         tool.display_name(),
                         t.section().to_lowercase()
                     ),
-                    None => "the item has no known type".to_string(),
+                    (None, Some(_)) => return None,
                 };
-                out.push(self.not_exported(&item, &reason));
-            }
-        }
-        out
+                Some(self.not_exported(&e.item, reason))
+            })
+            .collect()
     }
 }
 
-/// The "Not exported" note: a Markdown section that lists each item that is
-/// not in the files. Empty if every item is exported.
-pub(crate) fn not_exported_note(source: &Source, items: &[NotExported], heading: &str) -> String {
+/// Writes the "Not exported" note: a Markdown section that lists each item
+/// that is not in the files. Writes nothing if every item is exported.
+pub(crate) fn not_exported_note(
+    out: &mut String,
+    source: &Source,
+    items: &[NotExported],
+    heading: &str,
+) -> fmt::Result {
     if items.is_empty() {
-        return String::new();
+        return Ok(());
     }
-    let mut out = format!(
-        "\n{heading} Not exported\n\n\
-         These items of {} are not in these files. Read them in the OpenSkopos document.\n\n",
+    writeln!(out, "\n{heading} Not exported\n")?;
+    writeln!(
+        out,
+        "These items of {} are not in these files. Read them in the OpenSkopos document.\n",
         source.label()
-    );
+    )?;
     for n in items {
-        out.push_str(&format!(
-            "- `{}` ({}): {}\n",
-            n.reference, n.item_type, n.reason
-        ));
+        writeln!(out, "- `{}` ({}): {}", n.reference, n.item_type, n.reason)?;
     }
-    out
+    Ok(())
 }
 
 /// The words for a constraint modality, for example `Ask first`.
@@ -478,100 +511,90 @@ pub(crate) fn modality(item: &Item) -> &'static str {
     }
 }
 
-/// A constraint as a list item, with its other fields as nested items.
-pub(crate) fn constraint(source: &Source, item: &Item) -> String {
-    let mut out = format!(
-        "- **{}**: {} {}\n",
+/// Writes a constraint as a list item, with its other fields as nested
+/// items.
+pub(crate) fn constraint(out: &mut String, source: &Source, item: &Item) -> fmt::Result {
+    writeln!(
+        out,
+        "- **{}**: {} {}",
         modality(item),
         item.text(),
         source.tag(item.id)
-    );
-    let mut sub = |label: &str, value: Option<String>| {
+    )?;
+    let fields = [
+        ("Why", item.field("rationale")),
+        ("Applies to", item.joined("scope", "; ")),
+        ("Enforced by", item.field("enforced_by")),
+        ("Ask", item.field("approver")),
+        ("Bring", item.joined("bring", "; ")),
+    ];
+    for (label, value) in fields {
         if let Some(v) = value {
-            out.push_str(&format!("  - {label}: {v}\n"));
+            writeln!(out, "  - {label}: {v}")?;
         }
-    };
-    sub("Why", item.field("rationale"));
-    sub(
-        "Applies to",
-        Some(item.list("scope").join("; ")).filter(|s| !s.is_empty()),
-    );
-    sub("Enforced by", item.field("enforced_by"));
-    sub("Ask", item.field("approver"));
-    sub(
-        "Bring",
-        Some(item.list("bring").join("; ")).filter(|s| !s.is_empty()),
-    );
-    out
+    }
+    Ok(())
 }
 
-/// A decision as a section with a heading of the given level.
-pub(crate) fn decision(source: &Source, item: &Item, level: &str) -> String {
-    let mut out = format!("{level} {}: {}\n\n", item.id, item.short());
-    out.push_str(&format!(
-        "- **Decision**: {} {}\n",
+/// Writes a decision as a section with a heading of the given level.
+pub(crate) fn decision(out: &mut String, source: &Source, item: &Item, level: &str) -> fmt::Result {
+    writeln!(out, "{level} {}: {}\n", item.id, item.short())?;
+    writeln!(
+        out,
+        "- **Decision**: {} {}",
         item.text(),
         source.tag(item.id)
-    ));
+    )?;
     if let Some(r) = item.field("rationale") {
-        out.push_str(&format!("- **Rationale**: {r}\n"));
+        writeln!(out, "- **Rationale**: {r}")?;
     }
-    let alternatives = item.list("alternatives");
-    if !alternatives.is_empty() {
-        out.push_str(&format!(
-            "- **Alternatives considered**: {}\n",
-            alternatives.join("; ")
-        ));
+    if let Some(a) = item.joined("alternatives", "; ") {
+        writeln!(out, "- **Alternatives considered**: {a}")?;
     }
-    let consequences = item.list("consequences");
-    if !consequences.is_empty() {
-        out.push_str(&format!(
-            "- **Consequences**: {}\n",
-            consequences.join("; ")
-        ));
+    if let Some(c) = item.joined("consequences", "; ") {
+        writeln!(out, "- **Consequences**: {c}")?;
     }
     if let Some(d) = item.detail() {
-        out.push_str(&format!("\n{d}\n"));
+        writeln!(out, "\n{d}")?;
     }
-    out
+    Ok(())
 }
 
-/// A goal as a list item.
-pub(crate) fn goal(source: &Source, item: &Item) -> String {
-    let mut out = format!("- {} {}\n", item.text(), source.tag(item.id));
+/// Writes a goal as a list item.
+pub(crate) fn goal(out: &mut String, source: &Source, item: &Item) -> fmt::Result {
+    writeln!(out, "- {} {}", item.text(), source.tag(item.id))?;
     if let Some(f) = item.field("for") {
-        out.push_str(&format!("  - For: {f}\n"));
+        writeln!(out, "  - For: {f}")?;
     }
-    out
+    Ok(())
 }
 
-/// A success signal as a list item.
-pub(crate) fn signal(source: &Source, item: &Item) -> String {
-    let mut out = format!("- {} {}\n", item.text(), source.tag(item.id));
+/// Writes a success signal as a list item.
+pub(crate) fn signal(out: &mut String, source: &Source, item: &Item) -> fmt::Result {
+    writeln!(out, "- {} {}", item.text(), source.tag(item.id))?;
     if let Some(v) = item.field("verification") {
-        out.push_str(&format!("  - Verification: {v}\n"));
+        writeln!(out, "  - Verification: {v}")?;
     }
-    out
+    Ok(())
 }
 
-/// A term as a list item: `**word**: definition`.
-pub(crate) fn term(source: &Source, item: &Item) -> String {
-    let mut out = format!(
-        "- **{}**: {} {}\n",
-        item.text(),
+/// Writes a term as a list item: `**word**: definition`.
+pub(crate) fn term(out: &mut String, source: &Source, item: &Item) -> fmt::Result {
+    writeln!(
+        out,
+        "- **{}**: {} {}",
+        bold(&item.text()),
         item.field("definition").unwrap_or_default(),
         source.tag(item.id)
-    );
-    let aliases = item.list("aliases");
-    if !aliases.is_empty() {
-        out.push_str(&format!("  - Also called: {}\n", aliases.join(", ")));
+    )?;
+    if let Some(a) = item.joined("aliases", ", ") {
+        writeln!(out, "  - Also called: {a}")?;
     }
-    let names = item.list("code_names");
+    let names: Vec<String> = item.list("code_names").iter().map(|n| code(n)).collect();
     if !names.is_empty() {
-        let names: Vec<String> = names.iter().map(|n| format!("`{n}`")).collect();
-        out.push_str(&format!("  - In the code: {}\n", names.join(", ")));
+        writeln!(out, "  - In the code: {}", names.join(", "))?;
     }
-    out
+    Ok(())
 }
 
 /// The label of an example kind.
@@ -583,22 +606,13 @@ pub(crate) fn example_label(kind: &str) -> &'static str {
     }
 }
 
-/// The success signals that verify one of these item IDs, in document order.
-pub(crate) fn signals_for<'a>(source: &Source<'a>, ids: &[&str]) -> Vec<Item<'a>> {
-    source
-        .of(ItemType::SuccessSignal)
-        .into_iter()
-        .filter(|s| {
-            s.links("verifies", source.artifact)
-                .iter()
-                .any(|v| ids.contains(v))
-        })
-        .collect()
-}
-
-/// Text on one line: line breaks and runs of spaces become one space.
-pub(crate) fn one_line(text: &str) -> String {
-    text.split_whitespace().collect::<Vec<_>>().join(" ")
+/// `1 word` or `n words`.
+pub(crate) fn plural(n: usize, word: &str) -> String {
+    if n == 1 {
+        format!("1 {word}")
+    } else {
+        format!("{n} {word}s")
+    }
 }
 
 /// Indents every line of a Markdown text, for a block inside a list item.
@@ -615,22 +629,104 @@ pub(crate) fn indent(text: &str, by: &str) -> String {
         .join("\n")
 }
 
+/// Plain text for one line of Markdown: line breaks and runs of spaces become
+/// one space. A `#` at the start gets a backslash, so that the line cannot be
+/// read as a heading.
+pub(crate) fn inline(text: &str) -> String {
+    let line = crate::one_line(text);
+    if line.starts_with('#') {
+        format!("\\{line}")
+    } else {
+        line
+    }
+}
+
+/// Text for inside `**...**`: each `*` gets a backslash.
+pub(crate) fn bold(text: &str) -> String {
+    text.replace('*', "\\*")
+}
+
+/// Text in backticks. A text with a backtick gets two backticks and spaces,
+/// as CommonMark allows.
+pub(crate) fn code(text: &str) -> String {
+    if text.contains('`') {
+        format!("`` {text} ``")
+    } else {
+        format!("`{text}`")
+    }
+}
+
+/// A Markdown text (a `detail` or the `summary`) as a block that cannot start
+/// a section of the tool's file. Each ATX heading outside a code fence, such
+/// as `## Background`, becomes a bold line. Tools read the headings of their
+/// files, for example OpenSpec ends a requirement at a `##` heading.
+/// Surrounding blank lines are removed.
+pub(crate) fn block(markdown: &str) -> String {
+    // The open fence: its character and length.
+    let mut fence: Option<(char, usize)> = None;
+    let mut out = Vec::new();
+    for line in markdown.trim().lines() {
+        let trimmed = line.trim_start_matches(' ');
+        let indent = line.len() - trimmed.len();
+        let marker = trimmed.chars().next().filter(|c| *c == '`' || *c == '~');
+        if indent <= 3 {
+            if let Some(c) = marker {
+                let run = trimmed.chars().take_while(|x| *x == c).count();
+                if run >= 3 {
+                    match fence {
+                        None => fence = Some((c, run)),
+                        Some((open, len))
+                            if open == c && run >= len && trimmed[run..].trim().is_empty() =>
+                        {
+                            fence = None
+                        }
+                        Some(_) => {}
+                    }
+                    out.push(line.to_string());
+                    continue;
+                }
+            }
+        }
+        match (fence, heading_text(line)) {
+            (None, Some("")) => out.push(String::new()),
+            (None, Some(text)) => out.push(format!("**{}**", bold(text))),
+            _ => out.push(line.to_string()),
+        }
+    }
+    out.join("\n").trim().to_string()
+}
+
+/// The text of an ATX heading line such as `## Background ##`, or `None` if
+/// the line is not a heading.
+fn heading_text(line: &str) -> Option<&str> {
+    let trimmed = line.trim_start_matches(' ');
+    if line.len() - trimmed.len() > 3 {
+        return None;
+    }
+    let level = trimmed.chars().take_while(|c| *c == '#').count();
+    if !(1..=6).contains(&level) {
+        return None;
+    }
+    let rest = &trimmed[level..];
+    if !(rest.is_empty() || rest.starts_with([' ', '\t'])) {
+        return None;
+    }
+    let rest = rest.trim();
+    // A closing run of `#` after a space is not part of the text.
+    let without_closing = rest.trim_end_matches('#');
+    if without_closing.is_empty() || without_closing.ends_with([' ', '\t']) {
+        return Some(without_closing.trim_end());
+    }
+    Some(rest)
+}
+
 /// A name in kebab case: lowercase ASCII letters and digits, with `-`
 /// between words, at most 50 characters, cut at a word.
 pub(crate) fn slug(text: &str) -> String {
-    let mut words: Vec<String> = Vec::new();
-    let mut word = String::new();
-    for c in text.chars() {
-        if c.is_ascii_alphanumeric() {
-            word.push(c.to_ascii_lowercase());
-        } else if !word.is_empty() {
-            words.push(std::mem::take(&mut word));
-        }
-    }
-    if !word.is_empty() {
-        words.push(word);
-    }
     let mut out = String::new();
+    let words = text
+        .split(|c: char| !c.is_ascii_alphanumeric())
+        .filter(|w| !w.is_empty());
     for w in words {
         if !out.is_empty() && out.len() + 1 + w.len() > 50 {
             break;
@@ -638,20 +734,28 @@ pub(crate) fn slug(text: &str) -> String {
         if !out.is_empty() {
             out.push('-');
         }
-        out.push_str(&w);
+        out.push_str(&w.to_ascii_lowercase());
     }
     out.truncate(50);
     out
 }
 
 /// The first sentence of a text, at most about 60 characters, cut at a word,
-/// with no full stop at the end.
+/// with no full stop at the end. A sentence ends at `.`, `?` or `!` before a
+/// space or the end of the text, so `v2.5` and `e.g.` do not end it.
 pub(crate) fn short_title(text: &str) -> String {
-    let first = text
-        .split_inclusive(['.', '?', '!'])
-        .next()
-        .unwrap_or(text)
-        .trim();
+    let mut end = text.len();
+    let mut chars = text.char_indices().peekable();
+    while let Some((i, c)) = chars.next() {
+        if matches!(c, '.' | '?' | '!') && chars.peek().is_none_or(|(_, n)| n.is_whitespace()) {
+            end = i + c.len_utf8();
+            if !is_abbreviation(&text[..end]) {
+                break;
+            }
+            end = text.len();
+        }
+    }
+    let first = text[..end].trim();
     let first = first.strip_suffix('.').unwrap_or(first);
     if first.chars().count() <= 60 {
         return first.to_string();
@@ -671,6 +775,12 @@ pub(crate) fn short_title(text: &str) -> String {
     }
     out.push_str("...");
     out
+}
+
+/// True if a text ends with a common abbreviation, such as `e.g.`.
+fn is_abbreviation(text: &str) -> bool {
+    let last = text.rsplit(' ').next().unwrap_or(text).to_ascii_lowercase();
+    matches!(last.as_str(), "e.g." | "i.e." | "etc." | "vs." | "approx.")
 }
 
 #[cfg(test)]
@@ -702,6 +812,38 @@ mod tests {
             long.ends_with("...") && long.chars().count() <= 60,
             "{long}"
         );
+    }
+
+    #[test]
+    fn short_title_does_not_end_inside_numbers_or_abbreviations() {
+        assert_eq!(
+            short_title("Support API v2.5 for all clients."),
+            "Support API v2.5 for all clients"
+        );
+        assert_eq!(
+            short_title("Use a cache, e.g. Redis. Then more."),
+            "Use a cache, e.g. Redis"
+        );
+    }
+
+    #[test]
+    fn block_turns_headings_into_bold_lines_outside_fences() {
+        let md = "\n## Background\nWhy.\n\n### Requirement: fake ###\n```sh\n# a comment\n## not a heading\n```\n#hashtag\n    # indented code\n";
+        assert_eq!(
+            block(md),
+            "**Background**\nWhy.\n\n**Requirement: fake**\n```sh\n# a comment\n## not a heading\n```\n#hashtag\n    # indented code"
+        );
+        assert_eq!(
+            block("~~~\n# x\n```\n# y\n~~~\n# z"),
+            "~~~\n# x\n```\n# y\n~~~\n**z**"
+        );
+    }
+
+    #[test]
+    fn inline_text_cannot_start_a_heading() {
+        assert_eq!(inline("## Not\na heading"), "\\## Not a heading");
+        assert_eq!(bold("a*b"), "a\\*b");
+        assert_eq!(code("a`b"), "`` a`b ``");
     }
 
     #[test]
