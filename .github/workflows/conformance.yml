@@ -8,6 +8,9 @@ on:
 permissions:
   contents: read
 
+env:
+  CARGO_TERM_COLOR: always
+
 jobs:
   conformance:
     runs-on: ubuntu-latest
@@ -31,3 +34,43 @@ jobs:
       # The runner image has a stable Rust toolchain.
       - name: Check the conformance cases against the schema
         run: cargo run --locked --manifest-path conformance/runner/Cargo.toml
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the layout of the Rust code
+        run: cargo fmt --check -p skopos-core -p skopos
+      - name: Run clippy
+        run: cargo clippy --workspace --all-targets --locked -- -D warnings
+      # The tests run every conformance case through skopos-core and through
+      # the skopos binary.
+      - name: Run the tests
+        run: cargo test --workspace --locked
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add wasm32-unknown-unknown
+      # .cargo/config.toml sets the getrandom backend for this target.
+      - name: Build skopos-core for WebAssembly
+        run: cargo build -p skopos-core --target wasm32-unknown-unknown --locked
+
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install the skopos CLI
+        run: cargo install --locked --path crates/skopos
+      - name: Run the conformance cases with the installed CLI
+        run: |
+          jq -r '.cases[].file | "conformance/valid/" + .' conformance/valid/index.json | xargs skopos check
+          status=0
+          for file in $(jq -r '.cases[].file' conformance/invalid/index.json); do
+            if skopos check "conformance/invalid/$file" > /dev/null 2>&1; then
+              echo "::error file=conformance/invalid/$file::skopos accepted an invalid document"
+              status=1
+            fi
+          done
+          exit $status

@@ -20,7 +20,7 @@ conformance/
     generous/<case>/     A hand-written Markdown file and the document that a reader makes from it
     next-version/<case>/ A stored version, an edited Markdown file and what the tool stores
     invalid/<case>/      Markdown files that a reader must reject
-  runner/                The check that CI runs (Rust)
+  runner/                A check of the cases themselves (Rust)
 ```
 
 ### valid/
@@ -70,7 +70,12 @@ request. It does these checks:
 - Each file and folder is in its `index.json`.
 
 The runner does not read or write Markdown. That is the job of the reference
-implementation, which will run the Markdown cases when it exists.
+implementation in [`crates/`](../crates/).
+
+The tests of the reference implementation also run the cases in `valid/` and
+`invalid/`, through the library `skopos-core` and through the `skopos`
+command line tool. To run them, run `cargo test` from the root of the
+repository.
 
 To run the runner with Rust installed, run this command from the root of the
 repository:
