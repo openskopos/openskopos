@@ -1,0 +1,31 @@
+{
+  "name": "@openskopos/cli",
+  "version": "0.1.0",
+  "description": "The skopos command line tool for OpenSkopos documents, for Node on every platform.",
+  "keywords": [
+    "openskopos",
+    "cli",
+    "specification",
+    "ai-agents"
+  ],
+  "homepage": "https://openskopos.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openskopos/openskopos.git",
+    "directory": "npm/cli"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "bin": {
+    "skopos": "bin/skopos.js"
+  },
+  "files": [
+    "bin/skopos.js"
+  ],
+  "dependencies": {
+    "@openskopos/core": "0.1.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

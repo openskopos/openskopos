@@ -13,3 +13,12 @@ jsonschema = { version = "0.33", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml_ng = "0.10"
+
+# The WebAssembly build for npm: small code, and one unit so that the
+# optimizer sees all of it. `cargo build --profile wasm` uses it.
+[profile.wasm]
+inherits = "release"
+opt-level = "s"
+lto = true
+codegen-units = 1
+panic = "abort"

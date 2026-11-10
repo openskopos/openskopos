@@ -4,6 +4,12 @@
 documents. It reads and writes files. The library
 [`skopos-core`](../skopos-core/README.md) does the other work.
 
+The commands are in the library of this crate (`src/lib.rs`), behind the
+trait `Host`, which reads and writes the files and the terminal. The binary
+gives a host that uses the standard library. The WebAssembly build in
+[`skopos-wasm`](../skopos-wasm/README.md) gives a host that uses Node. So the
+npm package `@openskopos/cli` has the same commands, output and exit codes.
+
 ## Install
 
 To install the tool from a clone of the repository, run this command from the
@@ -12,6 +18,10 @@ root of the repository:
 ```bash
 cargo install --locked --path crates/skopos
 ```
+
+The npm package [`@openskopos/cli`](../../npm/cli/README.md) has the same
+tool for Node. To run it with no installation, use
+`npx @openskopos/cli check FILE`.
 
 ## Commands
 
