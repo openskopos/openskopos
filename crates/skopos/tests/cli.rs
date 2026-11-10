@@ -126,13 +126,13 @@ fn check_reports_a_file_that_it_cannot_read() {
     let dir = temp_dir("unreadable");
     let bad = dir.join("broken.json");
     fs::write(&bad, "{ not json").unwrap();
-    let md = dir.join("INTENT.md");
-    fs::write(&md, "# Intent\n").unwrap();
+    let txt = dir.join("intent.txt");
+    fs::write(&txt, "# Intent\n").unwrap();
     let out = skopos(&[
         "check",
         "--json",
         bad.to_str().unwrap(),
-        md.to_str().unwrap(),
+        txt.to_str().unwrap(),
     ]);
     assert_eq!(out.status.code(), Some(1));
     let results = stdout_json(&out);
@@ -143,7 +143,7 @@ fn check_reports_a_file_that_it_cannot_read() {
     assert!(results[1]["problems"][0]["message"]
         .as_str()
         .unwrap()
-        .contains("Markdown"));
+        .contains(".md"));
 }
 
 #[test]
@@ -254,4 +254,167 @@ fn ids_rejects_an_item_with_no_type() {
     assert_eq!(out.status.code(), Some(1));
     assert!(String::from_utf8_lossy(&out.stderr).contains("/items/0/type"));
     assert_eq!(fs::read_to_string(&file).unwrap(), before);
+}
+
+/// The files of the Markdown cases in one group of `conformance/markdown/`.
+fn markdown_files(group: &str) -> Vec<String> {
+    let text = fs::read_to_string(conformance().join("markdown/index.json")).unwrap();
+    let index: Value = serde_json::from_str(&text).unwrap();
+    index[group]
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|c| {
+            let dir = conformance()
+                .join("markdown")
+                .join(group)
+                .join(c["case"].as_str().unwrap());
+            dir.join(c["file"].as_str().unwrap()).display().to_string()
+        })
+        .collect()
+}
+
+#[test]
+fn check_reads_markdown() {
+    let files = markdown_files("generous");
+    let mut args = vec!["check"];
+    args.extend(files.iter().map(String::as_str));
+    let out = skopos(&args);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    // The warnings go to standard error, with their lines.
+    let stderr = String::from_utf8(out.stderr).unwrap();
+    assert!(stderr.contains("SPEC.md: warning: line 16: "), "{stderr}");
+
+    for file in markdown_files("invalid") {
+        let out = skopos(&["check", "--json", &file]);
+        assert_eq!(out.status.code(), Some(1), "{file}");
+        let problems = &stdout_json(&out)[0]["problems"];
+        assert!(!problems.as_array().unwrap().is_empty(), "{file}");
+    }
+}
+
+#[test]
+fn convert_to_markdown_and_back_keeps_the_document() {
+    let dir = temp_dir("convert-md");
+    let source = conformance().join("valid/spec-all-types-v3.json");
+    let md = dir.join("SPEC.md");
+    assert!(skopos(&[
+        "convert",
+        "--to",
+        "md",
+        source.to_str().unwrap(),
+        "-o",
+        md.to_str().unwrap()
+    ])
+    .status
+    .success());
+    let out = skopos(&["convert", "--to", "json", md.to_str().unwrap()]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let original: Value = serde_json::from_str(&fs::read_to_string(&source).unwrap()).unwrap();
+    // Markdown keeps the order of items within a type, and every field.
+    let by_id = |d: &Value| {
+        let mut items = d["items"].as_array().unwrap().clone();
+        items.sort_by_key(|i| i["id"].as_str().unwrap().to_string());
+        items
+    };
+    let back = stdout_json(&out);
+    assert_eq!(by_id(&back), by_id(&original));
+    let mut a = back.clone();
+    let mut b = original.clone();
+    a.as_object_mut().unwrap().remove("items");
+    b.as_object_mut().unwrap().remove("items");
+    assert_eq!(a, b);
+}
+
+#[test]
+fn convert_to_markdown_copies_material_from_inputs() {
+    let case = conformance().join("markdown/round-trip/03-copied-material");
+    let input = case.join("inputs/pa_3fQ8nV2kLm7Xc1Rt@1.json");
+    let out = skopos(&[
+        "convert",
+        "--to",
+        "markdown",
+        case.join("document.json").to_str().unwrap(),
+        "--input",
+        input.to_str().unwrap(),
+    ]);
+    assert!(out.status.success());
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(text.contains("\n## From other artifacts\n"), "{text}");
+    assert!(text.contains("\n- pa_3fQ8nV2kLm7Xc1Rt@1#CR1: "), "{text}");
+}
+
+#[test]
+fn import_stores_the_next_version() {
+    let dir = temp_dir("import");
+    for (case, version, message) in [
+        ("01-edit-final-version", 3, "new draft version 3"),
+        ("02-unchanged-final-version", 2, "no change"),
+        ("03-edit-draft", 3, "replaces draft version 3"),
+    ] {
+        let case_dir = conformance().join("markdown/next-version").join(case);
+        let output = dir.join(format!("{case}.json"));
+        let out = skopos(&[
+            "import",
+            case_dir.join("edited.md").to_str().unwrap(),
+            "--stored",
+            case_dir.join("stored.json").to_str().unwrap(),
+            "-o",
+            output.to_str().unwrap(),
+        ]);
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(out.status.success(), "{case}: {stderr}");
+        assert!(stderr.contains(message), "{case}: {stderr}");
+        let got: Value = serde_json::from_str(&fs::read_to_string(&output).unwrap()).unwrap();
+        assert_eq!(got["version"], version, "{case}");
+        assert!(skopos(&["check", output.to_str().unwrap()])
+            .status
+            .success());
+    }
+}
+
+#[test]
+fn fmt_and_ids_do_not_take_markdown() {
+    let file = conformance().join("markdown/generous/01-start-from-scratch/INTENT.md");
+    for command in ["fmt", "ids"] {
+        let out = skopos(&[command, file.to_str().unwrap()]);
+        assert_eq!(out.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&out.stderr).contains("skopos convert"));
+    }
+}
+
+#[test]
+fn import_of_an_unchanged_draft_says_that_it_replaces_the_draft() {
+    let dir = temp_dir("import-draft");
+    let stored = conformance().join("markdown/round-trip/01-all-item-types/document.json");
+    let md = dir.join("SPEC.md");
+    assert!(skopos(&[
+        "convert",
+        "--to",
+        "md",
+        stored.to_str().unwrap(),
+        "-o",
+        md.to_str().unwrap()
+    ])
+    .status
+    .success());
+    let out = skopos(&[
+        "import",
+        md.to_str().unwrap(),
+        "--stored",
+        stored.to_str().unwrap(),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("replaces draft version 3"), "{stderr}");
+    let original: Value = serde_json::from_str(&fs::read_to_string(&stored).unwrap()).unwrap();
+    assert_eq!(stdout_json(&out)["version"], original["version"]);
 }

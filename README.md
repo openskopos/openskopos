@@ -43,8 +43,9 @@ edited by hand and read back.
 
 ## Tools
 
-The `skopos` command line tool checks, formats and converts documents, and
-gives IDs to new items. To install it from a clone of this repository, run
+The `skopos` command line tool checks, formats and converts documents in
+JSON, YAML and Markdown, and gives IDs to new items. It also reads an edited
+Markdown file back into the next version of a document. To install it from a clone of this repository, run
 this command:
 
 ```bash

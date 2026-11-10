@@ -9,13 +9,13 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
-use skopos_core::{assign_ids, check, parse, write, Format, Problem, Value};
+use skopos_core::{assign_ids, check, markdown, parse, write, Format, Problem, Value};
 
 #[derive(Parser)]
 #[command(
     name = "skopos",
     version,
-    about = "Check, format and convert OpenSkopos documents"
+    about = "Check, format, convert and import OpenSkopos documents"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -28,7 +28,7 @@ enum Command {
     ///
     /// The exit code is 1 if a document has a problem.
     Check {
-        /// JSON or YAML files (.json, .yaml or .yml)
+        /// JSON, YAML or Markdown files (.json, .yaml, .yml or .md)
         #[arg(required = true)]
         files: Vec<PathBuf>,
         /// Write the problems as JSON
@@ -45,14 +45,37 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
-    /// Convert a document between JSON and YAML.
+    /// Convert a document between JSON, YAML and Markdown.
     Convert {
-        /// A JSON or YAML file
+        /// A JSON, YAML or Markdown file
         file: PathBuf,
         /// The format to write
         #[arg(long, value_enum)]
         to: Target,
         /// The file to write. Without it, the document goes to standard output.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// For Markdown: another document to copy material from, such as a
+        /// pinned glossary (section 10.7 of the specification). Give it once
+        /// for each document.
+        #[arg(long = "input", value_name = "FILE")]
+        inputs: Vec<PathBuf>,
+    },
+    /// Read an edited Markdown file of a stored version, and write the
+    /// version to store (section 10.8 of the specification).
+    ///
+    /// If the stored version is final and the content changed, the result is
+    /// the next version as a draft. If it is final and the content did not
+    /// change, the result is the stored version. If it is a draft, the file
+    /// replaces it and it keeps its version number.
+    Import {
+        /// The edited Markdown file
+        file: PathBuf,
+        /// The stored version, as JSON or YAML
+        #[arg(long, value_name = "FILE")]
+        stored: PathBuf,
+        /// The file to write, as JSON or YAML. Without it, the document goes
+        /// to standard output in the format of the stored version.
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
@@ -76,6 +99,15 @@ enum Command {
 enum Target {
     Json,
     Yaml,
+    #[value(alias = "md")]
+    Markdown,
+}
+
+/// The format of a file.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum FileFormat {
+    Data(Format),
+    Markdown,
 }
 
 fn main() -> ExitCode {
@@ -83,7 +115,17 @@ fn main() -> ExitCode {
     let ok = match cli.command {
         Command::Check { files, json } => run_check(&files, json),
         Command::Fmt { files, check } => run_fmt(&files, check),
-        Command::Convert { file, to, output } => run_convert(&file, to, output.as_deref()),
+        Command::Convert {
+            file,
+            to,
+            output,
+            inputs,
+        } => run_convert(&file, to, output.as_deref(), &inputs),
+        Command::Import {
+            file,
+            stored,
+            output,
+        } => run_import(&file, &stored, output.as_deref()),
         Command::Ids { files, check } => run_ids(&files, check),
     };
     if ok {
@@ -94,27 +136,87 @@ fn main() -> ExitCode {
 }
 
 /// The format of a file, from its name.
-fn format_of(path: &Path) -> Result<Format, String> {
+fn format_of(path: &Path) -> Result<FileFormat, Problem> {
     match path
         .extension()
         .and_then(|e| e.to_str())
         .map(str::to_ascii_lowercase)
         .as_deref()
     {
-        Some("json") => Ok(Format::Json),
-        Some("yaml") | Some("yml") => Ok(Format::Yaml),
-        Some("md") => Err("this version of skopos cannot read Markdown yet".to_string()),
-        _ => Err("the file name must end with .json, .yaml or .yml".to_string()),
+        Some("json") => Ok(FileFormat::Data(Format::Json)),
+        Some("yaml") | Some("yml") => Ok(FileFormat::Data(Format::Yaml)),
+        Some("md") | Some("markdown") => Ok(FileFormat::Markdown),
+        _ => Err(Problem::new(
+            "",
+            "the file name must end with .json, .yaml, .yml or .md",
+        )),
     }
 }
 
-/// Reads a file into its format, its text and its value.
+/// The format of a JSON or YAML file, from its name.
+fn data_format_of(path: &Path) -> Result<Format, Problem> {
+    match format_of(path)? {
+        FileFormat::Data(format) => Ok(format),
+        FileFormat::Markdown => Err(Problem::new(
+            "",
+            "this command works on JSON and YAML files. To read Markdown, use skopos convert or skopos import",
+        )),
+    }
+}
+
+/// Reads a JSON or YAML file into its format, its text and its value.
 fn read(path: &Path) -> Result<(Format, String, Value), Problem> {
-    let format = format_of(path).map_err(|e| Problem::new("", e))?;
-    let text = fs::read_to_string(path)
-        .map_err(|e| Problem::new("", format!("cannot read the file: {e}")))?;
+    let format = data_format_of(path)?;
+    let text = read_text(path)?;
     let doc = parse(&text, format)?;
     Ok((format, text, doc))
+}
+
+fn read_text(path: &Path) -> Result<String, Problem> {
+    fs::read_to_string(path).map_err(|e| Problem::new("", format!("cannot read the file: {e}")))
+}
+
+/// Reads a JSON, YAML or Markdown file into a document. Warnings go to
+/// standard error.
+fn read_any(path: &Path) -> Result<Value, Vec<Problem>> {
+    read_any_with_format(path).map(|(doc, _)| doc)
+}
+
+/// [`read_any`], with the format of the file. The reader of Markdown checks
+/// the document, so a Markdown document that it gives has no problems.
+fn read_any_with_format(path: &Path) -> Result<(Value, FileFormat), Vec<Problem>> {
+    match format_of(path).map_err(|p| vec![p])? {
+        FileFormat::Data(format) => {
+            let text = read_text(path).map_err(|p| vec![p])?;
+            let doc = parse(&text, format).map_err(|p| vec![p])?;
+            Ok((doc, FileFormat::Data(format)))
+        }
+        FileFormat::Markdown => {
+            let text = read_text(path).map_err(|p| vec![p])?;
+            let name = path.file_name().and_then(|n| n.to_str());
+            match markdown::read(&text, name) {
+                Ok((doc, warnings)) => {
+                    for w in &warnings {
+                        eprintln!("{}: warning: {w}", path.display());
+                    }
+                    Ok((doc, FileFormat::Markdown))
+                }
+                Err(errors) => Err(errors.iter().map(markdown_problem).collect()),
+            }
+        }
+    }
+}
+
+/// A Markdown error as a problem. The message starts with the line.
+fn markdown_problem(e: &markdown::Error) -> Problem {
+    let line = e.line.map(|l| format!("line {l}: ")).unwrap_or_default();
+    match &e.problem {
+        Some(p) => Problem {
+            message: format!("{line}{}", p.message),
+            ..p.clone()
+        },
+        None => Problem::new("", format!("{line}{}", e.message)),
+    }
 }
 
 /// Writes text to standard output. If the reader closed the pipe, for example
@@ -155,9 +257,11 @@ fn run_check(files: &[PathBuf], json: bool) -> bool {
         .iter()
         .map(|path| FileProblems {
             file: path.display().to_string(),
-            problems: match read(path) {
-                Ok((_, _, doc)) => check(&doc),
-                Err(problem) => vec![problem],
+            problems: match read_any_with_format(path) {
+                // The Markdown reader already checked the document.
+                Ok((_, FileFormat::Markdown)) => vec![],
+                Ok((doc, FileFormat::Data(_))) => check(&doc),
+                Err(problems) => problems,
             },
         })
         .collect();
@@ -221,18 +325,87 @@ fn run_fmt(files: &[PathBuf], check_only: bool) -> bool {
     ok
 }
 
-fn run_convert(file: &Path, to: Target, output: Option<&Path>) -> bool {
-    let doc = match read(file) {
-        Ok((_, _, doc)) => doc,
+fn run_convert(file: &Path, to: Target, output: Option<&Path>, inputs: &[PathBuf]) -> bool {
+    let Some(doc) = read_or_report(file) else {
+        return false;
+    };
+    let text = match to {
+        Target::Json => write(&doc, Format::Json),
+        Target::Yaml => write(&doc, Format::Yaml),
+        Target::Markdown => {
+            let mut others = Vec::with_capacity(inputs.len());
+            for path in inputs {
+                others.push(match read_or_report(path) {
+                    Some(doc) => doc,
+                    None => return false,
+                });
+            }
+            markdown::write(&doc, &others)
+        }
+    };
+    match output {
+        Some(path) => write_file(path, &text),
+        None => emit(&text),
+    }
+}
+
+/// Reads a file, or reports its problems and gives `None`.
+fn read_or_report(path: &Path) -> Option<Value> {
+    match read_any(path) {
+        Ok(doc) => Some(doc),
+        Err(problems) => {
+            for p in &problems {
+                report(path, p);
+            }
+            None
+        }
+    }
+}
+
+fn run_import(file: &Path, stored_path: &Path, output: Option<&Path>) -> bool {
+    if format_of(file).ok() != Some(FileFormat::Markdown) {
+        report(file, &Problem::new("", "the file name must end with .md"));
+        return false;
+    }
+    let (stored_format, _, stored) = match read(stored_path) {
+        Ok(r) => r,
         Err(problem) => {
-            report(file, &problem);
+            report(stored_path, &problem);
             return false;
         }
     };
-    let format = match to {
-        Target::Json => Format::Json,
-        Target::Yaml => Format::Yaml,
+    let format = match output.map(data_format_of) {
+        Some(Ok(format)) => format,
+        Some(Err(problem)) => {
+            report(output.expect("given"), &problem);
+            return false;
+        }
+        None => stored_format,
     };
+    let Some(read_doc) = read_or_report(file) else {
+        return false;
+    };
+    let doc = markdown::next_version(&stored, &read_doc);
+    let problems = check(&doc);
+    if !problems.is_empty() {
+        for p in &problems {
+            report(file, p);
+        }
+        return false;
+    }
+    let version = |d: &Value| d.get("version").map(Value::to_string).unwrap_or_default();
+    let stored_final = stored.get("status").and_then(Value::as_str) == Some("final");
+    let what = if !stored_final {
+        format!("the file replaces draft version {}", version(&doc))
+    } else if doc == stored {
+        format!(
+            "no change: version {} is final and its content is the same",
+            version(&stored)
+        )
+    } else {
+        format!("new draft version {}", version(&doc))
+    };
+    eprintln!("{}: {what}", file.display());
     let text = write(&doc, format);
     match output {
         Some(path) => write_file(path, &text),

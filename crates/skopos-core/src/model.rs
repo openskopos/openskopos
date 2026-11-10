@@ -149,6 +149,60 @@ pub struct ArtifactParent {
     pub title: Option<String>,
 }
 
+/// Gives each enum an `ALL` list of its values, in the order of the
+/// specification. A match in the macro makes the build fail if a value is
+/// missing from the list.
+macro_rules! all_values {
+    ($($ty:ident: [$($v:ident),+ $(,)?];)+) => {$(
+        impl $ty {
+            /// Every value, in the order of the specification.
+            pub const ALL: &'static [$ty] = &[$($ty::$v),+];
+
+            #[allow(dead_code)]
+            fn all_is_complete(self) {
+                match self {
+                    $($ty::$v)|+ => {}
+                }
+            }
+        }
+    )+};
+}
+
+all_values! {
+    DocumentStatus: [Draft, Final];
+    ItemStatus: [Proposed, Accepted, Rejected];
+    Priority: [Must, Should, Could];
+    ExampleKind: [Normal, Edge, Forbidden];
+    Modality: [Always, Never, AskFirst, Prefer, Avoid];
+    Confirmation: [Unconfirmed, Confirmed, Refuted];
+    Level: [Low, Medium, High];
+    Severity: [Blocker, Major, Minor, Note];
+    Category: [
+        Ambiguity,
+        Gap,
+        Conflict,
+        Untestable,
+        Incorrect,
+        UnstatedAssumption,
+        ScopeCreep,
+        OverSpecified,
+        Other,
+    ];
+    Outcome: [Open, FixSpec, FixCode, AcceptRisk, Defer];
+    RefRel: [
+        Refines,
+        DerivedFrom,
+        DependsOn,
+        Threatens,
+        Mitigates,
+        Resolves,
+        Verifies,
+        Supersedes,
+        Contradicts,
+        RelatesTo,
+    ];
+}
+
 /// Material that is not an OpenSkopos document, as a parent.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]

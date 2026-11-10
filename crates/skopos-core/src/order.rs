@@ -32,7 +32,7 @@ pub(crate) enum Shape {
     Free,
 }
 
-const DOCUMENT: &[&str] = &[
+pub(crate) const DOCUMENT: &[&str] = &[
     "$schema",
     "id",
     "version",
