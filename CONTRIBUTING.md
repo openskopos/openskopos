@@ -21,8 +21,11 @@ Thank you for your interest in OpenSkopos. You can contribute in these ways:
    - An entry in [spec/CHANGELOG.md](spec/CHANGELOG.md). If the change breaks
      existing documents, say so and say how to migrate them.
 
-Do not edit a published schema file. A published file never changes. A change
-to a published version goes into a new version, with a new schema file.
+Do not edit a published schema file. A schema file is published when its tag
+`schema-<version>` exists, for example `schema-0.1`. A published file never
+changes, and CI fails if it changes. A change to a published version goes into
+a new version, with a new schema file. Until its tag exists, a schema file is a
+draft and can change.
 
 ## Add conformance cases
 

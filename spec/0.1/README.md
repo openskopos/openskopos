@@ -13,7 +13,8 @@ This specification is for people who write tools that read or write OpenSkopos
 documents, and for people who want to know exactly what a file means.
 
 - JSON Schema: [`schema/artifact/0.1.json`](../../schema/artifact/0.1.json),
-  published at `https://openskopos.org/schema/artifact/0.1.json`
+  served at `https://openskopos.org/schema/artifact/0.1.json` once it is
+  published
 - Conformance cases: [`conformance/`](../../conformance/)
 - Changes between versions: [CHANGELOG.md](../CHANGELOG.md)
 
@@ -847,8 +848,12 @@ https://openskopos.org/schema/artifact/<format version>.json
   documents to the new version.
 - From 1.0, a minor version (1.0 to 1.1) only adds things: optional fields,
   item types or enum values. A major version (2.0) is a breaking change.
-- A published schema file never changes. A change publishes a new file with a
-  new version.
+- The maintainers publish a schema version with the git tag
+  `schema-<version>`, for example `schema-0.1`. The site then serves the file
+  as it was at the tag. Before the tag exists, the version is a draft and can
+  change.
+- A published schema file never changes. CI fails if it changes. A change
+  publishes a new file with a new version.
 
 The schema for 0.1 accepts any 0.y URL in `$schema`, so that a 0.1 tool can
 read a document of a later 0.y version and report what it does not know.

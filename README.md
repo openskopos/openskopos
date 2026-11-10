@@ -28,7 +28,7 @@ Version 0.1 is in draft. The format can change between 0.x versions.
 | Folder | Contents |
 |---|---|
 | `spec/` | The specification, by version |
-| `schema/` | The JSON Schema files, published at `https://openskopos.org/schema/` |
+| `schema/` | The JSON Schema files. A tagged version is published at `https://openskopos.org/schema/`. |
 | `conformance/` | Valid and invalid documents that every implementation must handle |
 | `crates/` | Planned: the reference implementation in Rust (`skopos-core`) and the `skopos` CLI |
 | `npm/` | Planned: the WebAssembly build for JavaScript |
