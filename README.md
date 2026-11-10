@@ -18,16 +18,20 @@ commits, tickets and agents can refer to it.
 
 ## Status
 
-Version 0.1 is in draft. The format can change between 0.x versions. This
-repository will hold:
+Version 0.1 is in draft. The format can change between 0.x versions.
+
+- [Specification 0.1](spec/0.1/README.md)
+- [JSON Schema 0.1](schema/artifact/0.1.json)
+- [Conformance cases](conformance/README.md)
+- [Changelog](spec/CHANGELOG.md)
 
 | Folder | Contents |
 |---|---|
 | `spec/` | The specification, by version |
-| `schema/` | The JSON Schema files, published at `https://openskopos.org/schema/` |
+| `schema/` | The JSON Schema files. A tagged version is published at `https://openskopos.org/schema/`. |
 | `conformance/` | Valid and invalid documents that every implementation must handle |
-| `crates/` | The reference implementation in Rust (`skopos-core`) and the `skopos` CLI |
-| `npm/` | The WebAssembly build for JavaScript |
+| `crates/` | Planned: the reference implementation in Rust (`skopos-core`) and the `skopos` CLI |
+| `npm/` | Planned: the WebAssembly build for JavaScript |
 | `site/` | The website at [openskopos.org](https://openskopos.org) |
 | `brand/` | The logo and the brand rules ([BRAND.md](brand/BRAND.md)) |
 
@@ -42,6 +46,11 @@ edited by hand and read back.
 [Clarvelo](https://clarvelo.com) facilitates the team sessions that produce
 OpenSkopos documents. Any tool can read and write the format without
 Clarvelo.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). [GOVERNANCE.md](GOVERNANCE.md) says who
+decides on changes during 0.x.
 
 ## License
 

@@ -1,0 +1,135 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.01.json",
+  "id": "pa_3fQ8nV2kLm7Xc1Rt",
+  "version": 1,
+  "kind": "critique",
+  "title": "Red team: retry failed card payments",
+  "summary": "Spec Red Team on the draft retry spec, checked against the billing code.",
+  "status": "final",
+  "method": {
+    "id": "spec-red-team",
+    "version": "1"
+  },
+  "session": {
+    "id": "4812",
+    "title": "Red team: payment retries",
+    "url": "https://example.com/sessions/4812",
+    "ended_at": "2026-11-04T11:42:00Z"
+  },
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Ana",
+      "kind": "human"
+    },
+    {
+      "id": "P2",
+      "name": "Sam",
+      "kind": "human"
+    },
+    {
+      "id": "P3",
+      "name": "Facilitator",
+      "kind": "ai"
+    }
+  ],
+  "decider": "P1",
+  "parents": [
+    {
+      "rel": "input",
+      "source": {
+        "kind": "pasted",
+        "title": "Payment retry spec (draft 3)",
+        "digest": "sha256:9c1185a5c5e9fc54612808977ee8f548b2258d31f0b1a4a0e1d4a6e4f4c3b2a1"
+      }
+    }
+  ],
+  "id_counters": {
+    "CR": 3
+  },
+  "items": [
+    {
+      "id": "CR1",
+      "type": "critique",
+      "text": "The spec retries every failure, but the code already treats card_declined as final.",
+      "status": "accepted",
+      "severity": "blocker",
+      "category": "incorrect",
+      "target": {
+        "section": "Retry policy"
+      },
+      "evidence": [
+        {
+          "kind": "quote",
+          "text": "Retry each failed charge up to three times.",
+          "from": {
+            "title": "Payment retry spec (draft 3)"
+          },
+          "location": "Retry policy"
+        },
+        {
+          "kind": "code",
+          "repo": "acme/billing",
+          "path": "lib/billing/retry.ex",
+          "line_start": 41,
+          "line_end": 48,
+          "commit": "a1b2c3d"
+        }
+      ],
+      "resolution": {
+        "outcome": "fix_spec",
+        "note": "Retry only network errors and processor 5xx.",
+        "decided_by": "P1"
+      },
+      "proposed_by": "P3",
+      "ratification": {
+        "yes": 2,
+        "no": 0,
+        "eligible": 2
+      }
+    },
+    {
+      "id": "CR2",
+      "type": "critique",
+      "text": "The spec does not say who is told when the last retry fails.",
+      "status": "accepted",
+      "severity": "major",
+      "category": "gap",
+      "target": {
+        "section": "Notifications"
+      },
+      "evidence": [
+        {
+          "kind": "discussion",
+          "text": "Support finds out from the customer today.",
+          "speaker": "P2"
+        }
+      ],
+      "suggestion": "Name who is told and how.",
+      "resolution": {
+        "outcome": "defer",
+        "note": "Separate ticket."
+      }
+    },
+    {
+      "id": "CR3",
+      "type": "critique",
+      "text": "Three retries can double-charge if the processor times out after capture.",
+      "status": "rejected",
+      "severity": "major",
+      "category": "unstated_assumption",
+      "suggestion": "Cap retries at one until the processor confirms idempotency.",
+      "evidence": [
+        {
+          "kind": "code",
+          "path": "lib/billing/charge.ex",
+          "line_start": 12,
+          "snippet": "idempotency_key: charge.id"
+        }
+      ],
+      "detail": "Rejected: charges already send an idempotency key."
+    }
+  ],
+  "created_at": "2026-11-04T10:30:00Z",
+  "finalized_at": "2026-11-04T11:40:00Z"
+}

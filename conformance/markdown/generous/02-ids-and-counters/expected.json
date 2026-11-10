@@ -1,0 +1,59 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_4Gh7Jk1Lm3Np5Qr8",
+  "version": 1,
+  "kind": "spec",
+  "title": "Seat limits",
+  "status": "draft",
+  "id_counters": {
+    "FR": 10,
+    "R": 3
+  },
+  "items": [
+    {
+      "id": "FR2",
+      "type": "requirement",
+      "text": "A plan change that leaves too many seats in use is blocked.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR5",
+      "type": "requirement",
+      "text": "The seat count never goes below zero.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR7",
+      "type": "requirement",
+      "text": "An admin can see the seat count on the billing page.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR8",
+      "type": "requirement",
+      "text": "An admin can see the seat limit on the billing page.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR9",
+      "type": "requirement",
+      "text": "The page names the members above the limit.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR10",
+      "type": "requirement",
+      "text": "The change takes effect at the end of the period.",
+      "status": "accepted"
+    },
+    {
+      "id": "R3",
+      "type": "risk",
+      "text": "A late seat count lets a blocked change through.",
+      "status": "accepted",
+      "likelihood": "low",
+      "impact": "high"
+    }
+  ],
+  "created_at": "2026-11-10T12:00:00Z"
+}

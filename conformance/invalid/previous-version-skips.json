@@ -1,0 +1,354 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_2Xc5Rv8Tn1Mb4Kz7",
+  "version": 3,
+  "kind": "spec",
+  "title": "Spec: seat limits on plan changes",
+  "summary": "What happens to seats when an org moves to a plan with fewer seats.\n\nThis version adds the critique from the red team.",
+  "status": "draft",
+  "method": {
+    "id": "elaboration-mob",
+    "version": "2"
+  },
+  "session": {
+    "id": "s-7781",
+    "title": "Seat limits, round 3",
+    "url": "https://example.com/sessions/7781"
+  },
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Ana",
+      "kind": "human"
+    },
+    {
+      "id": "P2",
+      "name": "Lee",
+      "kind": "human"
+    },
+    {
+      "id": "P3",
+      "name": "Facilitator",
+      "kind": "ai"
+    }
+  ],
+  "decider": "P1",
+  "parents": [
+    {
+      "rel": "previous_version",
+      "artifact": "pa_2Xc5Rv8Tn1Mb4Kz7",
+      "version": 1
+    },
+    {
+      "rel": "input",
+      "artifact": "pa_9Lp4Wd7Ks2Hq6Nb3",
+      "version": 1,
+      "kind": "glossary",
+      "title": "Billing glossary"
+    },
+    {
+      "rel": "input",
+      "source": {
+        "kind": "repo_file",
+        "title": "Seat model",
+        "repo": "acme/billing",
+        "path": "lib/billing/seat.ex",
+        "commit": "0f1e2d3c4b5a",
+        "digest": "sha256:abababababababababababababababababababababababababababababababab"
+      }
+    },
+    {
+      "rel": "input",
+      "source": {
+        "kind": "url",
+        "title": "Pricing page",
+        "uri": "https://example.com/pricing"
+      }
+    }
+  ],
+  "id_counters": {
+    "G": 2,
+    "S": 2,
+    "FR": 4,
+    "ST": 1,
+    "C": 4,
+    "A": 2,
+    "N": 1,
+    "R": 1,
+    "Q": 2,
+    "D": 1,
+    "T": 1,
+    "CR": 1
+  },
+  "items": [
+    {
+      "id": "G2",
+      "type": "goal",
+      "text": "No user loses access by surprise when the org changes plan.",
+      "status": "accepted",
+      "for": "Members of orgs that downgrade"
+    },
+    {
+      "id": "S2",
+      "type": "success_signal",
+      "text": "No support ticket about lost access after a plan change.",
+      "status": "proposed",
+      "verification": "Support tags tickets with plan-change for one month.",
+      "refs": [
+        {
+          "item": "G2",
+          "rel": "verifies"
+        }
+      ]
+    },
+    {
+      "id": "FR4",
+      "type": "requirement",
+      "text": "A plan change that leaves more seats in use than the new limit is blocked.",
+      "status": "accepted",
+      "priority": "must",
+      "examples": [
+        {
+          "text": "12 seats in use, new limit 10. The change is blocked."
+        },
+        {
+          "text": "10 seats in use, new limit 10. The change goes ahead.",
+          "kind": "edge"
+        }
+      ],
+      "refs": [
+        {
+          "item": "FR2",
+          "rel": "supersedes"
+        },
+        {
+          "item": "G2",
+          "rel": "derived_from"
+        }
+      ]
+    },
+    {
+      "id": "FR3",
+      "type": "requirement",
+      "text": "The seat count never goes below zero.",
+      "status": "accepted",
+      "priority": "should",
+      "detail": "An invariant. A property-based test fits it."
+    },
+    {
+      "id": "ST1",
+      "type": "story",
+      "text": "As an org admin, I want to see which seats block a plan change, so that I can free them.",
+      "status": "accepted",
+      "acceptance_criteria": [
+        "The page lists the members above the limit."
+      ],
+      "examples": [
+        {
+          "text": "A member who is not an admin sees the list.",
+          "kind": "forbidden"
+        }
+      ],
+      "refs": [
+        {
+          "item": "FR4",
+          "rel": "refines"
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "type": "constraint",
+      "text": "Always run the billing contract tests before a merge.",
+      "status": "accepted",
+      "modality": "always",
+      "enforced_by": "CI job billing-contract"
+    },
+    {
+      "id": "C3",
+      "type": "constraint",
+      "text": "Prefer the existing Seat module over new tables.",
+      "status": "accepted",
+      "modality": "prefer",
+      "rationale": "One owner for seat data.",
+      "scope": [
+        "lib/billing/"
+      ]
+    },
+    {
+      "id": "C4",
+      "type": "constraint",
+      "text": "Avoid new background jobs for this work.",
+      "status": "accepted",
+      "modality": "avoid",
+      "scope": [
+        "this work only"
+      ],
+      "refs": [
+        {
+          "item": "R1",
+          "rel": "mitigates"
+        }
+      ]
+    },
+    {
+      "id": "A1",
+      "type": "assumption",
+      "text": "Seat counts are exact at the time of the plan change.",
+      "status": "accepted",
+      "confirmation": "refuted",
+      "owner": "P2",
+      "evidence": [
+        {
+          "kind": "code",
+          "repo": "acme/billing",
+          "path": "lib/billing/seat.ex",
+          "line_start": 30,
+          "line_end": 44,
+          "commit": "0f1e2d3c4b5a",
+          "snippet": "Task.start(fn -> recount(org) end)"
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "type": "assumption",
+      "text": "Seat counts are at most one minute late.",
+      "status": "accepted",
+      "owner": "P2",
+      "confirm_by": "2026-12-01",
+      "refs": [
+        {
+          "item": "A1",
+          "rel": "contradicts"
+        }
+      ]
+    },
+    {
+      "id": "N1",
+      "type": "non_goal",
+      "text": "Automatic removal of members above the limit.",
+      "status": "accepted",
+      "reason": "An admin chooses who leaves.",
+      "deferred": true
+    },
+    {
+      "id": "R1",
+      "type": "risk",
+      "text": "A late seat count lets a blocked change through.",
+      "status": "accepted",
+      "likelihood": "low",
+      "impact": "high",
+      "mitigation": "Recount seats inside the plan change.",
+      "owner": "P1",
+      "refs": [
+        {
+          "item": "FR4",
+          "rel": "threatens"
+        }
+      ]
+    },
+    {
+      "id": "Q2",
+      "type": "open_question",
+      "text": "Do guest users count as seats?",
+      "status": "accepted",
+      "owner": "P1",
+      "blocking": true,
+      "answer": "No, guests are free.",
+      "refs": [
+        {
+          "item": "T1",
+          "artifact": "pa_9Lp4Wd7Ks2Hq6Nb3",
+          "version": 1,
+          "rel": "relates_to"
+        }
+      ]
+    },
+    {
+      "id": "D1",
+      "type": "decision",
+      "text": "Recount seats inside the plan change.",
+      "status": "accepted",
+      "rationale": "The background count can be late.",
+      "decided_by": "P1",
+      "refs": [
+        {
+          "item": "CR1",
+          "rel": "resolves"
+        },
+        {
+          "item": "A1",
+          "rel": "depends_on"
+        }
+      ]
+    },
+    {
+      "id": "T1",
+      "type": "term",
+      "text": "Seat limit",
+      "status": "accepted",
+      "definition": "The highest number of seats that a plan allows.",
+      "code_names": [
+        "Plan.max_seats"
+      ]
+    },
+    {
+      "id": "CR1",
+      "type": "critique",
+      "text": "Version 2 trusts a seat count that a background job writes.",
+      "status": "accepted",
+      "severity": "major",
+      "category": "incorrect",
+      "target": {
+        "artifact": "pa_2Xc5Rv8Tn1Mb4Kz7",
+        "version": 2,
+        "item": "A1"
+      },
+      "evidence": [
+        {
+          "kind": "quote",
+          "text": "Seat counts are exact.",
+          "from": {
+            "artifact": "pa_2Xc5Rv8Tn1Mb4Kz7",
+            "version": 2,
+            "item": "A1"
+          }
+        },
+        {
+          "kind": "discussion",
+          "text": "We saw a five minute lag last week.",
+          "speaker": "P2"
+        },
+        {
+          "kind": "link",
+          "uri": "https://example.com/incidents/42",
+          "title": "Incident 42"
+        }
+      ],
+      "resolution": {
+        "outcome": "fix_code",
+        "note": "The spec is right, the recount is wrong.",
+        "decided_by": "P1"
+      },
+      "proposed_by": "P3",
+      "ratification": {
+        "yes": 2,
+        "no": 0,
+        "eligible": 2
+      },
+      "x-tracker": "BILL-77"
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "Should we email the admin?",
+      "status": "rejected"
+    }
+  ],
+  "created_at": "2026-11-08T14:00:00Z",
+  "x-generator": {
+    "name": "example-tool",
+    "version": "0.0.1"
+  }
+}

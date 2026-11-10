@@ -1,0 +1,33 @@
+name: Conformance
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      # A schema file is published when its schema-<version> tag exists.
+      # A published file never changes.
+      - name: Check that published schema files did not change
+        run: |
+          status=0
+          for tag in $(git tag --list 'schema-*'); do
+            file="schema/artifact/${tag#schema-}.json"
+            if ! git diff --quiet "$tag" -- "$file"; then
+              echo "::error file=$file::$file is published by the tag $tag and must not change. Make a new version instead."
+              status=1
+            fi
+          done
+          exit $status
+      # The runner image has a stable Rust toolchain.
+      - name: Check the conformance cases against the schema
+        run: cargo run --locked --manifest-path conformance/runner/Cargo.toml

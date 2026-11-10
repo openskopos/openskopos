@@ -1,0 +1,33 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_riRhT50HulDkHfZE",
+  "version": 1,
+  "kind": "intent",
+  "title": "Faster invoices",
+  "status": "draft",
+  "id_counters": {
+    "G": 1,
+    "R": 1
+  },
+  "items": [
+    {
+      "id": "G1",
+      "type": "goal",
+      "text": "Finance sends invoices on the first working day.",
+      "status": "accepted",
+      "for": "Finance team",
+      "x-colour": "blue"
+    },
+    {
+      "id": "R1",
+      "type": "risk",
+      "text": "The ledger export is late.",
+      "status": "accepted",
+      "likelihood": "medium",
+      "impact": "medium",
+      "mitigation": "Run the export the night before."
+    }
+  ],
+  "created_at": "2026-11-10T12:00:00Z",
+  "x-owner": "Ana"
+}

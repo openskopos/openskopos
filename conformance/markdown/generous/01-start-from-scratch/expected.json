@@ -1,0 +1,105 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_5qF43nCm5ka49P7z",
+  "version": 1,
+  "kind": "intent",
+  "title": "Self-serve plan downgrades",
+  "summary": "Customers want to pay less without talking to us.",
+  "status": "draft",
+  "id_counters": {
+    "G": 1,
+    "S": 1,
+    "FR": 2,
+    "C": 2,
+    "N": 1,
+    "Q": 1,
+    "T": 1
+  },
+  "items": [
+    {
+      "id": "G1",
+      "type": "goal",
+      "text": "Customers can lower their bill without waiting for support.",
+      "status": "accepted",
+      "for": "Org admins on monthly plans"
+    },
+    {
+      "id": "S1",
+      "type": "success_signal",
+      "text": "A customer can downgrade without contacting support.",
+      "status": "accepted",
+      "verification": "The downgrade feature test passes in CI."
+    },
+    {
+      "id": "FR1",
+      "type": "requirement",
+      "text": "The billing page lets an org admin pick a smaller plan.",
+      "status": "accepted",
+      "priority": "must",
+      "examples": [
+        {
+          "text": "An admin on Team picks Starter."
+        },
+        {
+          "text": "12 seats in use, plan allows 10. The change is blocked.",
+          "kind": "edge"
+        }
+      ]
+    },
+    {
+      "id": "FR2",
+      "type": "requirement",
+      "text": "Downgrades start at the end of the paid period.",
+      "status": "accepted"
+    },
+    {
+      "id": "C1",
+      "type": "constraint",
+      "text": "Never change the payment webhook contract.",
+      "status": "accepted",
+      "modality": "never",
+      "enforced_by": "Webhook contract tests in CI"
+    },
+    {
+      "id": "C2",
+      "type": "constraint",
+      "text": "Ask before adding a database migration.",
+      "status": "accepted",
+      "modality": "ask_first",
+      "approver": "Tech lead",
+      "bring": [
+        "The migration",
+        "A rollback plan"
+      ]
+    },
+    {
+      "id": "N1",
+      "type": "non_goal",
+      "text": "Refunds for unused time.",
+      "status": "accepted",
+      "deferred": true
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "What happens to annual plans?",
+      "status": "accepted",
+      "blocking": false,
+      "options": [
+        "Downgrade at the end of the year",
+        "Refund the difference monthly"
+      ]
+    },
+    {
+      "id": "T1",
+      "type": "term",
+      "text": "Downgrade",
+      "status": "accepted",
+      "definition": "A move to a cheaper plan that starts at the end of the paid period.",
+      "aliases": [
+        "plan change down"
+      ]
+    }
+  ],
+  "created_at": "2026-11-10T12:00:00Z"
+}

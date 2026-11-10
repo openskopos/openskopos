@@ -1,0 +1,28 @@
+{
+  "cases": [
+    {
+      "file": "spec-red-team-critique.json",
+      "description": "A final critique (version 1) of a pasted spec. Has a rejected item, and quote, code and discussion evidence."
+    },
+    {
+      "file": "intent-lock-intent-v2.json",
+      "description": "A draft intent (version 2) with eleven item types, a previous_version parent, an artifact input and an external input."
+    },
+    {
+      "file": "spec-all-types-v3.json",
+      "description": "A draft spec (version 3) with all twelve item types, gaps in item IDs, counters above the highest IDs, every evidence kind, refs across artifacts and x- extension keys."
+    },
+    {
+      "file": "glossary-v1.json",
+      "description": "A final glossary with term items. One term is rejected."
+    },
+    {
+      "file": "minimal-draft.json",
+      "description": "The smallest valid document: version 1, no method, session, participants, parents or id_counters, and no items."
+    },
+    {
+      "file": "agent-rules.skopos.yaml",
+      "description": "A final agent_rules document in YAML, with always/never and ask_first constraints."
+    }
+  ]
+}

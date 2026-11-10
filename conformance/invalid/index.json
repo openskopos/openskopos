@@ -1,0 +1,280 @@
+{
+  "cases": [
+    {
+      "file": "missing-schema-url.json",
+      "check": "schema",
+      "rule": "envelope",
+      "reason": "The envelope has no $schema."
+    },
+    {
+      "file": "format-1-0.json",
+      "check": "schema",
+      "rule": "format-version",
+      "reason": "Format 1.0 does not exist. 0.1 documents use a 0.y URL."
+    },
+    {
+      "file": "format-leading-zero.json",
+      "check": "schema",
+      "rule": "format-version",
+      "reason": "0.01 has a leading zero."
+    },
+    {
+      "file": "bad-artifact-id.json",
+      "check": "schema",
+      "rule": "artifact-id",
+      "reason": "An artifact ID starts with pa_ and has 16 to 32 letters and digits."
+    },
+    {
+      "file": "version-zero.json",
+      "check": "schema",
+      "rule": "artifact-version",
+      "reason": "An artifact version starts at 1."
+    },
+    {
+      "file": "unknown-envelope-key.json",
+      "check": "schema",
+      "rule": "unknown-keys",
+      "reason": "owner_email is not a field. Only x- keys can be added."
+    },
+    {
+      "file": "unknown-item-key.json",
+      "check": "schema",
+      "rule": "unknown-keys",
+      "reason": "priority is not a field of a critique."
+    },
+    {
+      "file": "field-of-another-type.json",
+      "check": "schema",
+      "rule": "unknown-keys",
+      "reason": "severity is a critique field, not a success signal field."
+    },
+    {
+      "file": "participant-with-email.json",
+      "check": "schema",
+      "rule": "participants",
+      "reason": "A participant has only an ID, a display name and a kind."
+    },
+    {
+      "file": "method-without-id.json",
+      "check": "schema",
+      "rule": "method",
+      "reason": "A method, if present, has an id."
+    },
+    {
+      "file": "session-without-id.json",
+      "check": "schema",
+      "rule": "session",
+      "reason": "A session, if present, has an id."
+    },
+    {
+      "file": "final-without-finalized-at.json",
+      "check": "schema",
+      "rule": "final",
+      "reason": "A final version has finalized_at."
+    },
+    {
+      "file": "item-id-leading-zero.json",
+      "check": "schema",
+      "rule": "item-id",
+      "reason": "An item number has no leading zero."
+    },
+    {
+      "file": "item-id-wrong-prefix.json",
+      "check": "schema",
+      "rule": "item-id-prefix",
+      "reason": "A risk has the prefix R, not S."
+    },
+    {
+      "file": "item-type-wrong-for-prefix.json",
+      "check": "schema",
+      "rule": "item-id-prefix",
+      "reason": "ST1 is a story ID, but the type says success_signal."
+    },
+    {
+      "file": "unknown-item-type.json",
+      "check": "schema",
+      "rule": "item-type",
+      "reason": "outcome is not one of the twelve item types."
+    },
+    {
+      "file": "bad-item-status.json",
+      "check": "schema",
+      "rule": "item-status",
+      "reason": "An item status is proposed, accepted or rejected."
+    },
+    {
+      "file": "constraint-without-modality.json",
+      "check": "schema",
+      "rule": "constraint",
+      "reason": "A constraint has a modality."
+    },
+    {
+      "file": "ask-first-without-approver.json",
+      "check": "schema",
+      "rule": "constraint",
+      "reason": "An ask_first constraint names an approver."
+    },
+    {
+      "file": "approver-on-never.json",
+      "check": "schema",
+      "rule": "constraint",
+      "reason": "Only ask_first constraints have an approver."
+    },
+    {
+      "file": "bring-on-never.json",
+      "check": "schema",
+      "rule": "constraint",
+      "reason": "Only ask_first constraints have bring."
+    },
+    {
+      "file": "assumption-bad-confirmation.json",
+      "check": "schema",
+      "rule": "assumption",
+      "reason": "confirmation is unconfirmed, confirmed or refuted."
+    },
+    {
+      "file": "assumption-bad-date.json",
+      "check": "schema",
+      "rule": "assumption",
+      "reason": "confirm_by is a date."
+    },
+    {
+      "file": "term-without-definition.json",
+      "check": "schema",
+      "rule": "term",
+      "reason": "A term has a definition."
+    },
+    {
+      "file": "example-unknown-kind.json",
+      "check": "schema",
+      "rule": "example",
+      "reason": "An example kind is normal, edge or forbidden."
+    },
+    {
+      "file": "examples-on-constraint.json",
+      "check": "schema",
+      "rule": "example",
+      "reason": "Only requirements and stories have examples."
+    },
+    {
+      "file": "critique-without-evidence.json",
+      "check": "schema",
+      "rule": "critique",
+      "reason": "A critique has at least one evidence entry."
+    },
+    {
+      "file": "critique-without-category.json",
+      "check": "schema",
+      "rule": "critique",
+      "reason": "A critique has a category."
+    },
+    {
+      "file": "critique-unknown-outcome.json",
+      "check": "schema",
+      "rule": "critique",
+      "reason": "A resolution outcome is open, fix_spec, fix_code, accept_risk or defer."
+    },
+    {
+      "file": "code-evidence-without-path.json",
+      "check": "schema",
+      "rule": "evidence",
+      "reason": "Code evidence has a path."
+    },
+    {
+      "file": "quote-evidence-stray-key.json",
+      "check": "schema",
+      "rule": "evidence",
+      "reason": "Quote evidence has no path."
+    },
+    {
+      "file": "ref-unknown-rel.json",
+      "check": "schema",
+      "rule": "refs",
+      "reason": "addresses is not a rel. Use resolves."
+    },
+    {
+      "file": "ref-version-without-artifact.json",
+      "check": "schema",
+      "rule": "refs",
+      "reason": "A ref with a version also names the artifact."
+    },
+    {
+      "file": "counter-unknown-prefix.json",
+      "check": "schema",
+      "rule": "id-counters",
+      "reason": "X is not an item prefix."
+    },
+    {
+      "file": "counter-negative.json",
+      "check": "schema",
+      "rule": "id-counters",
+      "reason": "A counter is 0 or more."
+    },
+    {
+      "file": "v1-with-previous-version.json",
+      "check": "schema",
+      "rule": "previous-version",
+      "reason": "Version 1 has no previous_version parent."
+    },
+    {
+      "file": "v2-without-previous-version.json",
+      "check": "schema",
+      "rule": "previous-version",
+      "reason": "Version 2 and above have one previous_version parent."
+    },
+    {
+      "file": "v2-two-previous-versions.json",
+      "check": "schema",
+      "rule": "previous-version",
+      "reason": "Only one previous_version parent is allowed."
+    },
+    {
+      "file": "external-previous-version.json",
+      "check": "schema",
+      "rule": "previous-version",
+      "reason": "An external parent can only be an input."
+    },
+    {
+      "file": "duplicate-item-id.json",
+      "check": "semantic",
+      "rule": "unique-item-ids",
+      "reason": "Two items have the ID S1."
+    },
+    {
+      "file": "duplicate-critique-id.json",
+      "check": "semantic",
+      "rule": "unique-item-ids",
+      "reason": "Two critiques have the ID CR2."
+    },
+    {
+      "file": "counter-below-highest-id.json",
+      "check": "semantic",
+      "rule": "counters-cover-items",
+      "reason": "S3 exists, but the S counter is 2."
+    },
+    {
+      "file": "counter-missing-for-used-prefix.json",
+      "check": "semantic",
+      "rule": "counters-cover-items",
+      "reason": "G1 exists, but id_counters has no G, which means 0."
+    },
+    {
+      "file": "previous-version-other-artifact.json",
+      "check": "semantic",
+      "rule": "previous-version-same-artifact",
+      "reason": "The previous_version parent names a different artifact ID."
+    },
+    {
+      "file": "previous-version-skips.json",
+      "check": "semantic",
+      "rule": "previous-version-one-less",
+      "reason": "Version 3 names version 1 as its previous version."
+    },
+    {
+      "file": "previous-version-same-number.json",
+      "check": "semantic",
+      "rule": "previous-version-one-less",
+      "reason": "Version 2 names itself as its previous version."
+    }
+  ]
+}

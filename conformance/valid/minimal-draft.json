@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_0000000000000000",
+  "version": 1,
+  "kind": "intent",
+  "title": "A new intent",
+  "status": "draft",
+  "items": [],
+  "created_at": "2026-11-10T08:00:00Z"
+}

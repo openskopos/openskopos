@@ -1,9 +1,15 @@
 name: Deploy site
 
+# The site deploys from main. A schema version is published only by pushing
+# the tag schema-<version>, for example schema-0.1. Each deploy serves every
+# tagged schema file exactly as it was at its tag, so later changes on main
+# never change a published file.
+
 on:
   push:
     branches: [main]
-    paths: ["site/**", "schema/**", ".github/workflows/pages.yml"]
+    paths: ["site/**", ".github/workflows/pages.yml"]
+    tags: ["schema-*"]
   workflow_dispatch:
 
 permissions:
@@ -23,12 +29,18 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      # Published schema files live at /schema/ on the site.
+        with:
+          ref: main
+          fetch-depth: 0
       - name: Assemble site
         run: |
-          mkdir -p _site
+          mkdir -p _site/schema/artifact
           cp -R site/. _site/
-          if [ -d schema ]; then cp -R schema _site/schema; fi
+          for tag in $(git tag --list 'schema-*'); do
+            version="${tag#schema-}"
+            git show "$tag:schema/artifact/$version.json" > "_site/schema/artifact/$version.json"
+            echo "Published schema $version from tag $tag"
+          done
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
