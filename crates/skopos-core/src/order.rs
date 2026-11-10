@@ -108,44 +108,48 @@ impl Shape {
 /// The entries of an object in canonical order, each with the shape of its
 /// value.
 pub(crate) fn entries(map: &Map<String, Value>, shape: Shape) -> Vec<(&String, &Value, Shape)> {
-    let known: Vec<&str> = match shape {
-        Shape::Document => DOCUMENT.to_vec(),
-        Shape::Method => METHOD.to_vec(),
-        Shape::Session => SESSION.to_vec(),
-        Shape::Participant => PARTICIPANT.to_vec(),
-        Shape::Parent => PARENT.to_vec(),
-        Shape::Source => SOURCE.to_vec(),
-        Shape::IdCounters => ID_COUNTERS.to_vec(),
-        Shape::Item => {
-            let fields = map
-                .get("type")
+    let list: &[&str] = match shape {
+        Shape::Document => DOCUMENT,
+        Shape::Method => METHOD,
+        Shape::Session => SESSION,
+        Shape::Participant => PARTICIPANT,
+        Shape::Parent => PARENT,
+        Shape::Source => SOURCE,
+        Shape::IdCounters => ID_COUNTERS,
+        Shape::Item => ITEM_HEAD,
+        Shape::Example => EXAMPLE,
+        Shape::Evidence => EVIDENCE,
+        Shape::QuoteSource => QUOTE_SOURCE,
+        Shape::Ref => REF,
+        Shape::Target => TARGET,
+        Shape::Resolution => RESOLUTION,
+        Shape::Ratification => RATIFICATION,
+        Shape::Free => &[],
+    };
+    // An item has its head, the fields of its type, and its tail.
+    let (fields, tail): (&[&str], &[&str]) = match shape {
+        Shape::Item => (
+            map.get("type")
                 .and_then(Value::as_str)
                 .and_then(|t| t.parse::<ItemType>().ok())
-                .map(ItemType::fields)
-                .unwrap_or_default();
-            [ITEM_HEAD, fields, ITEM_TAIL].concat()
-        }
-        Shape::Example => EXAMPLE.to_vec(),
-        Shape::Evidence => EVIDENCE.to_vec(),
-        Shape::QuoteSource => QUOTE_SOURCE.to_vec(),
-        Shape::Ref => REF.to_vec(),
-        Shape::Target => TARGET.to_vec(),
-        Shape::Resolution => RESOLUTION.to_vec(),
-        Shape::Ratification => RATIFICATION.to_vec(),
-        Shape::Free => vec![],
+                .map_or(&[], ItemType::fields),
+            ITEM_TAIL,
+        ),
+        _ => (&[], &[]),
     };
-    let mut out: Vec<(&String, &Value, Shape)> = known
-        .iter()
-        .filter_map(|k| map.get_key_value(*k))
-        .map(|(k, v)| (k, v, shape.child(k)))
-        .collect();
-    let rest = map.iter().filter(|(k, _)| !known.contains(&k.as_str()));
-    let (ext, other): (Vec<_>, Vec<_>) = rest.partition(|(k, _)| k.starts_with("x-"));
-    out.extend(
-        ext.into_iter()
-            .chain(other)
-            .map(|(k, v)| (k, v, shape.child(k))),
-    );
+    let known = [list, fields, tail];
+    let is_known = |k: &str| known.iter().any(|part| part.contains(&k));
+
+    let mut out = Vec::with_capacity(map.len());
+    for k in known.into_iter().flatten() {
+        if let Some((k, v)) = map.get_key_value(*k) {
+            out.push((k, v, shape.child(k)));
+        }
+    }
+    let rest = || map.iter().filter(|(k, _)| !is_known(k));
+    let ext = rest().filter(|(k, _)| k.starts_with("x-"));
+    let other = rest().filter(|(k, _)| !k.starts_with("x-"));
+    out.extend(ext.chain(other).map(|(k, v)| (k, v, shape.child(k))));
     out
 }
 

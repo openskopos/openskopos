@@ -121,6 +121,17 @@ pub fn check(doc: &Value) -> Vec<Problem> {
     problems
 }
 
+/// A whole number of 0 or more. JSON Schema reads `3.0` as the integer 3, so
+/// this function does too.
+pub(crate) fn whole_number(value: &Value) -> Option<u64> {
+    if let Some(n) = value.as_u64() {
+        return Some(n);
+    }
+    let f = value.as_f64()?;
+    // 2^64 as f64. Every whole f64 below it fits in a u64.
+    (f >= 0.0 && f.fract() == 0.0 && f < 18_446_744_073_709_551_616.0).then_some(f as u64)
+}
+
 /// JSON Pointer of a key under a parent pointer.
 pub(crate) fn pointer(parent: &str, key: impl fmt::Display) -> String {
     let key = key.to_string().replace('~', "~0").replace('/', "~1");

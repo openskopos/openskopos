@@ -181,3 +181,32 @@ fn embedded_schema_is_the_published_file() {
     let schema: Value = serde_json::from_str(&file).unwrap();
     assert_eq!(schema["$id"], skopos_core::SCHEMA_URL);
 }
+
+#[test]
+fn rules_read_whole_number_floats_like_the_schema() {
+    // JSON Schema reads 0.0 and 3.0 as integers, so the rules must too.
+    let mut doc = read(&conformance().join("invalid/counter-below-highest-id.json"));
+    let counter = doc["id_counters"]["S"].as_u64().unwrap();
+    doc["id_counters"]["S"] = serde_json::json!(counter as f64);
+    assert!(check_schema(&doc).is_empty());
+    let names: Vec<_> = check(&doc).into_iter().filter_map(|p| p.rule).collect();
+    assert_eq!(names, [rules::COUNTERS_COVER_ITEMS]);
+
+    let mut doc = read(&conformance().join("invalid/previous-version-skips.json"));
+    let version = doc["version"].as_u64().unwrap();
+    doc["version"] = serde_json::json!(version as f64);
+    assert!(check_schema(&doc).is_empty());
+    let names: Vec<_> = check(&doc).into_iter().filter_map(|p| p.rule).collect();
+    assert_eq!(names, [rules::PREVIOUS_VERSION_ONE_LESS]);
+}
+
+#[test]
+fn parents_message_follows_the_schema_branch() {
+    let mut doc = read(&conformance().join("invalid/v2-without-previous-version.json"));
+    doc["version"] = serde_json::json!(2.0);
+    let messages: Vec<_> = check_schema(&doc).into_iter().map(|p| p.message).collect();
+    assert_eq!(
+        messages,
+        ["version 2 must have exactly one previous_version parent"]
+    );
+}

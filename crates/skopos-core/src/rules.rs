@@ -4,7 +4,7 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde_json::Value;
 
-use crate::{parse_item_id, pointer, Problem};
+use crate::{parse_item_id, pointer, whole_number, Problem};
 
 /// No two items in a version have the same ID.
 pub const UNIQUE_ITEM_IDS: &str = "unique-item-ids";
@@ -71,7 +71,7 @@ pub fn check_rules(doc: &Value) -> Vec<Problem> {
             let counter = counters.and_then(|c| c.get(prefix));
             let value = match counter {
                 None => 0,
-                Some(v) => match v.as_u64() {
+                Some(v) => match whole_number(v) {
                     Some(v) => v,
                     // The schema reports a counter that is not a whole number.
                     None => continue,
@@ -115,9 +115,9 @@ pub fn check_rules(doc: &Value) -> Vec<Problem> {
         }
         // Version 1 has no previous version. The schema reports that.
         if let (Some(parent_version), Some(version)) = (
-            parent.get("version").and_then(Value::as_u64),
+            parent.get("version").and_then(whole_number),
             doc.get("version")
-                .and_then(Value::as_u64)
+                .and_then(whole_number)
                 .filter(|v| *v >= 2),
         ) {
             if parent_version != version - 1 {

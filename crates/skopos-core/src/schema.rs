@@ -7,7 +7,7 @@ use jsonschema::{error::ValidationErrorKind, ValidationError, Validator};
 use serde_json::Value;
 
 use crate::model::ItemType;
-use crate::{parse_item_id, Problem};
+use crate::{parse_item_id, whole_number, Problem};
 
 /// The JSON Schema of format 0.1, as text. It is the same file as
 /// `schema/artifact/0.1.json` in the repository.
@@ -104,12 +104,15 @@ fn explain(doc: &Value, e: &ValidationError) -> Option<Problem> {
         (ValidationErrorKind::Not { .. }, ["items", _]) if item_type == Some(ItemType::Constraint) => {
             "only an ask_first constraint can have approver or bring".to_string()
         }
-        (ValidationErrorKind::Not { .. } | ValidationErrorKind::Contains, ["parents"]) => {
-            match doc.get("version").and_then(Value::as_u64) {
-                Some(v) if v >= 2 => format!("version {v} must have exactly one previous_version parent"),
-                _ => "version 1 cannot have a previous_version parent".to_string(),
-            }
+        // The schema checks the parents of version 1 with `not contains`, and
+        // the parents of a later version with `contains`.
+        (ValidationErrorKind::Not { .. }, ["parents"]) => {
+            "version 1 cannot have a previous_version parent".to_string()
         }
+        (ValidationErrorKind::Contains, ["parents"]) => match doc.get("version").and_then(whole_number) {
+            Some(v) => format!("version {v} must have exactly one previous_version parent"),
+            None => "a version after 1 must have exactly one previous_version parent".to_string(),
+        },
         (
             ValidationErrorKind::OneOfNotValid { .. } | ValidationErrorKind::OneOfMultipleValid { .. },
             ["parents", _],

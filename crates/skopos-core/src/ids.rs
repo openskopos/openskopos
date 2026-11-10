@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
 use crate::model::ItemType;
-use crate::{pointer, Problem};
+use crate::{pointer, whole_number, Problem};
 
 /// Reads an item ID such as `CR12` into its type and number.
 ///
@@ -115,7 +115,7 @@ pub fn assign_ids(doc: &mut Value) -> Result<IdReport, Vec<Problem>> {
         let Some(t) = ItemType::from_prefix(prefix) else {
             continue;
         };
-        match value.as_u64() {
+        match whole_number(value) {
             Some(v) => {
                 let c = counters.entry(t.prefix()).or_insert(0);
                 *c = (*c).max(v);
@@ -151,7 +151,10 @@ pub fn assign_ids(doc: &mut Value) -> Result<IdReport, Vec<Problem>> {
     let mut new_counters: Map<String, Value> = old_counters.cloned().unwrap_or_default();
     for t in ItemType::ALL {
         if let Some(&c) = counters.get(t.prefix()) {
-            if c > 0 || new_counters.contains_key(t.prefix()) {
+            // Write a counter only if it is new or its number changes, so
+            // that a counter such as 3.0 stays as it is.
+            let old = new_counters.get(t.prefix()).and_then(whole_number);
+            if (c > 0 || old.is_some()) && old != Some(c) {
                 new_counters.insert(t.prefix().to_string(), Value::from(c));
             }
         }
@@ -253,6 +256,21 @@ mod tests {
         let paths: Vec<_> = problems.iter().map(|p| p.path.as_str()).collect();
         assert_eq!(paths, ["/items/0/type", "/items/1/type"]);
         assert_eq!(doc, before);
+    }
+
+    #[test]
+    fn reads_whole_number_floats_as_counters() {
+        let mut doc = json!({
+            "id_counters": {"G": 3.0},
+            "items": [{"id": "G2", "type": "goal"}, {"type": "goal"}]
+        });
+        let report = assign_ids(&mut doc).unwrap();
+        assert_eq!(report.assigned[0].id, "G4");
+        assert_eq!(doc["id_counters"], json!({"G": 4}));
+
+        let mut doc = json!({"id_counters": {"G": 3.0}, "items": [{"id": "G2", "type": "goal"}]});
+        assert!(!assign_ids(&mut doc).unwrap().changed());
+        assert_eq!(doc["id_counters"], json!({"G": 3.0}));
     }
 
     #[test]

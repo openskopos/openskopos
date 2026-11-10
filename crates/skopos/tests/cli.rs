@@ -68,13 +68,29 @@ fn check_accepts_every_valid_case() {
 
 #[test]
 fn check_rejects_every_invalid_case_for_its_rule() {
-    for case in cases("invalid") {
+    // One run for all cases, so that the schema compiles one time.
+    let cases = cases("invalid");
+    let paths: Vec<String> = cases
+        .iter()
+        .map(|c| {
+            conformance()
+                .join("invalid")
+                .join(c["file"].as_str().unwrap())
+                .display()
+                .to_string()
+        })
+        .collect();
+    let mut args = vec!["check", "--json"];
+    args.extend(paths.iter().map(String::as_str));
+    let out = skopos(&args);
+    assert_eq!(out.status.code(), Some(1));
+    let results = stdout_json(&out);
+    let results = results.as_array().unwrap();
+    assert_eq!(results.len(), cases.len());
+    for (case, result) in cases.iter().zip(results) {
         let file = case["file"].as_str().unwrap();
         let rule = case["rule"].as_str().unwrap();
-        let path = conformance().join("invalid").join(file);
-        let out = skopos(&["check", "--json", path.to_str().unwrap()]);
-        assert_eq!(out.status.code(), Some(1), "invalid/{file} must fail");
-        let problems = stdout_json(&out)[0]["problems"].as_array().unwrap().clone();
+        let problems = result["problems"].as_array().unwrap();
         let rules: BTreeSet<Option<&str>> = problems.iter().map(|p| p["rule"].as_str()).collect();
         match case["check"].as_str().unwrap() {
             "schema" => assert!(

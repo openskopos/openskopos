@@ -2,6 +2,8 @@
 //!
 //! These types are for valid documents. Use [`crate::check`] on the
 //! [`Value`] first: a document that is not valid can fail to deserialize.
+//! The schema also accepts a whole number written with a decimal point, such
+//! as `2.0`, for an integer field. The `u64` fields of these types do not.
 //!
 //! The types keep every field. A field that is absent stays absent when you
 //! serialize again, so `Value` to [`Document`] to `Value` gives the same value.
@@ -442,16 +444,28 @@ impl fmt::Display for ItemType {
 }
 
 impl FromStr for ItemType {
-    type Err = ();
+    type Err = UnknownItemType;
 
     /// Reads the value of `type`, for example `success_signal`.
-    fn from_str(s: &str) -> Result<Self, ()> {
+    fn from_str(s: &str) -> Result<Self, UnknownItemType> {
         ItemType::ALL
             .into_iter()
             .find(|t| t.as_str() == s)
-            .ok_or(())
+            .ok_or_else(|| UnknownItemType(s.to_string()))
     }
 }
+
+/// The error of `ItemType::from_str`: the text is not one of the twelve types.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownItemType(pub String);
+
+impl fmt::Display for UnknownItemType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?} is not an item type", self.0)
+    }
+}
+
+impl std::error::Error for UnknownItemType {}
 
 /// `must`, `should` or `could`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

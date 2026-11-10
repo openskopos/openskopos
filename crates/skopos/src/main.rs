@@ -3,7 +3,7 @@
 //! The tool reads and writes files. `skopos-core` does all the other work.
 
 use std::fs;
-use std::io::Write as _;
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
@@ -108,12 +108,26 @@ fn format_of(path: &Path) -> Result<Format, String> {
     }
 }
 
-/// Reads a file into its format and its value.
-fn read(path: &Path) -> Result<(Format, Value), Problem> {
+/// Reads a file into its format, its text and its value.
+fn read(path: &Path) -> Result<(Format, String, Value), Problem> {
     let format = format_of(path).map_err(|e| Problem::new("", e))?;
     let text = fs::read_to_string(path)
         .map_err(|e| Problem::new("", format!("cannot read the file: {e}")))?;
-    Ok((format, parse(&text, format)?))
+    let doc = parse(&text, format)?;
+    Ok((format, text, doc))
+}
+
+/// Writes text to standard output. If the reader closed the pipe, for example
+/// `skopos convert ... | head`, the tool stops writing with no error.
+fn emit(text: &str) -> bool {
+    match io::stdout().lock().write_all(text.as_bytes()) {
+        Ok(()) => true,
+        Err(e) if e.kind() == io::ErrorKind::BrokenPipe => true,
+        Err(e) => {
+            eprintln!("cannot write to standard output: {e}");
+            false
+        }
+    }
 }
 
 fn report(path: &Path, problem: &Problem) {
@@ -142,7 +156,7 @@ fn run_check(files: &[PathBuf], json: bool) -> bool {
         .map(|path| FileProblems {
             file: path.display().to_string(),
             problems: match read(path) {
-                Ok((_, doc)) => check(&doc),
+                Ok((_, _, doc)) => check(&doc),
                 Err(problem) => vec![problem],
             },
         })
@@ -150,15 +164,15 @@ fn run_check(files: &[PathBuf], json: bool) -> bool {
     let with_problems = results.iter().filter(|r| !r.problems.is_empty()).count();
 
     if json {
-        let text = serde_json::to_string_pretty(&results).expect("problems serialize");
-        println!("{text}");
+        let mut text = serde_json::to_string_pretty(&results).expect("problems serialize");
+        text.push('\n');
+        emit(&text);
     } else {
-        let mut out = std::io::stdout().lock();
-        for r in &results {
-            for p in &r.problems {
-                let _ = writeln!(out, "{}: {p}", r.file);
-            }
-        }
+        let lines: String = results
+            .iter()
+            .flat_map(|r| r.problems.iter().map(move |p| format!("{}: {p}\n", r.file)))
+            .collect();
+        emit(&lines);
         let count: usize = results.iter().map(|r| r.problems.len()).sum();
         if count == 0 {
             eprintln!("{}: no problems.", plural(files.len(), "file"));
@@ -185,7 +199,7 @@ fn plural(n: usize, word: &str) -> String {
 fn run_fmt(files: &[PathBuf], check_only: bool) -> bool {
     let mut ok = true;
     for path in files {
-        let (format, doc) = match read(path) {
+        let (format, old_text, doc) = match read(path) {
             Ok(r) => r,
             Err(problem) => {
                 report(path, &problem);
@@ -194,11 +208,11 @@ fn run_fmt(files: &[PathBuf], check_only: bool) -> bool {
             }
         };
         let text = write(&doc, format);
-        if fs::read_to_string(path).ok().as_deref() == Some(text.as_str()) {
+        if text == old_text {
             continue;
         }
         if check_only {
-            println!("{}", path.display());
+            emit(&format!("{}\n", path.display()));
             ok = false;
         } else {
             ok &= write_file(path, &text);
@@ -209,7 +223,7 @@ fn run_fmt(files: &[PathBuf], check_only: bool) -> bool {
 
 fn run_convert(file: &Path, to: Target, output: Option<&Path>) -> bool {
     let doc = match read(file) {
-        Ok((_, doc)) => doc,
+        Ok((_, _, doc)) => doc,
         Err(problem) => {
             report(file, &problem);
             return false;
@@ -222,17 +236,14 @@ fn run_convert(file: &Path, to: Target, output: Option<&Path>) -> bool {
     let text = write(&doc, format);
     match output {
         Some(path) => write_file(path, &text),
-        None => {
-            print!("{text}");
-            true
-        }
+        None => emit(&text),
     }
 }
 
 fn run_ids(files: &[PathBuf], check_only: bool) -> bool {
     let mut ok = true;
     for path in files {
-        let (format, mut doc) = match read(path) {
+        let (format, _, mut doc) = match read(path) {
             Ok(r) => r,
             Err(problem) => {
                 report(path, &problem);
@@ -261,7 +272,7 @@ fn run_ids(files: &[PathBuf], check_only: bool) -> bool {
         if report_ids.counters_changed {
             changes.push("id_counters changes".to_string());
         }
-        println!("{}: {}", path.display(), changes.join(", "));
+        emit(&format!("{}: {}\n", path.display(), changes.join(", ")));
         if check_only {
             ok = false;
         } else {

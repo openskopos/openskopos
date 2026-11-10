@@ -14,12 +14,12 @@ use crate::order::{entries, Shape};
 pub(crate) fn write(doc: &Value) -> String {
     let mut out = String::new();
     match doc {
-        Value::Object(map) if !map.is_empty() => write_map(&mut out, map, Shape::Document, 0),
-        Value::Array(list) if !list.is_empty() => write_seq(&mut out, list, Shape::Free, 0),
-        Value::String(s) if literal_ok(s) => {
-            out.push_str(&literal_header(s));
-            write_literal_body(&mut out, s, 0);
+        Value::Object(map) if !map.is_empty() => {
+            write_map(&mut out, map, Shape::Document, 0, false)
         }
+        Value::Array(list) if !list.is_empty() => write_seq(&mut out, list, Shape::Free, 0, false),
+        // A value that is not a list or an object is not a document. It goes
+        // on one line, with no literal block.
         other => {
             out.push_str(&scalar(other));
             out.push('\n');
@@ -28,20 +28,30 @@ pub(crate) fn write(doc: &Value) -> String {
     out
 }
 
-fn write_map(out: &mut String, map: &Map<String, Value>, shape: Shape, indent: usize) {
+/// Writes the entries of an object, each at `indent`. If `inline` is true,
+/// the first entry continues the current line, after a list dash.
+fn write_map(
+    out: &mut String,
+    map: &Map<String, Value>,
+    shape: Shape,
+    indent: usize,
+    mut inline: bool,
+) {
     for (key, value, child) in entries(map, shape) {
-        push_indent(out, indent);
+        if !std::mem::take(&mut inline) {
+            push_indent(out, indent);
+        }
         out.push_str(&string(key));
         out.push(':');
         match value {
             Value::Object(m) if !m.is_empty() => {
                 out.push('\n');
-                write_map(out, m, child, indent + 2);
+                write_map(out, m, child, indent + 2, false);
             }
             Value::Array(list) if !list.is_empty() => {
                 out.push('\n');
                 // A list under a key has the same indent as the key.
-                write_seq(out, list, child, indent);
+                write_seq(out, list, child, indent, false);
             }
             Value::String(s) if literal_ok(s) => {
                 out.push(' ');
@@ -57,24 +67,24 @@ fn write_map(out: &mut String, map: &Map<String, Value>, shape: Shape, indent: u
     }
 }
 
-fn write_seq(out: &mut String, list: &[Value], shape: Shape, indent: usize) {
+/// Writes the elements of a list, each at `indent`. If `inline` is true, the
+/// first element continues the current line, after a list dash.
+fn write_seq(out: &mut String, list: &[Value], shape: Shape, indent: usize, mut inline: bool) {
     for value in list {
-        push_indent(out, indent);
+        if !std::mem::take(&mut inline) {
+            push_indent(out, indent);
+        }
         out.push('-');
         match value {
+            // The first line of a nested object or list goes on the line of
+            // the dash. The other lines have the indent of the first.
             Value::Object(m) if !m.is_empty() => {
-                // Write the object as if it were indented under the dash, and
-                // then put its first line on the line of the dash.
-                let mut nested = String::new();
-                write_map(&mut nested, m, shape, indent + 2);
                 out.push(' ');
-                out.push_str(&nested[indent + 2..]);
+                write_map(out, m, shape, indent + 2, true);
             }
             Value::Array(l) if !l.is_empty() => {
-                let mut nested = String::new();
-                write_seq(&mut nested, l, shape, indent + 2);
                 out.push(' ');
-                out.push_str(&nested[indent + 2..]);
+                write_seq(out, l, shape, indent + 2, true);
             }
             Value::String(s) if literal_ok(s) => {
                 out.push(' ');
@@ -357,6 +367,7 @@ mod tests {
         }));
         round_trip(&json!([1, "two", {"three": 3}]));
         round_trip(&json!("just a string"));
+        round_trip(&json!("two\nlines\n"));
         round_trip(&json!(null));
     }
 
