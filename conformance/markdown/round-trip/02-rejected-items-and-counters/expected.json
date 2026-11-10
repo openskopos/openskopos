@@ -1,0 +1,85 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_9Lp4Wd7Ks2Hq6Nb3",
+  "version": 2,
+  "kind": "glossary",
+  "title": "Billing glossary",
+  "summary": "Terms for the billing area of the product.",
+  "status": "draft",
+  "method": {
+    "id": "glossary-workshop"
+  },
+  "session": {
+    "id": "5120",
+    "title": "Billing terms"
+  },
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Ana",
+      "kind": "human"
+    },
+    {
+      "id": "P2",
+      "name": "Lee",
+      "kind": "human"
+    },
+    {
+      "id": "P3",
+      "name": "Facilitator",
+      "kind": "ai"
+    }
+  ],
+  "parents": [
+    {
+      "rel": "previous_version",
+      "artifact": "pa_9Lp4Wd7Ks2Hq6Nb3",
+      "version": 1
+    }
+  ],
+  "id_counters": {
+    "T": 4
+  },
+  "items": [
+    {
+      "id": "T1",
+      "type": "term",
+      "text": "Seat",
+      "status": "accepted",
+      "definition": "One user who can sign in to an org.",
+      "code_names": [
+        "Billing.Seat",
+        "seats_used"
+      ]
+    },
+    {
+      "id": "T2",
+      "type": "term",
+      "text": "Plan",
+      "status": "accepted",
+      "definition": "The product tier that an org pays for. Each plan has a seat limit.",
+      "code_names": [
+        "Billing.Plan"
+      ]
+    },
+    {
+      "id": "T4",
+      "type": "term",
+      "text": "Billing period",
+      "status": "accepted",
+      "definition": "The month or year that the customer paid for.",
+      "aliases": [
+        "paid period"
+      ]
+    },
+    {
+      "id": "T3",
+      "type": "term",
+      "text": "Paid period",
+      "status": "rejected",
+      "definition": "The month that the customer paid for.",
+      "detail": "Rejected: annual plans have a year, not a month."
+    }
+  ],
+  "created_at": "2026-11-10T12:00:00Z"
+}
