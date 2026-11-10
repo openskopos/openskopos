@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://openskopos.org/schema/artifact/0.1.json",
   "title": "OpenSkopos artifact",
-  "description": "One version of an OpenSkopos artifact. Clarvelo Prep Methods produce OpenSkopos documents. Format version 0.1, a draft that is not published yet. See app/docs/adr/039-prep-artifact-envelope-and-stable-item-ids.md. Rules that JSON Schema cannot express: item IDs are unique in a version, a previous_version parent has the same artifact ID and version - 1, an item ID is never used again for a different item in the same artifact, and each id_counters value is at least the highest number of that prefix in items.",
+  "description": "One version of an OpenSkopos artifact, format version 0.1. See https://github.com/openskopos/openskopos/tree/main/spec/0.1. Rules that JSON Schema cannot express: item IDs are unique in a version, a previous_version parent has the same artifact ID and version - 1, an item ID is never used again for a different item in the same artifact, and each id_counters value is at least the highest number of that prefix in items.",
   "type": "object",
   "required": [
     "$schema",
@@ -392,7 +392,7 @@
         },
         "proposed_by": { "$ref": "#/$defs/participantId" },
         "ratification": {
-          "description": "Vote counts, as stored by the wrap-up harvest (ADR 028).",
+          "description": "Vote counts for the item.",
           "type": "object",
           "required": ["yes", "no", "eligible"],
           "properties": {

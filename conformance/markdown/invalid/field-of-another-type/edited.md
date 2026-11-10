@@ -35,21 +35,21 @@ status: final
 
 ## Constraints
 
-- C1: Never change the Polar webhook contract.
+- C1: Never change the payment webhook contract.
   - modality: never
   - rationale: The billing sync depends on it.
-  - scope: app/lib/clarvelo/billing/
-  - enforced_by: Polar webhook contract tests in CI
+  - scope: lib/billing/
+  - enforced_by: Payment webhook contract tests in CI
 - C2: Ask before adding a database migration.
   - modality: ask_first
-  - scope: app/priv/repo/migrations/
+  - scope: priv/repo/migrations/
   - approver: Tech lead
   - bring: The migration
   - bring: A rollback plan
 
 ## Assumptions
 
-- A1: Polar can schedule a plan change for the end of the paid period.
+- A1: The payment provider can schedule a plan change for the end of the paid period.
   - confirmation: confirmed
   - owner: P2
 - A2: Fewer than 5% of customers are on annual plans.
@@ -82,7 +82,7 @@ status: final
 ## Decisions
 
 - D1: Downgrades are scheduled, never immediate.
-  - rationale: Matches how Polar bills periods.
+  - rationale: Matches how the payment provider bills periods.
   - alternatives: Immediate downgrade with proration
   - consequences: Customers pay the old price until the period ends.
   - decided_by: P2

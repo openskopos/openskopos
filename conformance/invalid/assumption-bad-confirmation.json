@@ -25,7 +25,7 @@
     },
     {
       "id": "P3",
-      "name": "Clarvelo facilitator",
+      "name": "Facilitator",
       "kind": "ai"
     }
   ],
@@ -46,8 +46,8 @@
       "rel": "input",
       "source": {
         "kind": "ticket",
-        "title": "CLA-901 Downgrade flow",
-        "uri": "https://linear.app/acme/issue/CLA-901"
+        "title": "BILL-901 Downgrade flow",
+        "uri": "https://tracker.example.com/BILL-901"
       }
     }
   ],
@@ -130,14 +130,14 @@
     {
       "id": "C1",
       "type": "constraint",
-      "text": "Never change the Polar webhook contract.",
+      "text": "Never change the payment webhook contract.",
       "status": "accepted",
       "modality": "never",
       "rationale": "The billing sync depends on it.",
       "scope": [
-        "app/lib/clarvelo/billing/"
+        "lib/billing/"
       ],
-      "enforced_by": "Polar webhook contract tests in CI"
+      "enforced_by": "Payment webhook contract tests in CI"
     },
     {
       "id": "C2",
@@ -146,7 +146,7 @@
       "status": "accepted",
       "modality": "ask_first",
       "scope": [
-        "app/priv/repo/migrations/"
+        "priv/repo/migrations/"
       ],
       "approver": "Tech lead",
       "bring": [
@@ -157,7 +157,7 @@
     {
       "id": "A1",
       "type": "assumption",
-      "text": "Polar can schedule a plan change for the end of the paid period.",
+      "text": "The payment provider can schedule a plan change for the end of the paid period.",
       "status": "accepted",
       "confirmation": "maybe",
       "owner": "P2",
@@ -165,7 +165,7 @@
         {
           "kind": "code",
           "repo": "acme/billing",
-          "path": "lib/billing/providers/polar.ex",
+          "path": "lib/billing/provider.ex",
           "line_start": 88,
           "line_end": 97,
           "commit": "b4c5d6e"
@@ -221,7 +221,7 @@
       "type": "decision",
       "text": "Downgrades are scheduled, never immediate.",
       "status": "accepted",
-      "rationale": "Matches how Polar bills periods.",
+      "rationale": "Matches how the payment provider bills periods.",
       "alternatives": [
         "Immediate downgrade with proration"
       ],

@@ -10,7 +10,7 @@
   "participants": [
     { "id": "P1", "name": "Ana", "kind": "human" },
     { "id": "P2", "name": "Lee", "kind": "human" },
-    { "id": "P3", "name": "Clarvelo facilitator", "kind": "ai" }
+    { "id": "P3", "name": "Facilitator", "kind": "ai" }
   ],
   "decider": "P2",
   "parents": [
@@ -18,7 +18,7 @@
     { "rel": "input", "artifact": "pa_3fQ8nV2kLm7Xc1Rt", "version": 1, "kind": "critique" },
     {
       "rel": "input",
-      "source": { "kind": "ticket", "title": "CLA-901 Downgrade flow", "uri": "https://linear.app/acme/issue/CLA-901" }
+      "source": { "kind": "ticket", "title": "BILL-901 Downgrade flow", "uri": "https://tracker.example.com/BILL-901" }
     }
   ],
   "id_counters": {
@@ -82,12 +82,12 @@
     {
       "id": "C1",
       "type": "constraint",
-      "text": "Never change the Polar webhook contract.",
+      "text": "Never change the payment webhook contract.",
       "status": "accepted",
       "modality": "never",
       "rationale": "The billing sync depends on it.",
-      "scope": ["app/lib/clarvelo/billing/"],
-      "enforced_by": "Polar webhook contract tests in CI"
+      "scope": ["lib/billing/"],
+      "enforced_by": "Payment webhook contract tests in CI"
     },
     {
       "id": "C2",
@@ -95,14 +95,14 @@
       "text": "Ask before adding a database migration.",
       "status": "accepted",
       "modality": "ask_first",
-      "scope": ["app/priv/repo/migrations/"],
+      "scope": ["priv/repo/migrations/"],
       "approver": "Tech lead",
       "bring": ["The migration", "A rollback plan"]
     },
     {
       "id": "A1",
       "type": "assumption",
-      "text": "Polar can schedule a plan change for the end of the paid period.",
+      "text": "The payment provider can schedule a plan change for the end of the paid period.",
       "status": "accepted",
       "confirmation": "confirmed",
       "owner": "P2",
@@ -110,7 +110,7 @@
         {
           "kind": "code",
           "repo": "acme/billing",
-          "path": "lib/billing/providers/polar.ex",
+          "path": "lib/billing/provider.ex",
           "line_start": 88,
           "line_end": 97,
           "commit": "b4c5d6e"
@@ -158,7 +158,7 @@
       "type": "decision",
       "text": "Downgrades are scheduled, never immediate.",
       "status": "accepted",
-      "rationale": "Matches how Polar bills periods.",
+      "rationale": "Matches how the payment provider bills periods.",
       "alternatives": ["Immediate downgrade with proration"],
       "consequences": ["Customers pay the old price until the period ends."],
       "decided_by": "P2",
