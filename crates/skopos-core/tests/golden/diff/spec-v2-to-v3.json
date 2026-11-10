@@ -1,0 +1,107 @@
+{
+  "from": {
+    "artifact": "pa_2Xc5Rv8Tn1Mb4Kz7",
+    "version": 2
+  },
+  "to": {
+    "artifact": "pa_2Xc5Rv8Tn1Mb4Kz7",
+    "version": 3
+  },
+  "same_artifact": true,
+  "envelope": [
+    "summary",
+    "x-generator"
+  ],
+  "added": [
+    {
+      "id": "FR4",
+      "type": "requirement",
+      "text": "A plan change that leaves more seats in use than the new limit is blocked."
+    },
+    {
+      "id": "C4",
+      "type": "constraint",
+      "text": "Avoid new background jobs for this work."
+    },
+    {
+      "id": "A2",
+      "type": "assumption",
+      "text": "Seat counts are at most one minute late."
+    },
+    {
+      "id": "R1",
+      "type": "risk",
+      "text": "A late seat count lets a blocked change through."
+    },
+    {
+      "id": "D1",
+      "type": "decision",
+      "text": "Recount seats inside the plan change."
+    },
+    {
+      "id": "CR1",
+      "type": "critique",
+      "text": "Version 2 trusts a seat count that a background job writes."
+    }
+  ],
+  "changed": [
+    {
+      "id": "S2",
+      "type": "success_signal",
+      "text": "No support ticket about lost access after a plan change.",
+      "fields": [
+        "status"
+      ],
+      "status_from": "accepted",
+      "status_to": "proposed"
+    },
+    {
+      "id": "ST1",
+      "type": "story",
+      "text": "As an org admin, I want to see which seats block a plan change, so that I can free them.",
+      "fields": [
+        "refs"
+      ]
+    },
+    {
+      "id": "A1",
+      "type": "assumption",
+      "text": "Seat counts are exact at the time of the plan change.",
+      "fields": [
+        "confirmation",
+        "evidence",
+        "text"
+      ]
+    },
+    {
+      "id": "Q2",
+      "type": "open_question",
+      "text": "Do guest users count as seats?",
+      "fields": [
+        "answer",
+        "refs"
+      ]
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "Should we email the admin?",
+      "fields": [
+        "status"
+      ],
+      "status_from": "proposed",
+      "status_to": "rejected"
+    }
+  ],
+  "dropped": [],
+  "superseded": [
+    {
+      "id": "FR2",
+      "type": "requirement",
+      "text": "A plan change that leaves more seats in use than the new limit shows a warning.",
+      "by": [
+        "FR4"
+      ]
+    }
+  ]
+}

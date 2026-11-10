@@ -1,0 +1,203 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_2Xc5Rv8Tn1Mb4Kz7",
+  "version": 2,
+  "kind": "spec",
+  "title": "Spec: seat limits on plan changes",
+  "summary": "What happens to seats when an org moves to a plan with fewer seats.",
+  "status": "final",
+  "method": {
+    "id": "elaboration-mob",
+    "version": "2"
+  },
+  "session": {
+    "id": "s-7702",
+    "title": "Seat limits, round 2"
+  },
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Ana",
+      "kind": "human"
+    },
+    {
+      "id": "P2",
+      "name": "Lee",
+      "kind": "human"
+    },
+    {
+      "id": "P3",
+      "name": "Facilitator",
+      "kind": "ai"
+    }
+  ],
+  "decider": "P1",
+  "parents": [
+    {
+      "rel": "previous_version",
+      "artifact": "pa_2Xc5Rv8Tn1Mb4Kz7",
+      "version": 1
+    },
+    {
+      "rel": "input",
+      "artifact": "pa_9Lp4Wd7Ks2Hq6Nb3",
+      "version": 1,
+      "kind": "glossary",
+      "title": "Billing glossary"
+    },
+    {
+      "rel": "input",
+      "source": {
+        "kind": "repo_file",
+        "title": "Seat model",
+        "repo": "acme/billing",
+        "path": "lib/billing/seat.ex",
+        "commit": "0f1e2d3c4b5a",
+        "digest": "sha256:abababababababababababababababababababababababababababababababab"
+      }
+    },
+    {
+      "rel": "input",
+      "source": {
+        "kind": "url",
+        "title": "Pricing page",
+        "uri": "https://example.com/pricing"
+      }
+    }
+  ],
+  "id_counters": {
+    "G": 2,
+    "S": 2,
+    "FR": 3,
+    "ST": 1,
+    "C": 3,
+    "A": 1,
+    "N": 1,
+    "Q": 2,
+    "T": 1
+  },
+  "items": [
+    {
+      "id": "G2",
+      "type": "goal",
+      "text": "No user loses access by surprise when the org changes plan.",
+      "status": "accepted",
+      "for": "Members of orgs that downgrade"
+    },
+    {
+      "id": "S2",
+      "type": "success_signal",
+      "text": "No support ticket about lost access after a plan change.",
+      "status": "accepted",
+      "verification": "Support tags tickets with plan-change for one month.",
+      "refs": [
+        {
+          "item": "G2",
+          "rel": "verifies"
+        }
+      ]
+    },
+    {
+      "id": "FR2",
+      "type": "requirement",
+      "text": "A plan change that leaves more seats in use than the new limit shows a warning.",
+      "status": "accepted",
+      "priority": "must",
+      "refs": [
+        {
+          "item": "G2",
+          "rel": "derived_from"
+        }
+      ]
+    },
+    {
+      "id": "FR3",
+      "type": "requirement",
+      "text": "The seat count never goes below zero.",
+      "status": "accepted",
+      "priority": "should",
+      "detail": "An invariant. A property-based test fits it."
+    },
+    {
+      "id": "ST1",
+      "type": "story",
+      "text": "As an org admin, I want to see which seats block a plan change, so that I can free them.",
+      "status": "accepted",
+      "acceptance_criteria": [
+        "The page lists the members above the limit."
+      ],
+      "examples": [
+        {
+          "text": "A member who is not an admin sees the list.",
+          "kind": "forbidden"
+        }
+      ],
+      "refs": [
+        {
+          "item": "FR2",
+          "rel": "refines"
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "type": "constraint",
+      "text": "Always run the billing contract tests before a merge.",
+      "status": "accepted",
+      "modality": "always",
+      "enforced_by": "CI job billing-contract"
+    },
+    {
+      "id": "C3",
+      "type": "constraint",
+      "text": "Prefer the existing Seat module over new tables.",
+      "status": "accepted",
+      "modality": "prefer",
+      "rationale": "One owner for seat data.",
+      "scope": [
+        "lib/billing/"
+      ]
+    },
+    {
+      "id": "A1",
+      "type": "assumption",
+      "text": "Seat counts are exact.",
+      "status": "accepted",
+      "owner": "P2"
+    },
+    {
+      "id": "N1",
+      "type": "non_goal",
+      "text": "Automatic removal of members above the limit.",
+      "status": "accepted",
+      "reason": "An admin chooses who leaves.",
+      "deferred": true
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "Should we email the admin?",
+      "status": "proposed"
+    },
+    {
+      "id": "Q2",
+      "type": "open_question",
+      "text": "Do guest users count as seats?",
+      "status": "accepted",
+      "owner": "P1",
+      "blocking": true
+    },
+    {
+      "id": "T1",
+      "type": "term",
+      "text": "Seat limit",
+      "status": "accepted",
+      "definition": "The highest number of seats that a plan allows.",
+      "code_names": [
+        "Plan.max_seats"
+      ]
+    }
+  ],
+  "created_at": "2026-11-01T10:00:00Z",
+  "finalized_at": "2026-11-01T12:00:00Z"
+}

@@ -9,13 +9,14 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
-use skopos_core::{assign_ids, check, markdown, parse, write, Format, Problem, Value};
+use skopos_core::export::{self, Options, Tool};
+use skopos_core::{assign_ids, check, diff, markdown, parse, write, Format, Problem, Value};
 
 #[derive(Parser)]
 #[command(
     name = "skopos",
     version,
-    about = "Check, format, convert and import OpenSkopos documents"
+    about = "Check, format, convert, import, export and compare OpenSkopos documents"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -93,6 +94,47 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
+    /// Export a document to the files of a spec-driven development tool.
+    ///
+    /// Only accepted items are exported. Each item keeps its reference
+    /// string. Items with no place in the tool are named in a "Not exported"
+    /// note. See docs/exporters.md.
+    Export {
+        /// The document to export
+        file: PathBuf,
+        /// The tool
+        #[arg(long, value_enum)]
+        to: ExportTool,
+        /// The root folder of the project. The tool's folders go inside it.
+        #[arg(short, long, default_value = ".")]
+        output: PathBuf,
+        /// The name of the change or feature. Without it, the name comes from
+        /// the title.
+        #[arg(long)]
+        name: Option<String>,
+        /// Spec Kit only: the feature number. Without it, skopos uses the
+        /// number of the feature folder with the same name, or the next free
+        /// number in specs/.
+        #[arg(long)]
+        number: Option<u32>,
+        /// Write over files that exist
+        #[arg(long)]
+        force: bool,
+        /// Write no files. Name the files and the items that are not exported.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Show the items that were added, changed, dropped and superseded
+    /// between two versions, by item ID.
+    Diff {
+        /// The old version
+        old: PathBuf,
+        /// The new version
+        new: PathBuf,
+        /// Write the difference as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -108,6 +150,25 @@ enum Target {
 enum FileFormat {
     Data(Format),
     Markdown,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ExportTool {
+    #[value(name = "openspec")]
+    OpenSpec,
+    Kiro,
+    #[value(name = "speckit")]
+    SpecKit,
+}
+
+impl From<ExportTool> for Tool {
+    fn from(t: ExportTool) -> Tool {
+        match t {
+            ExportTool::OpenSpec => Tool::OpenSpec,
+            ExportTool::Kiro => Tool::Kiro,
+            ExportTool::SpecKit => Tool::SpecKit,
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -127,6 +188,23 @@ fn main() -> ExitCode {
             output,
         } => run_import(&file, &stored, output.as_deref()),
         Command::Ids { files, check } => run_ids(&files, check),
+        Command::Export {
+            file,
+            to,
+            output,
+            name,
+            number,
+            force,
+            dry_run,
+        } => run_export(
+            &file,
+            to.into(),
+            &output,
+            Options { name, number },
+            force,
+            dry_run,
+        ),
+        Command::Diff { old, new, json } => run_diff(&old, &new, json),
     };
     if ok {
         ExitCode::SUCCESS
@@ -453,4 +531,130 @@ fn run_ids(files: &[PathBuf], check_only: bool) -> bool {
         }
     }
     ok
+}
+
+/// Reads a document and checks it. Reports each problem.
+fn read_valid(path: &Path) -> Option<Value> {
+    let doc = match read(path) {
+        Ok((_, _, doc)) => doc,
+        Err(problem) => {
+            report(path, &problem);
+            return None;
+        }
+    };
+    let problems = check(&doc);
+    if problems.is_empty() {
+        return Some(doc);
+    }
+    for p in &problems {
+        report(path, p);
+    }
+    eprintln!(
+        "{}: fix the {} first.",
+        path.display(),
+        plural(problems.len(), "problem")
+    );
+    None
+}
+
+/// The Spec Kit feature number: the number of the folder `NNN-<name>` in
+/// `specs/` if there is one, or one more than the highest number there.
+fn speckit_number(root: &Path, name: &str) -> u32 {
+    let mut highest = 0;
+    let Ok(entries) = fs::read_dir(root.join("specs")) else {
+        return 1;
+    };
+    for entry in entries.flatten() {
+        let folder = entry.file_name().to_string_lossy().to_string();
+        let Some((number, rest)) = folder.split_once('-') else {
+            continue;
+        };
+        let Ok(n) = number.parse::<u32>() else {
+            continue;
+        };
+        if rest == name {
+            return n;
+        }
+        highest = highest.max(n);
+    }
+    highest + 1
+}
+
+fn run_export(
+    file: &Path,
+    tool: Tool,
+    root: &Path,
+    mut options: Options,
+    force: bool,
+    dry_run: bool,
+) -> bool {
+    let Some(doc) = read_valid(file) else {
+        return false;
+    };
+    if tool == Tool::SpecKit && options.number.is_none() {
+        options.number = Some(speckit_number(root, &export::name(&doc, &options)));
+    }
+    let out = export::export(&doc, tool, &options);
+
+    let existing: Vec<PathBuf> = out
+        .files
+        .iter()
+        .map(|f| root.join(&f.path))
+        .filter(|p| p.exists())
+        .collect();
+    if !existing.is_empty() && !force && !dry_run {
+        for p in &existing {
+            eprintln!(
+                "{}: the file exists. Use --force to write over it.",
+                p.display()
+            );
+        }
+        return false;
+    }
+
+    let mut ok = true;
+    for f in &out.files {
+        let path = root.join(&f.path);
+        if dry_run {
+            emit(&format!("{}\n", path.display()));
+            continue;
+        }
+        if let Some(parent) = path.parent() {
+            if let Err(e) = fs::create_dir_all(parent) {
+                eprintln!("{}: cannot make the folder: {e}", parent.display());
+                ok = false;
+                continue;
+            }
+        }
+        if write_file(&path, &f.text) {
+            emit(&format!("{}\n", path.display()));
+        } else {
+            ok = false;
+        }
+    }
+    if !out.not_exported.is_empty() {
+        eprintln!(
+            "Not exported to {} ({}):",
+            tool.display_name(),
+            plural(out.not_exported.len(), "item")
+        );
+        for n in &out.not_exported {
+            eprintln!("  {} ({}): {}", n.reference, n.item_type, n.reason);
+        }
+    }
+    ok
+}
+
+fn run_diff(old: &Path, new: &Path, json: bool) -> bool {
+    let (Some(a), Some(b)) = (read_valid(old), read_valid(new)) else {
+        return false;
+    };
+    let d = diff::diff(&a, &b);
+    if json {
+        let mut text = serde_json::to_string_pretty(&d).expect("a diff serializes");
+        text.push('\n');
+        emit(&text)
+    } else {
+        emit(&d.to_text())
+    }
 }

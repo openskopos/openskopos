@@ -45,8 +45,10 @@ edited by hand and read back.
 
 The `skopos` command line tool checks, formats and converts documents in
 JSON, YAML and Markdown, and gives IDs to new items. It also reads an edited
-Markdown file back into the next version of a document. To install it from a clone of this repository, run
-this command:
+Markdown file back into the next version of a document. It compares two
+versions item by item, and exports a document to OpenSpec, Kiro or Spec Kit
+(see [docs/exporters.md](docs/exporters.md)). To install it from a clone of
+this repository, run this command:
 
 ```bash
 cargo install --locked --path crates/skopos

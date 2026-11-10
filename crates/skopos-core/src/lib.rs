@@ -43,6 +43,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 pub use serde_json::Value;
 
+pub mod diff;
+pub mod export;
 mod ids;
 pub mod markdown;
 pub mod model;

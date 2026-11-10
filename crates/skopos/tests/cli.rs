@@ -418,3 +418,156 @@ fn import_of_an_unchanged_draft_says_that_it_replaces_the_draft() {
     let original: Value = serde_json::from_str(&fs::read_to_string(&stored).unwrap()).unwrap();
     assert_eq!(stdout_json(&out)["version"], original["version"]);
 }
+
+fn valid(file: &str) -> String {
+    conformance().join("valid").join(file).display().to_string()
+}
+
+fn fixture(file: &str) -> String {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../skopos-core/tests/fixtures")
+        .join(file)
+        .display()
+        .to_string()
+}
+
+#[test]
+fn export_writes_the_files_of_each_tool() {
+    let doc = valid("spec-all-types-v3.json");
+    // The file with the requirements, and the file with the note.
+    for (tool, file, note) in [
+        (
+            "openspec",
+            "openspec/changes/seat-limits/specs/seat-limits/spec.md",
+            "openspec/changes/seat-limits/proposal.md",
+        ),
+        (
+            "kiro",
+            ".kiro/specs/seat-limits/requirements.md",
+            ".kiro/specs/seat-limits/requirements.md",
+        ),
+        (
+            "speckit",
+            "specs/001-seat-limits/spec.md",
+            "specs/001-seat-limits/spec.md",
+        ),
+    ] {
+        let dir = temp_dir(&format!("export-{tool}"));
+        let root = dir.to_str().unwrap();
+        let args = [
+            "export",
+            &doc,
+            "--to",
+            tool,
+            "-o",
+            root,
+            "--name",
+            "seat limits",
+        ];
+        let out = skopos(&args);
+        assert!(
+            out.status.success(),
+            "{}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        let text = fs::read_to_string(dir.join(file)).unwrap();
+        assert!(text.contains("`pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4`"), "{text}");
+        let text = fs::read_to_string(dir.join(note)).unwrap();
+        assert!(text.contains("## Not exported"), "{text}");
+        let stderr = String::from_utf8_lossy(&out.stderr);
+        assert!(
+            stderr.contains("pa_2Xc5Rv8Tn1Mb4Kz7@3#CR1 (critique)"),
+            "{stderr}"
+        );
+
+        // A second export does not write over the files without --force.
+        let again = skopos(&args);
+        assert_eq!(again.status.code(), Some(1));
+        assert!(String::from_utf8_lossy(&again.stderr).contains("--force"));
+        let mut forced = args.to_vec();
+        forced.push("--force");
+        assert!(skopos(&forced).status.success());
+    }
+}
+
+#[test]
+fn export_dry_run_writes_nothing() {
+    let dir = temp_dir("export-dry-run");
+    let out = skopos(&[
+        "export",
+        &valid("intent-lock-intent-v2.json"),
+        "--to",
+        "kiro",
+        "-o",
+        dir.to_str().unwrap(),
+        "--dry-run",
+    ]);
+    assert!(out.status.success());
+    assert!(String::from_utf8_lossy(&out.stdout).contains("requirements.md"));
+    assert_eq!(fs::read_dir(&dir).unwrap().count(), 0);
+}
+
+#[test]
+fn export_to_speckit_takes_the_next_feature_number() {
+    let dir = temp_dir("export-speckit-number");
+    fs::create_dir_all(dir.join("specs/001-login")).unwrap();
+    fs::create_dir_all(dir.join("specs/004-billing")).unwrap();
+    let root = dir.to_str().unwrap();
+    let doc = valid("spec-all-types-v3.json");
+    let out = skopos(&[
+        "export", &doc, "--to", "speckit", "-o", root, "--name", "seats",
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(dir.join("specs/005-seats/spec.md").exists());
+    // The same name keeps its number.
+    let out = skopos(&[
+        "export", &doc, "--to", "speckit", "-o", root, "--name", "seats", "--force",
+    ]);
+    assert!(out.status.success());
+    assert!(!dir.join("specs/006-seats").exists());
+}
+
+#[test]
+fn export_refuses_an_invalid_document() {
+    let dir = temp_dir("export-invalid");
+    let file = dir.join("doc.json");
+    fs::write(&file, r#"{"items": []}"#).unwrap();
+    let out = skopos(&[
+        "export",
+        file.to_str().unwrap(),
+        "--to",
+        "kiro",
+        "-o",
+        dir.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(!dir.join(".kiro").exists());
+}
+
+#[test]
+fn diff_names_items_by_id() {
+    let old = fixture("spec-v2.json");
+    let new = valid("spec-all-types-v3.json");
+    let out = skopos(&["diff", &old, &new]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.starts_with("pa_2Xc5Rv8Tn1Mb4Kz7@2 -> pa_2Xc5Rv8Tn1Mb4Kz7@3\n"),
+        "{text}"
+    );
+    assert!(text.contains("superseded FR2  by FR4\n"), "{text}");
+
+    let out = skopos(&["diff", "--json", &old, &new]);
+    let json = stdout_json(&out);
+    assert_eq!(json["superseded"][0]["id"], "FR2");
+    assert_eq!(json["added"][0]["id"], "FR4");
+    assert_eq!(json["changed"][0]["id"], "S2");
+}
