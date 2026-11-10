@@ -179,6 +179,88 @@ changed file in the canonical layout.
 With `--check`, the tool changes no files. It names each file that needs a
 change. If there is one, the exit code is 1.
 
+### export
+
+`skopos export` writes the files of a spec-driven development tool from a
+document: [OpenSpec](https://github.com/Fission-AI/OpenSpec),
+[Kiro](https://kiro.dev) or [Spec Kit](https://github.com/github/spec-kit).
+Teams can keep what they agreed in OpenSkopos and give it to the tool that
+their agents already use.
+
+```bash
+skopos export spec.skopos.json --to openspec
+skopos export spec.skopos.json --to kiro --name seat-limits
+skopos export spec.skopos.json --to speckit -o ../billing
+```
+
+| Tool | Files |
+|---|---|
+| `openspec` | `openspec/changes/<name>-v<version>/`: `.openspec.yaml`, `proposal.md`, `design.md` and a spec delta in `specs/<capability>/spec.md` |
+| `kiro` | `.kiro/specs/<name>/`: `requirements.md` and `design.md` |
+| `speckit` | `specs/<NNN>-<name>/`: `spec.md`, `plan.md` and `research.md` |
+
+- `-o` is the root folder of the project. The default is the current folder.
+- `--name` is the name of the change or feature. Without it, the name comes
+  from the title of the document.
+- For Spec Kit, `--number` sets the feature number. Without it, the tool uses
+  the number of a folder in `specs/` with the same name, or the next free
+  number.
+- The tool does not write over a file that exists. Use `--force` to write
+  over it. With `--force`, the tool also removes the files of an earlier
+  export that this export does not write, so that no old items stay behind.
+- `--dry-run` names the files and writes nothing.
+- For OpenSpec, the tool reads `openspec/specs/` and the open changes. A
+  later export writes MODIFIED and REMOVED requirements for the items that
+  earlier exports put into the specs. It refuses while an earlier export is
+  not archived yet. See [docs/exporters.md](../../docs/exporters.md#openspec).
+- For Spec Kit, the tool names the `.specify/feature.json` setting that makes
+  Spec Kit work on the exported feature. It does not change that file.
+
+The tool exports only accepted items. Each exported line ends with the
+reference string of its item, for example `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4`. Items
+that have no place in the tool, and items that are proposed or rejected, are
+in a "Not exported" note in the files. The tool also writes the list to
+standard error. [docs/exporters.md](../../docs/exporters.md) explains where
+each item type goes.
+
+The document can be JSON, YAML or Markdown. It must be valid. If
+`skopos check` finds a problem, the tool
+exports nothing.
+
+### diff
+
+`skopos diff` compares two versions of an artifact, item by item. The item ID
+keeps its meaning in every version, so the tool compares the items with the
+same ID.
+
+```bash
+skopos diff spec-v2.skopos.json spec-v3.skopos.json
+```
+
+Each file can be JSON, YAML or Markdown, so `skopos diff spec.skopos.json SPEC.md`
+shows what a hand edit of the Markdown file changed.
+
+```
+pa_2Xc5Rv8Tn1Mb4Kz7@2 -> pa_2Xc5Rv8Tn1Mb4Kz7@3
+envelope   summary
+added      FR4  A plan change that leaves more seats in use than the new limit is blocked.
+changed    A1   confirmation, evidence, text
+changed    Q1   status (status proposed -> rejected)
+superseded FR2  by FR4
+dropped    N2   Emails to members above the limit.
+```
+
+| Line | Meaning |
+|---|---|
+| `added` | The ID is in the new version only. |
+| `changed` | The ID is in both versions, and the fields after it are different. A change of display order, of items or of `refs`, is not a change. |
+| `superseded` | The ID is in the old version only, and an item of the new version links to it with `supersedes`. A rejected item supersedes nothing. |
+| `dropped` | The ID is in the old version only, and no item supersedes it. |
+| `envelope` | Fields of the document that are different, such as `title` or `summary`. The tool does not compare `version`, `status`, `parents`, `created_at`, `finalized_at`, `method`, `session` and `id_counters`. |
+
+With `--json`, the tool writes the difference as JSON. The exit code is 0 if
+both documents are valid, also if they are different.
+
 ## License
 
 [Apache License 2.0](../../LICENSE)

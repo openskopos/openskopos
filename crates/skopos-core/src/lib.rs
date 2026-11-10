@@ -43,6 +43,8 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 pub use serde_json::Value;
 
+pub mod diff;
+pub mod export;
 mod ids;
 pub mod markdown;
 pub mod model;
@@ -138,4 +140,29 @@ pub(crate) fn whole_number(value: &Value) -> Option<u64> {
 pub(crate) fn pointer(parent: &str, key: impl fmt::Display) -> String {
     let key = key.to_string().replace('~', "~0").replace('/', "~1");
     format!("{parent}/{key}")
+}
+
+/// Text on one line: line breaks and runs of spaces become one space.
+pub(crate) fn one_line(text: &str) -> String {
+    text.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// An artifact and version, for example `pa_2Xc5Rv8Tn1Mb4Kz7@3`, or the
+/// artifact ID alone if there is no version.
+pub(crate) fn version_label(artifact: &str, version: Option<u64>) -> String {
+    match version {
+        Some(v) => format!("{artifact}@{v}"),
+        None => artifact.to_string(),
+    }
+}
+
+/// A reference string (specification section 6), for example
+/// `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4`.
+pub(crate) fn reference_string(artifact: &str, version: Option<u64>, item: &str) -> String {
+    format!("{}#{item}", version_label(artifact, version))
+}
+
+/// The date part of an RFC 3339 date and time, for example `2026-11-08`.
+pub(crate) fn date_of(timestamp: &str) -> &str {
+    timestamp.get(..10).unwrap_or(timestamp)
 }

@@ -18,6 +18,8 @@ strings or values. The crate reads no files and uses no network. It builds for
 | `write(&Value, Format) -> String` | Writes a document as JSON or YAML in the canonical layout. Reading the text again gives the same value. |
 | `assign_ids(&mut Value) -> Result<IdReport, Vec<Problem>>` | Gives an ID to each item that has none, and updates `id_counters` (specification section 7). |
 | `parse_item_id(&str)` | Reads an item ID such as `CR12` into its type and number. |
+| `diff::diff(&Value, &Value) -> Diff` | Compares two versions by item ID: the items that were added, changed, dropped and superseded. `Diff::to_text` gives one line for each item. |
+| `export::export(&Value, Tool, &Options) -> Export` | Makes the files of OpenSpec, Kiro or Spec Kit from a document. The result has the files and the items that are not exported. See [docs/exporters.md](../../docs/exporters.md). |
 
 A `Problem` has three fields:
 

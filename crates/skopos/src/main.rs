@@ -9,13 +9,14 @@ use std::process::ExitCode;
 
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
-use skopos_core::{assign_ids, check, markdown, parse, write, Format, Problem, Value};
+use skopos_core::export::{self, Options, Tool};
+use skopos_core::{assign_ids, check, diff, markdown, parse, write, Format, Problem, Value};
 
 #[derive(Parser)]
 #[command(
     name = "skopos",
     version,
-    about = "Check, format, convert and import OpenSkopos documents"
+    about = "Check, format, convert, import, export and compare OpenSkopos documents"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -93,6 +94,47 @@ enum Command {
         #[arg(long)]
         check: bool,
     },
+    /// Export a document to the files of a spec-driven development tool.
+    ///
+    /// Only accepted items are exported. Each item keeps its reference
+    /// string. Items with no place in the tool are named in a "Not exported"
+    /// note. See docs/exporters.md.
+    Export {
+        /// The document to export
+        file: PathBuf,
+        /// The tool
+        #[arg(long, value_enum)]
+        to: ExportTool,
+        /// The root folder of the project. The tool's folders go inside it.
+        #[arg(short, long, default_value = ".")]
+        output: PathBuf,
+        /// The name of the change or feature. Without it, the name comes from
+        /// the title.
+        #[arg(long)]
+        name: Option<String>,
+        /// Spec Kit only: the feature number. Without it, skopos uses the
+        /// number of the feature folder with the same name, or the next free
+        /// number in specs/.
+        #[arg(long)]
+        number: Option<u32>,
+        /// Write over files that exist
+        #[arg(long)]
+        force: bool,
+        /// Write no files. Name the files and the items that are not exported.
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Show the items that were added, changed, dropped and superseded
+    /// between two versions, by item ID.
+    Diff {
+        /// The old version
+        old: PathBuf,
+        /// The new version
+        new: PathBuf,
+        /// Write the difference as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -108,6 +150,25 @@ enum Target {
 enum FileFormat {
     Data(Format),
     Markdown,
+}
+
+#[derive(Clone, Copy, ValueEnum)]
+enum ExportTool {
+    #[value(name = "openspec")]
+    OpenSpec,
+    Kiro,
+    #[value(name = "speckit")]
+    SpecKit,
+}
+
+impl From<ExportTool> for Tool {
+    fn from(t: ExportTool) -> Tool {
+        match t {
+            ExportTool::OpenSpec => Tool::OpenSpec,
+            ExportTool::Kiro => Tool::Kiro,
+            ExportTool::SpecKit => Tool::SpecKit,
+        }
+    }
 }
 
 fn main() -> ExitCode {
@@ -127,6 +188,27 @@ fn main() -> ExitCode {
             output,
         } => run_import(&file, &stored, output.as_deref()),
         Command::Ids { files, check } => run_ids(&files, check),
+        Command::Export {
+            file,
+            to,
+            output,
+            name,
+            number,
+            force,
+            dry_run,
+        } => run_export(
+            &file,
+            to.into(),
+            &output,
+            Options {
+                name,
+                number,
+                existing: Vec::new(),
+            },
+            force,
+            dry_run,
+        ),
+        Command::Diff { old, new, json } => run_diff(&old, &new, json),
     };
     if ok {
         ExitCode::SUCCESS
@@ -453,4 +535,257 @@ fn run_ids(files: &[PathBuf], check_only: bool) -> bool {
         }
     }
     ok
+}
+
+/// Reads a JSON, YAML or Markdown document and checks it. Reports each
+/// problem.
+fn read_valid(path: &Path) -> Option<Value> {
+    let doc = read_or_report(path)?;
+    let problems = check(&doc);
+    if problems.is_empty() {
+        return Some(doc);
+    }
+    for p in &problems {
+        report(path, p);
+    }
+    eprintln!(
+        "{}: fix the {} first.",
+        path.display(),
+        plural(problems.len(), "problem")
+    );
+    None
+}
+
+/// Every file under a folder, as paths from `root` with `/` between folders,
+/// in sorted order. A missing folder has no files.
+fn files_under(root: &Path, folder: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut stack = vec![root.join(folder)];
+    while let Some(dir) = stack.pop() {
+        let Ok(entries) = fs::read_dir(&dir) else {
+            continue;
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                stack.push(path);
+            } else if let Ok(rel) = path.strip_prefix(root) {
+                let parts: Vec<String> = rel
+                    .components()
+                    .map(|c| c.as_os_str().to_string_lossy().to_string())
+                    .collect();
+                out.push(parts.join("/"));
+            }
+        }
+    }
+    out.sort();
+    out
+}
+
+/// The paths of `Export::owned`, with each folder (a path that ends with
+/// `/`) replaced by the files under it.
+fn owned_files(root: &Path, owned: &[String]) -> Vec<String> {
+    owned
+        .iter()
+        .flat_map(|p| match p.strip_suffix('/') {
+            Some(folder) => files_under(root, folder),
+            None => vec![p.clone()],
+        })
+        .collect()
+}
+
+/// The OpenSpec files that an export reads: the main specs and the Markdown
+/// files of the open changes. Archived changes are not read.
+fn openspec_files(root: &Path) -> Vec<export::File> {
+    let specs = files_under(root, "openspec/specs")
+        .into_iter()
+        .filter(|p| p.ends_with("/spec.md"));
+    let changes = files_under(root, "openspec/changes")
+        .into_iter()
+        .filter(|p| !p.starts_with("openspec/changes/archive/") && p.ends_with(".md"));
+    specs
+        .chain(changes)
+        .filter_map(|path| {
+            let text = fs::read_to_string(root.join(&path)).ok()?;
+            Some(export::File { path, text })
+        })
+        .collect()
+}
+
+/// The sequence number of a Spec Kit feature folder such as `004-billing`:
+/// three or more digits and `-`. A folder with a timestamp prefix, such as
+/// `20261110-093000-login`, has no sequence number. Spec Kit reads the
+/// folders in the same way.
+fn speckit_folder_number(folder: &str) -> Option<(u32, &str)> {
+    let digits = folder.bytes().take_while(u8::is_ascii_digit).count();
+    let rest = folder[digits..].strip_prefix('-')?;
+    if digits < 3 {
+        return None;
+    }
+    let time = rest.bytes().take_while(u8::is_ascii_digit).count();
+    if digits == 8 && time == 6 && rest[time..].starts_with('-') {
+        return None;
+    }
+    Some((folder[..digits].parse().ok()?, rest))
+}
+
+/// The Spec Kit feature number: the number of the folder `NNN-<name>` in
+/// `specs/` if there is one, or one more than the highest number there.
+fn speckit_number(root: &Path, name: &str) -> u32 {
+    let mut highest = 0;
+    let Ok(entries) = fs::read_dir(root.join("specs")) else {
+        return 1;
+    };
+    for entry in entries.flatten() {
+        let folder = entry.file_name().to_string_lossy().to_string();
+        let Some((n, rest)) = speckit_folder_number(&folder) else {
+            continue;
+        };
+        if rest == name {
+            return n;
+        }
+        highest = highest.max(n);
+    }
+    highest.saturating_add(1)
+}
+
+fn run_export(
+    file: &Path,
+    tool: Tool,
+    root: &Path,
+    mut options: Options,
+    force: bool,
+    dry_run: bool,
+) -> bool {
+    let Some(doc) = read_valid(file) else {
+        return false;
+    };
+    if tool == Tool::SpecKit && options.number.is_none() {
+        options.number = Some(speckit_number(root, &export::name(&doc, &options)));
+    }
+    if tool == Tool::OpenSpec {
+        options.existing = openspec_files(root);
+    }
+    let out = match export::export(&doc, tool, &options) {
+        Ok(out) => out,
+        Err(e) => {
+            eprintln!("{}: {e}", file.display());
+            return false;
+        }
+    };
+
+    // Files of an earlier export that this export does not write. They hold
+    // old items, so they must go.
+    let stale: Vec<PathBuf> = owned_files(root, &out.owned)
+        .into_iter()
+        .filter(|p| !out.files.iter().any(|f| f.path == *p))
+        .map(|p| root.join(p))
+        .filter(|p| p.exists())
+        .collect();
+    let existing: Vec<PathBuf> = out
+        .files
+        .iter()
+        .map(|f| root.join(&f.path))
+        .filter(|p| p.exists())
+        .collect();
+    if !force && !dry_run && (!existing.is_empty() || !stale.is_empty()) {
+        for p in &existing {
+            eprintln!(
+                "{}: the file exists. Use --force to write over it.",
+                p.display()
+            );
+        }
+        for p in &stale {
+            eprintln!(
+                "{}: the file is left over from an earlier export. Use --force to remove it.",
+                p.display()
+            );
+        }
+        return false;
+    }
+
+    let mut ok = true;
+    for f in &out.files {
+        let path = root.join(&f.path);
+        if dry_run {
+            emit(&format!("{}\n", path.display()));
+            continue;
+        }
+        if let Some(parent) = path.parent() {
+            if let Err(e) = fs::create_dir_all(parent) {
+                eprintln!("{}: cannot make the folder: {e}", parent.display());
+                ok = false;
+                continue;
+            }
+        }
+        if write_file(&path, &f.text) {
+            emit(&format!("{}\n", path.display()));
+        } else {
+            ok = false;
+        }
+    }
+    for path in &stale {
+        if dry_run {
+            emit(&format!("{} (remove)\n", path.display()));
+            continue;
+        }
+        match fs::remove_file(path) {
+            Ok(()) => {
+                eprintln!(
+                    "removed {}: this export has no content for it",
+                    path.display()
+                );
+                // Remove the folders that are now empty, up to the export
+                // folder. OpenSpec counts any file under specs/.
+                let top = root.join(&out.folder);
+                let mut dir = path.parent();
+                while let Some(d) = dir.filter(|d| *d != top && d.starts_with(&top)) {
+                    if fs::remove_dir(d).is_err() {
+                        break;
+                    }
+                    dir = d.parent();
+                }
+            }
+            Err(e) => {
+                eprintln!("{}: cannot remove the file: {e}", path.display());
+                ok = false;
+            }
+        }
+    }
+    for w in &out.warnings {
+        eprintln!("warning: {w}");
+    }
+    if !out.not_exported.is_empty() {
+        eprintln!(
+            "Not exported to {} ({}):",
+            tool.display_name(),
+            plural(out.not_exported.len(), "item")
+        );
+        for n in &out.not_exported {
+            eprintln!("  {} ({}): {}", n.reference, n.item_type, n.reason);
+        }
+    }
+    if tool == Tool::SpecKit && !dry_run && ok {
+        // Spec Kit finds the feature to work on in .specify/feature.json, not
+        // in the folder name. The tool does not change that file.
+        eprintln!(
+            "To work on this feature with Spec Kit, set \"feature_directory\" to \"{}\" in .specify/feature.json, or set SPECIFY_FEATURE_DIRECTORY.",
+            out.folder
+        );
+    }
+    ok
+}
+
+fn run_diff(old: &Path, new: &Path, json: bool) -> bool {
+    let (Some(a), Some(b)) = (read_valid(old), read_valid(new)) else {
+        return false;
+    };
+    let d = diff::diff(&a, &b);
+    if json {
+        let mut text = serde_json::to_string_pretty(&d).expect("a diff serializes");
+        text.push('\n');
+        emit(&text)
+    } else {
+        emit(&d.to_text())
+    }
 }

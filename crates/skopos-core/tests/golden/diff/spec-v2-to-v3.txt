@@ -1,0 +1,14 @@
+pa_2Xc5Rv8Tn1Mb4Kz7@2 -> pa_2Xc5Rv8Tn1Mb4Kz7@3
+envelope   summary, x-generator
+added      FR4  A plan change that leaves more seats in use than the new limit is blocked.
+added      C4   Avoid new background jobs for this work.
+added      A2   Seat counts are at most one minute late.
+added      R1   A late seat count lets a blocked change through.
+added      D1   Recount seats inside the plan change.
+added      CR1  Version 2 trusts a seat count that a background job writes.
+changed    S2   status (status accepted -> proposed)
+changed    ST1  refs
+changed    A1   confirmation, evidence, text
+changed    Q2   answer, refs
+changed    Q1   status (status proposed -> rejected)
+superseded FR2  by FR4
