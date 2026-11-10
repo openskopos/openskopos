@@ -79,3 +79,4 @@ terminal cannot show Unicode, print `skopos` and no mark.
 | `favicon.svg` | Browser tab. It changes to the dark colours when the system is in dark mode. |
 | `icon-light.svg`, `icon-dark.svg` | 512 px square: GitHub organization avatar, npm, social |
 | `logo-light.svg`, `logo-dark.svg` | Horizontal logo for the site header and the README |
+| `avatar-square-black.svg`, `avatar-square-zinc.svg` (and `-512.png`) | Square corners, for places that round the corners themselves, such as the GitHub organization avatar |
