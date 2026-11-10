@@ -2,6 +2,7 @@
 
 use serde_json::{Map, Value};
 
+use super::read::parse_ref;
 use super::{evidence_main, item_type, kind, list_key, Kind, ENVELOPE, OTHER, SCHEMA_KEY};
 use crate::model::ItemType;
 use crate::whole_number;
@@ -202,6 +203,18 @@ impl Lines<'_> {
                 .push(format!("{}{pad}- {key}: {value}", self.indent));
         }
     }
+
+    /// `- <key>: <value>` for a value that is not a reference. A reader
+    /// reads a value such as `Q1` on that line as an item ID, so such a value,
+    /// and an empty one, goes on a nested `- <sub>:` line.
+    fn plain_or_nested(&mut self, extra: usize, key: &str, sub: &str, value: &str) {
+        if value.is_empty() || parse_ref(value).is_some() {
+            self.field(extra, key, "");
+            self.field(extra + 2, sub, value);
+        } else {
+            self.field(extra, key, value);
+        }
+    }
 }
 
 fn write_item(out: &mut Vec<String>, item: &Value, prefix: Option<&str>) {
@@ -248,7 +261,7 @@ fn write_item(out: &mut Vec<String>, item: &Value, prefix: Option<&str>) {
                         l.field(2, "section", &one_line_value(Some(s)));
                     }
                 } else {
-                    l.field(0, "target", &one_line_value(v.get("section")));
+                    l.plain_or_nested(0, "target", "section", &one_line_value(v.get("section")));
                 }
             }
             Kind::Resolution => {
@@ -341,7 +354,7 @@ fn write_evidence(l: &mut Lines<'_>, ev: &Value) {
                         l.field(6, "title", &one_line_value(Some(t)));
                     }
                 } else {
-                    l.field(4, "from", &one_line_value(from.get("title")));
+                    l.plain_or_nested(4, "from", "title", &one_line_value(from.get("title")));
                 }
             }
             if let Some(loc) = get("location") {

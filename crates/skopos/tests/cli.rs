@@ -390,3 +390,31 @@ fn fmt_and_ids_do_not_take_markdown() {
         assert!(String::from_utf8_lossy(&out.stderr).contains("skopos convert"));
     }
 }
+
+#[test]
+fn import_of_an_unchanged_draft_says_that_it_replaces_the_draft() {
+    let dir = temp_dir("import-draft");
+    let stored = conformance().join("markdown/round-trip/01-all-item-types/document.json");
+    let md = dir.join("SPEC.md");
+    assert!(skopos(&[
+        "convert",
+        "--to",
+        "md",
+        stored.to_str().unwrap(),
+        "-o",
+        md.to_str().unwrap()
+    ])
+    .status
+    .success());
+    let out = skopos(&[
+        "import",
+        md.to_str().unwrap(),
+        "--stored",
+        stored.to_str().unwrap(),
+    ]);
+    let stderr = String::from_utf8_lossy(&out.stderr);
+    assert!(out.status.success(), "{stderr}");
+    assert!(stderr.contains("replaces draft version 3"), "{stderr}");
+    let original: Value = serde_json::from_str(&fs::read_to_string(&stored).unwrap()).unwrap();
+    assert_eq!(stdout_json(&out)["version"], original["version"]);
+}

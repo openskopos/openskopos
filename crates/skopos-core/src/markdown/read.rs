@@ -7,7 +7,7 @@ use regex::Regex;
 use serde_json::{Map, Value};
 
 use super::{
-    enum_values, evidence_main, kind, Error, Fill, Kind, Message, Warning, ENVELOPE, OTHER, RELS,
+    enum_values, evidence_main, is_rel, kind, Error, Fill, Kind, Warning, ENVELOPE, OTHER,
     SCHEMA_KEY,
 };
 use crate::model::ItemType;
@@ -46,10 +46,7 @@ pub fn read_with(
     }
     let problems = crate::check(&doc);
     if !problems.is_empty() {
-        return Err(problems
-            .into_iter()
-            .map(|p| r.problem_message(&doc, p))
-            .collect());
+        return Err(problems.into_iter().map(|p| r.problem_error(p)).collect());
     }
     Ok((doc, r.warnings))
 }
@@ -72,7 +69,9 @@ static FIELD: LazyLock<Regex> = LazyLock::new(|| {
     re(r"^(\s+)[-*+]\s+(?:\*\*)?([A-Za-z][\w .\-]*?)(?:\*\*)?\s*:(?:\s+(.*)|\s*)$")
 });
 static VALUE: LazyLock<Regex> = LazyLock::new(|| re(r"^(\s+)[-*+]\s+(.*)$"));
-static HEADING: LazyLock<Regex> = LazyLock::new(|| re(r"^(#{1,6})\s+(.*?)\s*#*\s*$"));
+/// An ATX heading. As in CommonMark, a closing run of `#` is taken off only
+/// after a space, so `# Support for C#` keeps its `#`.
+static HEADING: LazyLock<Regex> = LazyLock::new(|| re(r"^(#{1,6})\s+(.*?)(?:\s+#+)?\s*$"));
 static REF: LazyLock<Regex> = LazyLock::new(|| {
     re(
         r"^(?:(pa_[0-9A-Za-z]{16,32})(?:@(\d+))?(?:#([A-Za-z]{1,2}[1-9]\d*))?|([A-Za-z]{1,2}[1-9]\d*))$",
@@ -174,7 +173,7 @@ fn canon_key(k: &str, allowed: &[&str]) -> Option<String> {
 
 /// A reference: an item ID such as `FR1`, or a reference string such as
 /// `pa_7Hk2mQ9xR4tV8wZ1@2#FR1`. Item IDs become capital letters.
-fn parse_ref(raw: &str) -> Option<Map<String, Value>> {
+pub(super) fn parse_ref(raw: &str) -> Option<Map<String, Value>> {
     let c = REF.captures(raw.trim())?;
     let mut o = Map::new();
     if let Some(a) = c.get(1) {
@@ -187,6 +186,10 @@ fn parse_ref(raw: &str) -> Option<Map<String, Value>> {
         o.insert("item".into(), i.as_str().to_uppercase().into());
     }
     Some(o)
+}
+
+fn is_digits(s: &str) -> bool {
+    !s.is_empty() && s.bytes().all(|b| b.is_ascii_digit())
 }
 
 fn number(s: &str) -> Option<Value> {
@@ -306,11 +309,14 @@ struct Reader {
 
 impl Reader {
     fn error(&mut self, line: usize, message: impl Into<String>) {
-        self.errors.push(Message::at(line, message));
+        self.errors.push(Error::at(line, message));
     }
 
     fn warn(&mut self, line: usize, message: impl Into<String>) {
-        self.warnings.push(Message::at(line, message));
+        self.warnings.push(Warning {
+            line,
+            message: message.into(),
+        });
     }
 
     fn read(&mut self, md: &str, filename: Option<&str>, fill: &Fill) -> Value {
@@ -325,7 +331,8 @@ impl Reader {
         let mut summary: Vec<&str> = vec![];
         let mut items: Vec<Pending> = vec![];
         let mut section = Section::Start;
-        let mut in_fence = false;
+        // The marker of the open code fence, for example three backticks.
+        let mut fence: Option<(char, usize)> = None;
         // The item that is open, its field lines and its detail lines.
         let mut cur: Option<Pending> = None;
         let mut fields: Vec<(usize, String)> = vec![];
@@ -334,9 +341,24 @@ impl Reader {
         for (i, &line) in lines.iter().enumerate().skip(body_start) {
             let no = i + 1;
             let start = line.trim_start();
-            if start.starts_with("```") || start.starts_with("~~~") {
-                in_fence = !in_fence;
+            let marker = fence_marker(start);
+            match fence {
+                Some((ch, len)) => {
+                    let closes = marker.is_some_and(|(c, n)| c == ch && n >= len)
+                        && start.trim_start_matches(ch).trim().is_empty();
+                    // A writer indents each line of a detail, so an H1, an H2
+                    // or an item at column 0 is never in a fence. It ends a
+                    // fence that has no closing line.
+                    let top = !line.starts_with([' ', '\t'])
+                        && (ITEM.is_match(line)
+                            || HEADING.captures(line).is_some_and(|h| h[1].len() <= 2));
+                    if closes || top {
+                        fence = None;
+                    }
+                }
+                None => fence = marker,
             }
+            let in_fence = fence.is_some();
             let heading = if in_fence {
                 None
             } else {
@@ -405,11 +427,20 @@ impl Reader {
                 detail = Some(vec![]);
             } else if FIELD_LINE.is_match(line) {
                 fields.push((no, line.to_string()));
-            } else if line.starts_with(' ') && fields.is_empty() {
-                // A line that continues the text of the item.
-                let text = item.item.get("text").and_then(Value::as_str).unwrap_or("");
-                let joined = format!("{text} {}", line.trim()).trim().to_string();
-                item.item.insert("text".into(), joined.into());
+            } else if line.starts_with(' ') {
+                match fields.last_mut() {
+                    // A line that continues the value of the last field.
+                    Some((_, last)) => {
+                        last.push(' ');
+                        last.push_str(line.trim());
+                    }
+                    // A line that continues the text of the item.
+                    None => {
+                        let text = item.item.get("text").and_then(Value::as_str).unwrap_or("");
+                        let joined = format!("{text} {}", line.trim()).trim().to_string();
+                        item.item.insert("text".into(), joined.into());
+                    }
+                }
             } else {
                 detail = Some(vec![dedent(line)]);
             }
@@ -426,7 +457,7 @@ impl Reader {
             Some(t) => {
                 doc.insert("title".into(), t);
             }
-            None => self.errors.push(Message::file(
+            None => self.errors.push(Error::file(
                 "the file has no title: add a line '# <title>' after the front matter",
             )),
         }
@@ -442,7 +473,7 @@ impl Reader {
             }
         }
         if !doc.contains_key("kind") {
-            self.errors.push(Message::file(
+            self.errors.push(Error::file(
                 "the file has no kind: add 'kind: intent' (or another kind) to the front matter, \
                  or name the file after its kind, for example INTENT.md",
             ));
@@ -634,7 +665,7 @@ impl Reader {
                 self.examples(it, &k, n);
                 continue;
             }
-            let rel = if RELS.contains(&k.as_str()) {
+            let rel = if is_rel(&k) {
                 Some(k.clone())
             } else if k == "related_to" {
                 Some("relates_to".to_string())
@@ -743,7 +774,7 @@ impl Reader {
     fn enum_value(&mut self, field: &str, raw: &str, line: usize) -> Option<String> {
         let v = norm(raw).replace(' ', "_");
         let values = enum_values(field);
-        if values.contains(&v.as_str()) {
+        if values.contains(&v) {
             return Some(v);
         }
         self.error(
@@ -791,21 +822,36 @@ impl Reader {
         }
     }
 
+    /// A whole number from digits, or an error if it is too large.
+    fn int(&mut self, digits: &str, line: usize) -> Option<Value> {
+        let n = number(digits);
+        if n.is_none() {
+            self.error(line, format!("{digits} is too large for a number"));
+        }
+        n
+    }
+
     fn votes(&mut self, n: &Node) -> Option<Value> {
+        let errors = self.errors.len();
         let mut r = Map::new();
         for c in VOTES.captures_iter(&n.value) {
-            r.insert(c[2].to_lowercase(), number(&c[1])?);
+            if let Some(v) = self.int(&c[1], n.line) {
+                r.insert(c[2].to_lowercase(), v);
+            }
         }
         for c in &n.children {
             let k = c.key();
-            if matches!(k.as_str(), "yes" | "no" | "eligible") {
-                if let Some(v) = number(c.value.trim()) {
+            if matches!(k.as_str(), "yes" | "no" | "eligible") && is_digits(c.value.trim()) {
+                if let Some(v) = self.int(c.value.trim(), c.line) {
                     r.insert(k, v);
                 }
             }
         }
         if ["yes", "no", "eligible"].iter().all(|k| r.contains_key(*k)) {
             return Some(Value::Object(r));
+        }
+        if self.errors.len() > errors {
+            return None;
         }
         self.error(
             n.line,
@@ -901,15 +947,28 @@ impl Reader {
         };
         let mut ev = Map::new();
         ev.insert("kind".into(), k.clone().into());
+        // `path:41-48` gives the lines in the path, unless a nested line gives
+        // them. A writer puts the lines on a nested line, so a path that ends
+        // in `:<number>` stays as it is.
+        let nested_lines = n.children.iter().any(|c| {
+            matches!(
+                c.key().as_str(),
+                "lines" | "line" | "line_start" | "line_end"
+            )
+        });
         let in_path = CODE_LINES_IN_PATH
             .captures(&n.value)
-            .filter(|_| k == "code");
+            .filter(|_| k == "code" && !nested_lines);
         match in_path {
             Some(c) => {
                 ev.insert("path".into(), c[1].into());
-                ev.insert("line_start".into(), number(&c[2])?);
+                if let Some(v) = self.int(&c[2], n.line) {
+                    ev.insert("line_start".into(), v);
+                }
                 if let Some(e) = c.get(3) {
-                    ev.insert("line_end".into(), number(e.as_str())?);
+                    if let Some(v) = self.int(e.as_str(), n.line) {
+                        ev.insert("line_end".into(), v);
+                    }
                 }
             }
             None => {
@@ -921,9 +980,13 @@ impl Reader {
             match (k.as_str(), ck.as_str()) {
                 ("code", "lines" | "line") => match LINES.captures(c.value.trim()) {
                     Some(m) => {
-                        ev.insert("line_start".into(), number(&m[1])?);
+                        if let Some(v) = self.int(&m[1], c.line) {
+                            ev.insert("line_start".into(), v);
+                        }
                         if let Some(e) = m.get(2) {
-                            ev.insert("line_end".into(), number(e.as_str())?);
+                            if let Some(v) = self.int(e.as_str(), c.line) {
+                                ev.insert("line_end".into(), v);
+                            }
                         }
                     }
                     None => self.error(
@@ -931,12 +994,13 @@ impl Reader {
                         "lines are a number or a range, for example '- lines: 41-48'",
                     ),
                 },
-                ("code", "line_start" | "line_end") => match number(c.value.trim()) {
-                    Some(v) => {
+                ("code", "line_start" | "line_end") => {
+                    if !is_digits(c.value.trim()) {
+                        self.error(c.line, format!("{ck} is a number, for example 41"));
+                    } else if let Some(v) = self.int(c.value.trim(), c.line) {
                         ev.insert(ck, v);
                     }
-                    None => self.error(c.line, format!("{ck} is a number, for example 41")),
-                },
+                }
                 ("code", "repo" | "commit" | "snippet")
                 | ("quote", "location")
                 | ("discussion", "speaker")
@@ -975,27 +1039,22 @@ impl Reader {
 
     /// An error for a problem that [`crate::check`] found, at the line of its
     /// item or its front matter key.
-    fn problem_message(&self, doc: &Value, p: crate::Problem) -> Message {
+    fn problem_error(&self, p: crate::Problem) -> Error {
         let mut parts = p.path.split('/').skip(1);
-        let first = parts.next().unwrap_or("");
-        let (line, label) = if first == "items" {
-            let index = parts.next().and_then(|s| s.parse::<usize>().ok());
-            let line = index.and_then(|i| self.item_lines.get(i).copied());
-            let id = index
-                .and_then(|i| doc["items"].get(i))
-                .and_then(|i| i.get("id"))
-                .and_then(Value::as_str)
-                .map(|id| format!("{id}: "));
-            (line, id.unwrap_or_default())
-        } else if first == "title" {
-            (self.title_line, String::new())
-        } else {
-            let key = first.replace("~1", "/").replace("~0", "~");
-            (self.fm_lines.get(&key).copied(), String::new())
+        let line = match parts.next().unwrap_or("") {
+            "items" => parts
+                .next()
+                .and_then(|s| s.parse::<usize>().ok())
+                .and_then(|i| self.item_lines.get(i).copied()),
+            "title" => self.title_line,
+            key => {
+                let key = key.replace("~1", "/").replace("~0", "~");
+                self.fm_lines.get(&key).copied()
+            }
         };
-        Message {
+        Error {
             line,
-            message: format!("{label}{p}"),
+            message: p.message.clone(),
             problem: Some(p),
         }
     }
@@ -1028,6 +1087,13 @@ fn new_item(ty: ItemType, content: &str, line: usize) -> Pending {
         item,
         line,
     }
+}
+
+/// The marker of a code fence: three or more backticks or tildes.
+fn fence_marker(start: &str) -> Option<(char, usize)> {
+    let ch = start.chars().next().filter(|c| matches!(c, '`' | '~'))?;
+    let len = start.chars().take_while(|c| *c == ch).count();
+    (len >= 3).then_some((ch, len))
 }
 
 /// A detail line with the indent of two spaces taken off.

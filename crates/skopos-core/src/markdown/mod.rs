@@ -22,12 +22,17 @@
 //! assert!(text.contains("- G1: Finance sends invoices on day one.\n"));
 //! ```
 
+use std::collections::HashMap;
 use std::fmt;
+use std::sync::LazyLock;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::model::ItemType;
+use crate::model::{
+    Category, Confirmation, ItemStatus, ItemType, Level, Modality, Outcome, Priority, RefRel,
+    Severity,
+};
 use crate::Problem;
 
 mod read;
@@ -42,29 +47,40 @@ pub use version::next_version;
 pub use version::{next_version_at, same_content};
 pub use write::write;
 
-/// A warning or an error from the reader.
+/// A case where the reader skips or changes something and continues (10.6).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Message {
-    /// The line in the file, counted from 1. `None` if the message is about
-    /// the whole file.
+pub struct Warning {
+    /// The line in the file, counted from 1.
+    pub line: usize,
+    /// What the reader found and what it did.
+    pub message: String,
+}
+
+impl fmt::Display for Warning {
+    /// `line <n>: <message>`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "line {}: {}", self.line, self.message)
+    }
+}
+
+/// A case where the reader cannot make a valid document (10.6).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Error {
+    /// The line in the file, counted from 1. `None` if the error is about the
+    /// whole file.
     pub line: Option<usize>,
-    /// What the reader found, and for an error, what to write.
+    /// What is wrong and what to write.
     pub message: String,
     /// For an error from the schema or the rules of section 9, the problem
-    /// that [`crate::check`] found in the document.
+    /// that [`crate::check`] found in the document. `message` is the message
+    /// of the problem.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub problem: Option<Problem>,
 }
 
-/// A case where the reader skips or changes something and continues (10.6).
-pub type Warning = Message;
-
-/// A case where the reader cannot make a valid document (10.6).
-pub type Error = Message;
-
-impl Message {
+impl Error {
     pub(crate) fn at(line: usize, message: impl Into<String>) -> Self {
-        Message {
+        Error {
             line: Some(line),
             message: message.into(),
             problem: None,
@@ -72,7 +88,7 @@ impl Message {
     }
 
     pub(crate) fn file(message: impl Into<String>) -> Self {
-        Message {
+        Error {
             line: None,
             message: message.into(),
             problem: None,
@@ -80,17 +96,21 @@ impl Message {
     }
 }
 
-impl fmt::Display for Message {
-    /// `line <n>: <message>`, or only the message if it has no line.
+impl fmt::Display for Error {
+    /// `line <n>: <message>`. An error from [`crate::check`] also has the
+    /// JSON Pointer and the rule of its problem.
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(line) = self.line {
             write!(f, "line {line}: ")?;
         }
-        f.write_str(&self.message)
+        match &self.problem {
+            Some(p) => write!(f, "{p}"),
+            None => f.write_str(&self.message),
+        }
     }
 }
 
-impl std::error::Error for Message {}
+impl std::error::Error for Error {}
 
 /// The values that the reader fills when the file does not give them.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -207,24 +227,7 @@ pub(crate) const SCHEMA_KEY: &str = "$schema";
 pub(crate) const OTHER: &str = "From other artifacts";
 
 /// Envelope keys in the order of specification section 3.
-pub(crate) const ENVELOPE: &[&str] = &[
-    "$schema",
-    "id",
-    "version",
-    "kind",
-    "title",
-    "summary",
-    "status",
-    "method",
-    "session",
-    "participants",
-    "decider",
-    "parents",
-    "id_counters",
-    "items",
-    "created_at",
-    "finalized_at",
-];
+pub(crate) const ENVELOPE: &[&str] = crate::order::DOCUMENT;
 
 /// How a field of an item type is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -271,44 +274,39 @@ pub(crate) fn list_key(field: &str) -> &str {
     }
 }
 
-/// The values of a field with a fixed list.
-pub(crate) fn enum_values(field: &str) -> &'static [&'static str] {
-    match field {
-        "priority" => &["must", "should", "could"],
-        "modality" => &["always", "never", "ask_first", "prefer", "avoid"],
-        "confirmation" => &["unconfirmed", "confirmed", "refuted"],
-        "likelihood" | "impact" => &["low", "medium", "high"],
-        "severity" => &["blocker", "major", "minor", "note"],
-        "category" => &[
-            "ambiguity",
-            "gap",
-            "conflict",
-            "untestable",
-            "incorrect",
-            "unstated_assumption",
-            "scope_creep",
-            "over_specified",
-            "other",
-        ],
-        "status" => &["proposed", "accepted", "rejected"],
-        "outcome" => &["open", "fix_spec", "fix_code", "accept_risk", "defer"],
-        _ => &[],
-    }
+/// The names of enum values, as serde writes them, for example `ask_first`.
+fn names<T: Serialize>(all: &[T]) -> Vec<String> {
+    all.iter()
+        .filter_map(|v| serde_json::to_value(v).ok()?.as_str().map(str::to_string))
+        .collect()
 }
 
-/// The values of `rel` in a ref (specification section 5).
-pub(crate) const RELS: &[&str] = &[
-    "refines",
-    "derived_from",
-    "depends_on",
-    "threatens",
-    "mitigates",
-    "resolves",
-    "verifies",
-    "supersedes",
-    "contradicts",
-    "relates_to",
-];
+/// The values of each field with a fixed list, from the types in `model`.
+static ENUMS: LazyLock<HashMap<&'static str, Vec<String>>> = LazyLock::new(|| {
+    HashMap::from([
+        ("priority", names(Priority::ALL)),
+        ("modality", names(Modality::ALL)),
+        ("confirmation", names(Confirmation::ALL)),
+        ("likelihood", names(Level::ALL)),
+        ("impact", names(Level::ALL)),
+        ("severity", names(Severity::ALL)),
+        ("category", names(Category::ALL)),
+        ("status", names(ItemStatus::ALL)),
+        ("outcome", names(Outcome::ALL)),
+        ("rel", names(RefRel::ALL)),
+    ])
+});
+
+/// The values of a field with a fixed list. `rel` gives the values of `rel`
+/// in a ref (specification section 5).
+pub(crate) fn enum_values(field: &str) -> &'static [String] {
+    ENUMS.get(field).map_or(&[], Vec::as_slice)
+}
+
+/// Whether a key is the `rel` of a ref, for example `refines`.
+pub(crate) fn is_rel(key: &str) -> bool {
+    enum_values("rel").iter().any(|r| r == key)
+}
 
 /// The main field of each evidence kind: the value on the `- <kind>:` line.
 pub(crate) fn evidence_main(kind: &str) -> Option<&'static str> {

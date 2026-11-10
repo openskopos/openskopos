@@ -267,3 +267,72 @@ fn details_and_extension_values_round_trip() {
     assert_same(&back, &doc, &md);
     assert_eq!(warnings, 0);
 }
+
+/// Values that look like Markdown or like IDs survive a round trip: a title
+/// that ends in `#`, a target section and a quote title that look like item
+/// IDs, a code path that ends in `:<number>`, and a detail with a code fence
+/// that has no closing line.
+#[test]
+fn values_that_look_like_markup_round_trip() {
+    let doc = serde_json::json!({
+        "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+        "id": "pa_3fQ8nV2kLm7Xc1Rt",
+        "version": 1,
+        "kind": "critique",
+        "title": "Support for C#",
+        "status": "draft",
+        "id_counters": {"CR": 2},
+        "items": [
+            {
+                "id": "CR1", "type": "critique", "text": "Q1 is vague.", "status": "accepted",
+                "severity": "minor", "category": "ambiguity",
+                "target": {"section": "Q1"},
+                "evidence": [
+                    {"kind": "quote", "text": "Ship in Q1.", "from": {"title": "FR2"}},
+                    {"kind": "code", "path": "config/app.yml:2", "line_start": 10}
+                ],
+                "detail": "Start of a block:\n\n```\nno end"
+            },
+            {
+                "id": "CR2", "type": "critique", "text": "Second.", "status": "accepted",
+                "severity": "note", "category": "gap",
+                "target": {"section": "Retry policy"},
+                "evidence": [{"kind": "discussion", "text": "Said so."}]
+            }
+        ],
+        "created_at": "2026-11-05T09:00:00Z"
+    });
+    let md = write(&doc, &[]);
+    let (back, warnings) = read_ok(&md, "CRITIQUE.md", &md);
+    assert_same(&back, &doc, &md);
+    assert_eq!(warnings, 0);
+}
+
+/// An indented line under a field continues the value of that field.
+#[test]
+fn a_wrapped_field_value_continues_the_field() {
+    let md = "# I\n\n## Decisions\n\n- D1: Use the queue.\n  - rationale: The queue keeps\n    jobs in order.\n  - decided_by: P1\n";
+    let (doc, warnings) = read_ok(md, "INTENT.md", "wrapped");
+    assert_eq!(warnings, 0);
+    let item = &doc["items"][0];
+    assert_eq!(item["rationale"], "The queue keeps jobs in order.");
+    assert_eq!(item["decided_by"], "P1");
+    assert!(item.get("detail").is_none(), "{item:#}");
+}
+
+/// A number that is too large is an error, not a silent drop.
+#[test]
+fn numbers_that_are_too_large_are_errors() {
+    let big = "99999999999999999999";
+    let md = format!(
+        "# C\n\n## Critiques\n\n- CR1: Gap.\n  - severity: minor\n  - category: gap\n  - evidence:\n    - code: lib/x.ex:{big}\n  - votes: {big} yes, 0 no, 2 eligible\n"
+    );
+    let got = errors(&md);
+    assert_eq!(
+        got,
+        [
+            format!("line 9: {big} is too large for a number"),
+            format!("line 10: {big} is too large for a number"),
+        ]
+    );
+}

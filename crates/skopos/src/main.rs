@@ -176,14 +176,20 @@ fn read_text(path: &Path) -> Result<String, Problem> {
     fs::read_to_string(path).map_err(|e| Problem::new("", format!("cannot read the file: {e}")))
 }
 
-/// Reads a JSON, YAML or Markdown file into a document. The reader of
-/// Markdown checks the document, so its errors include the problems that
-/// `check` finds. Warnings go to standard error.
+/// Reads a JSON, YAML or Markdown file into a document. Warnings go to
+/// standard error.
 fn read_any(path: &Path) -> Result<Value, Vec<Problem>> {
+    read_any_with_format(path).map(|(doc, _)| doc)
+}
+
+/// [`read_any`], with the format of the file. The reader of Markdown checks
+/// the document, so a Markdown document that it gives has no problems.
+fn read_any_with_format(path: &Path) -> Result<(Value, FileFormat), Vec<Problem>> {
     match format_of(path).map_err(|p| vec![p])? {
         FileFormat::Data(format) => {
             let text = read_text(path).map_err(|p| vec![p])?;
-            parse(&text, format).map_err(|p| vec![p])
+            let doc = parse(&text, format).map_err(|p| vec![p])?;
+            Ok((doc, FileFormat::Data(format)))
         }
         FileFormat::Markdown => {
             let text = read_text(path).map_err(|p| vec![p])?;
@@ -193,7 +199,7 @@ fn read_any(path: &Path) -> Result<Value, Vec<Problem>> {
                     for w in &warnings {
                         eprintln!("{}: warning: {w}", path.display());
                     }
-                    Ok(doc)
+                    Ok((doc, FileFormat::Markdown))
                 }
                 Err(errors) => Err(errors.iter().map(markdown_problem).collect()),
             }
@@ -251,8 +257,10 @@ fn run_check(files: &[PathBuf], json: bool) -> bool {
         .iter()
         .map(|path| FileProblems {
             file: path.display().to_string(),
-            problems: match read_any(path) {
-                Ok(doc) => check(&doc),
+            problems: match read_any_with_format(path) {
+                // The Markdown reader already checked the document.
+                Ok((_, FileFormat::Markdown)) => vec![],
+                Ok((doc, FileFormat::Data(_))) => check(&doc),
                 Err(problems) => problems,
             },
         })
@@ -386,13 +394,14 @@ fn run_import(file: &Path, stored_path: &Path, output: Option<&Path>) -> bool {
         return false;
     }
     let version = |d: &Value| d.get("version").map(Value::to_string).unwrap_or_default();
-    let what = if doc == stored {
+    let stored_final = stored.get("status").and_then(Value::as_str) == Some("final");
+    let what = if !stored_final {
+        format!("the file replaces draft version {}", version(&doc))
+    } else if doc == stored {
         format!(
             "no change: version {} is final and its content is the same",
             version(&stored)
         )
-    } else if doc.get("version") == stored.get("version") {
-        format!("the file replaces draft version {}", version(&doc))
     } else {
         format!("new draft version {}", version(&doc))
     };

@@ -53,12 +53,13 @@ An error is a case where the reader cannot make a valid document. Section 10.6
 of the specification lists both. The reader checks the document with `check`,
 so a schema problem is also an error.
 
-`Warning` and `Error` are the same type, `markdown::Message`:
+A `Warning` has the `line` (counted from 1) and the `message`. An `Error`
+has these fields:
 
 | Field | Meaning |
 |---|---|
-| `line` | The line in the file, counted from 1. `None` if the message is about the whole file. |
-| `message` | What the reader found, and for an error, what to write. |
+| `line` | The line in the file, counted from 1. `None` if the error is about the whole file. |
+| `message` | What is wrong, and what to write. |
 | `problem` | For an error from `check`, the `Problem`. |
 
 If the file has no `id` or `created_at`, `read` gives a new random artifact ID
