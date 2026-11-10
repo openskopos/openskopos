@@ -61,6 +61,11 @@ A document has three formats:
 | YAML | The same data as JSON. The same JSON Schema applies. | Yes |
 | Markdown | The format for people who read and write documents by hand. See [section 10](#10-markdown). | Yes |
 
+A tool, for example an AI agent that helps a team write a document, writes
+JSON or YAML directly and makes sure that the document is valid against the
+schema. Markdown is for people. Its reader is generous (10.5), because people
+write by hand. A tool does not need it.
+
 Files use UTF-8.
 
 ### 2.1 File names
