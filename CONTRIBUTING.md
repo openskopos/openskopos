@@ -36,6 +36,21 @@ steps. Run the conformance check before you open a pull request:
 cargo run --locked --manifest-path conformance/runner/Cargo.toml
 ```
 
+## Change the Rust code
+
+The reference implementation is in `crates/`. Before you open a pull request,
+run these commands from the root of the repository:
+
+```bash
+cargo fmt -p skopos-core -p skopos
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+```
+
+`skopos-core` must build for WebAssembly. Do not add file access, network
+access or a dependency that cannot build for `wasm32-unknown-unknown`. CI
+builds the crate for this target on each pull request.
+
 ## Writing style
 
 The specification is for readers in many countries, and many of them do not

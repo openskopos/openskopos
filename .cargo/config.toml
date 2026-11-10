@@ -1,0 +1,4 @@
+# getrandom needs this flag, together with its wasm_js feature, to build for
+# wasm32-unknown-unknown. skopos-core turns on the feature for that target.
+[target.wasm32-unknown-unknown]
+rustflags = ['--cfg', 'getrandom_backend="wasm_js"']

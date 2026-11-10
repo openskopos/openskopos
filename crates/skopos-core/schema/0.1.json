@@ -1,0 +1,647 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://openskopos.org/schema/artifact/0.1.json",
+  "title": "OpenSkopos artifact",
+  "description": "One version of an OpenSkopos artifact, format version 0.1. See https://github.com/openskopos/openskopos/tree/main/spec/0.1. Rules that JSON Schema cannot express: item IDs are unique in a version, a previous_version parent has the same artifact ID and version - 1, an item ID is never used again for a different item in the same artifact, and each id_counters value is at least the highest number of that prefix in items.",
+  "type": "object",
+  "required": [
+    "$schema",
+    "id",
+    "version",
+    "kind",
+    "title",
+    "status",
+    "items",
+    "created_at"
+  ],
+  "properties": {
+    "$schema": {
+      "description": "URL of the exact format version. While the format is at 0.x, each 0.y version can break the one before, and the skopos CLI migrates documents.",
+      "type": "string",
+      "pattern": "^https://openskopos\\.org/schema/artifact/0\\.(0|[1-9][0-9]*)\\.json$"
+    },
+    "id": { "$ref": "#/$defs/artifactId" },
+    "version": { "$ref": "#/$defs/version" },
+    "kind": {
+      "description": "The type of document. It does not change between versions.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,63}$",
+      "examples": [
+        "intent",
+        "spec",
+        "agent_rules",
+        "critique",
+        "glossary",
+        "ritual_plan",
+        "handoff_brief",
+        "drift_report"
+      ]
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "summary": {
+      "description": "Short Markdown introduction.",
+      "type": "string"
+    },
+    "status": {
+      "description": "A draft can change. A final version never changes.",
+      "enum": ["draft", "final"]
+    },
+    "method": {
+      "description": "The method that made this version, if a method made it. Optional.",
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,63}$",
+          "examples": [
+            "intent-lock",
+            "elaboration-mob",
+            "team-charter",
+            "spec-red-team",
+            "ritual-sizer",
+            "handoff-rehearsal",
+            "drift-review"
+          ]
+        },
+        "version": {
+          "description": "Version of the method script.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 64
+        }
+      },
+      "additionalProperties": false
+    },
+    "session": {
+      "description": "The working session that made this version, if there was one. Optional.",
+      "type": "object",
+      "required": ["id"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1, "maxLength": 64 },
+        "title": { "type": "string" },
+        "url": { "type": "string", "format": "uri" },
+        "ended_at": { "type": "string", "format": "date-time" }
+      },
+      "additionalProperties": false
+    },
+    "participants": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/participant" }
+    },
+    "decider": {
+      "description": "Participant who makes the final call when the group does not agree.",
+      "$ref": "#/$defs/participantId"
+    },
+    "parents": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/parent" }
+    },
+    "id_counters": {
+      "description": "The highest number ever used for each item prefix in this artifact, in all versions. A missing prefix means 0. A tool that assigns an ID takes the counter plus 1 and writes the new counter back.",
+      "type": "object",
+      "propertyNames": { "enum": ["G", "S", "FR", "ST", "C", "A", "N", "R", "Q", "D", "T", "CR"] },
+      "additionalProperties": { "type": "integer", "minimum": 0 }
+    },
+    "items": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/item" }
+    },
+    "created_at": { "type": "string", "format": "date-time" },
+    "finalized_at": { "type": "string", "format": "date-time" }
+  },
+  "patternProperties": {
+    "^x-": true
+  },
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "final" } },
+        "required": ["status"]
+      },
+      "then": { "required": ["finalized_at"] }
+    },
+    {
+      "if": {
+        "properties": { "version": { "minimum": 2 } },
+        "required": ["version"]
+      },
+      "then": {
+        "required": ["parents"],
+        "properties": {
+          "parents": {
+            "contains": { "$ref": "#/$defs/previousVersionParent" },
+            "minContains": 1,
+            "maxContains": 1
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "parents": {
+            "not": { "contains": { "$ref": "#/$defs/previousVersionParent" } }
+          }
+        }
+      }
+    }
+  ],
+  "$defs": {
+    "artifactId": {
+      "description": "Opaque artifact ID. All versions of an artifact have the same ID.",
+      "type": "string",
+      "pattern": "^pa_[0-9A-Za-z]{16,32}$"
+    },
+    "version": {
+      "description": "Artifact version, not format version.",
+      "type": "integer",
+      "minimum": 1
+    },
+    "itemId": {
+      "description": "Type prefix and a positive integer. Never renumbered, never used again.",
+      "type": "string",
+      "pattern": "^(G|S|FR|ST|C|A|N|R|Q|D|T|CR)[1-9][0-9]*$"
+    },
+    "participantId": {
+      "type": "string",
+      "pattern": "^P[1-9][0-9]*$"
+    },
+    "level": {
+      "enum": ["low", "medium", "high"]
+    },
+    "example": {
+      "description": "A concrete example under a requirement or a story.",
+      "type": "object",
+      "required": ["text"],
+      "properties": {
+        "text": { "type": "string", "minLength": 1 },
+        "kind": {
+          "description": "normal: what happens in the usual case. edge: a boundary case. forbidden: what must not happen.",
+          "enum": ["normal", "edge", "forbidden"],
+          "default": "normal"
+        }
+      },
+      "additionalProperties": false
+    },
+    "participant": {
+      "description": "Display name only. No email address or account ID.",
+      "type": "object",
+      "required": ["id", "name", "kind"],
+      "properties": {
+        "id": { "$ref": "#/$defs/participantId" },
+        "name": { "type": "string", "minLength": 1, "maxLength": 100 },
+        "kind": { "enum": ["human", "ai"] }
+      },
+      "additionalProperties": false
+    },
+    "parent": {
+      "oneOf": [
+        { "$ref": "#/$defs/artifactParent" },
+        { "$ref": "#/$defs/externalParent" }
+      ]
+    },
+    "artifactParent": {
+      "description": "Another OpenSkopos artifact version, or the previous version of this artifact.",
+      "type": "object",
+      "required": ["rel", "artifact", "version"],
+      "properties": {
+        "rel": { "enum": ["previous_version", "input"] },
+        "artifact": { "$ref": "#/$defs/artifactId" },
+        "version": { "$ref": "#/$defs/version" },
+        "kind": { "type": "string", "pattern": "^[a-z][a-z0-9_]{0,63}$" },
+        "title": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "externalParent": {
+      "description": "Material that is not an OpenSkopos artifact, which the method worked from.",
+      "type": "object",
+      "required": ["rel", "source"],
+      "properties": {
+        "rel": { "const": "input" },
+        "source": {
+          "type": "object",
+          "required": ["kind", "title"],
+          "properties": {
+            "kind": { "enum": ["pasted", "url", "repo_file", "ticket", "document"] },
+            "title": { "type": "string", "minLength": 1 },
+            "uri": { "type": "string", "format": "uri" },
+            "repo": { "type": "string" },
+            "path": { "type": "string" },
+            "commit": { "type": "string", "pattern": "^[0-9a-f]{7,64}$" },
+            "digest": {
+              "description": "sha256 of the text the team used.",
+              "type": "string",
+              "pattern": "^sha256:[0-9a-f]{64}$"
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "previousVersionParent": {
+      "type": "object",
+      "required": ["rel"],
+      "properties": { "rel": { "const": "previous_version" } }
+    },
+    "itemRef": {
+      "description": "A link to an item in this artifact, or in another artifact when artifact is set.",
+      "type": "object",
+      "required": ["item"],
+      "properties": {
+        "item": { "$ref": "#/$defs/itemId" },
+        "artifact": { "$ref": "#/$defs/artifactId" },
+        "version": { "$ref": "#/$defs/version" },
+        "rel": {
+          "description": "How the item that holds the link relates to the linked item.",
+          "enum": [
+            "refines",
+            "derived_from",
+            "depends_on",
+            "threatens",
+            "mitigates",
+            "resolves",
+            "verifies",
+            "supersedes",
+            "contradicts",
+            "relates_to"
+          ]
+        }
+      },
+      "dependentRequired": { "version": ["artifact"] },
+      "additionalProperties": false
+    },
+    "evidence": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": { "enum": ["quote", "code", "discussion", "link"] }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "quote" } }, "required": ["kind"] },
+          "then": {
+            "required": ["text"],
+            "properties": {
+              "kind": true,
+              "text": { "type": "string", "minLength": 1 },
+              "from": {
+                "description": "The input that the quote comes from.",
+                "type": "object",
+                "properties": {
+                  "artifact": { "$ref": "#/$defs/artifactId" },
+                  "version": { "$ref": "#/$defs/version" },
+                  "item": { "$ref": "#/$defs/itemId" },
+                  "title": { "type": "string" }
+                },
+                "additionalProperties": false
+              },
+              "location": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "code" } }, "required": ["kind"] },
+          "then": {
+            "required": ["path", "line_start"],
+            "properties": {
+              "kind": true,
+              "repo": { "type": "string" },
+              "path": { "type": "string", "minLength": 1 },
+              "line_start": { "type": "integer", "minimum": 1 },
+              "line_end": { "type": "integer", "minimum": 1 },
+              "commit": { "type": "string", "pattern": "^[0-9a-f]{7,64}$" },
+              "snippet": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "discussion" } }, "required": ["kind"] },
+          "then": {
+            "required": ["text"],
+            "properties": {
+              "kind": true,
+              "text": { "type": "string", "minLength": 1 },
+              "speaker": { "$ref": "#/$defs/participantId" }
+            },
+            "additionalProperties": false
+          }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "link" } }, "required": ["kind"] },
+          "then": {
+            "required": ["uri"],
+            "properties": {
+              "kind": true,
+              "uri": { "type": "string", "format": "uri" },
+              "title": { "type": "string" }
+            },
+            "additionalProperties": false
+          }
+        }
+      ]
+    },
+    "item": {
+      "type": "object",
+      "required": ["id", "type", "text", "status"],
+      "properties": {
+        "id": { "$ref": "#/$defs/itemId" },
+        "type": {
+          "enum": [
+            "goal",
+            "success_signal",
+            "requirement",
+            "story",
+            "constraint",
+            "assumption",
+            "non_goal",
+            "risk",
+            "open_question",
+            "decision",
+            "term",
+            "critique"
+          ]
+        },
+        "text": {
+          "description": "One statement in plain text.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "detail": {
+          "description": "Optional Markdown.",
+          "type": "string"
+        },
+        "status": {
+          "description": "Rejected items stay in the version.",
+          "enum": ["proposed", "accepted", "rejected"]
+        },
+        "evidence": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/evidence" }
+        },
+        "refs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/itemRef" }
+        },
+        "proposed_by": { "$ref": "#/$defs/participantId" },
+        "ratification": {
+          "description": "Vote counts for the item.",
+          "type": "object",
+          "required": ["yes", "no", "eligible"],
+          "properties": {
+            "yes": { "type": "integer", "minimum": 0 },
+            "no": { "type": "integer", "minimum": 0 },
+            "eligible": { "type": "integer", "minimum": 0 }
+          },
+          "additionalProperties": false
+        }
+      },
+      "patternProperties": {
+        "^x-": true
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "goal" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^G[1-9][0-9]*$" },
+              "for": { "description": "Who benefits.", "type": "string" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "success_signal" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^S[1-9][0-9]*$" },
+              "verification": {
+                "description": "How a person or an agent can test the signal.",
+                "type": "string"
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "requirement" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^FR[1-9][0-9]*$" },
+              "priority": { "enum": ["must", "should", "could"] },
+              "examples": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/example" }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "story" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^ST[1-9][0-9]*$" },
+              "acceptance_criteria": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "examples": {
+                "type": "array",
+                "items": { "$ref": "#/$defs/example" }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "constraint" } }, "required": ["type"] },
+          "then": {
+            "required": ["modality"],
+            "properties": {
+              "id": { "pattern": "^C[1-9][0-9]*$" },
+              "modality": {
+                "description": "always and never are hard rules. ask_first: the agent stops and asks the approver. prefer and avoid are defaults that the agent can break with a reason.",
+                "enum": ["always", "never", "ask_first", "prefer", "avoid"]
+              },
+              "rationale": { "type": "string" },
+              "scope": {
+                "description": "Where the rule applies, for example paths, areas or this work only.",
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "enforced_by": {
+                "description": "What enforces the rule, for example a CI check or a hook. Absent when only the agent enforces it.",
+                "type": "string"
+              },
+              "approver": {
+                "description": "Who the agent asks: a role or a participant ID. Only for ask_first.",
+                "type": "string",
+                "minLength": 1
+              },
+              "bring": {
+                "description": "What the agent shows the approver, for example a plan or a diff summary. Only for ask_first.",
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            },
+            "allOf": [
+              {
+                "if": {
+                  "properties": { "modality": { "const": "ask_first" } },
+                  "required": ["modality"]
+                },
+                "then": { "required": ["approver"] },
+                "else": {
+                  "not": { "anyOf": [{ "required": ["approver"] }, { "required": ["bring"] }] }
+                }
+              }
+            ]
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "assumption" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^A[1-9][0-9]*$" },
+              "confirmation": {
+                "enum": ["unconfirmed", "confirmed", "refuted"],
+                "default": "unconfirmed"
+              },
+              "owner": { "$ref": "#/$defs/participantId" },
+              "confirm_by": {
+                "description": "Date by which the owner confirms or refutes the assumption.",
+                "type": "string",
+                "format": "date"
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "non_goal" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^N[1-9][0-9]*$" },
+              "reason": { "type": "string" },
+              "deferred": { "description": "true: later, not never.", "type": "boolean" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "risk" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^R[1-9][0-9]*$" },
+              "likelihood": { "$ref": "#/$defs/level" },
+              "impact": { "$ref": "#/$defs/level" },
+              "mitigation": { "type": "string" },
+              "owner": { "$ref": "#/$defs/participantId" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "open_question" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^Q[1-9][0-9]*$" },
+              "owner": { "$ref": "#/$defs/participantId" },
+              "blocking": { "type": "boolean" },
+              "options": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "answer": { "type": "string" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "decision" } }, "required": ["type"] },
+          "then": {
+            "properties": {
+              "id": { "pattern": "^D[1-9][0-9]*$" },
+              "rationale": { "type": "string" },
+              "alternatives": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "consequences": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "decided_by": { "$ref": "#/$defs/participantId" }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "term" } }, "required": ["type"] },
+          "then": {
+            "required": ["definition"],
+            "properties": {
+              "id": { "pattern": "^T[1-9][0-9]*$" },
+              "definition": { "type": "string", "minLength": 1 },
+              "aliases": {
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              },
+              "code_names": {
+                "description": "Identifiers in the code for this term.",
+                "type": "array",
+                "items": { "type": "string", "minLength": 1 }
+              }
+            }
+          }
+        },
+        {
+          "if": { "properties": { "type": { "const": "critique" } }, "required": ["type"] },
+          "then": {
+            "required": ["severity", "category", "evidence"],
+            "properties": {
+              "id": { "pattern": "^CR[1-9][0-9]*$" },
+              "severity": { "enum": ["blocker", "major", "minor", "note"] },
+              "category": {
+                "description": "incorrect: the input contradicts the code or a known fact.",
+                "enum": [
+                  "ambiguity",
+                  "gap",
+                  "conflict",
+                  "untestable",
+                  "incorrect",
+                  "unstated_assumption",
+                  "scope_creep",
+                  "over_specified",
+                  "other"
+                ]
+              },
+              "suggestion": { "description": "What the critic proposes.", "type": "string" },
+              "evidence": { "minItems": 1 },
+              "target": {
+                "description": "What the critique is about: an item of an input artifact, or a section of an external input.",
+                "type": "object",
+                "properties": {
+                  "artifact": { "$ref": "#/$defs/artifactId" },
+                  "version": { "$ref": "#/$defs/version" },
+                  "item": { "$ref": "#/$defs/itemId" },
+                  "section": { "type": "string", "minLength": 1 }
+                },
+                "anyOf": [{ "required": ["item"] }, { "required": ["section"] }],
+                "additionalProperties": false
+              },
+              "resolution": {
+                "description": "What the team decided to do. No resolution means that the critique is open.",
+                "type": "object",
+                "required": ["outcome"],
+                "properties": {
+                  "outcome": { "enum": ["open", "fix_spec", "fix_code", "accept_risk", "defer"] },
+                  "note": { "type": "string" },
+                  "decided_by": { "$ref": "#/$defs/participantId" }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        }
+      ],
+      "unevaluatedProperties": false
+    }
+  }
+}

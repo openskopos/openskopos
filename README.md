@@ -30,7 +30,7 @@ Version 0.1 is in draft. The format can change between 0.x versions.
 | `spec/` | The specification, by version |
 | `schema/` | The JSON Schema files. A tagged version is published at `https://openskopos.org/schema/`. |
 | `conformance/` | Valid and invalid documents that every implementation must handle |
-| `crates/` | Planned: the reference implementation in Rust (`skopos-core`) and the `skopos` CLI |
+| `crates/` | The reference implementation in Rust: the library [`skopos-core`](crates/skopos-core/README.md) and the command line tool [`skopos`](crates/skopos/README.md) |
 | `npm/` | Planned: the WebAssembly build for JavaScript |
 | `site/` | The website at [openskopos.org](https://openskopos.org) |
 | `brand/` | The logo and the brand rules ([BRAND.md](brand/BRAND.md)) |
@@ -40,6 +40,19 @@ Version 0.1 is in draft. The format can change between 0.x versions.
 A team keeps a readable Markdown file, such as `INTENT.md`, next to a data
 file in JSON or YAML, such as `intent.skopos.json`. The Markdown file can be
 edited by hand and read back.
+
+## Tools
+
+The `skopos` command line tool checks, formats and converts documents, and
+gives IDs to new items. To install it from a clone of this repository, run
+this command:
+
+```bash
+cargo install --locked --path crates/skopos
+```
+
+Then run `skopos check intent.skopos.json`. See
+[crates/skopos/README.md](crates/skopos/README.md) for all commands.
 
 ## Reference user
 

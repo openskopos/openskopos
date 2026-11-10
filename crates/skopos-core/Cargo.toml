@@ -1,0 +1,22 @@
+[package]
+name = "skopos-core"
+version = "0.1.0"
+description = "Read, check and write OpenSkopos documents"
+keywords = ["openskopos", "specification", "json-schema", "ai-agents"]
+categories = ["parser-implementations", "development-tools"]
+readme = "README.md"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+jsonschema = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml_ng = { workspace = true }
+
+# The schema validator hashes with a random seed. On wasm32-unknown-unknown,
+# getrandom gets its random numbers from JavaScript. See .cargo/config.toml.
+[target.'cfg(all(target_arch = "wasm32", target_os = "unknown"))'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
