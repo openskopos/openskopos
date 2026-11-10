@@ -1,0 +1,257 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_7Hk2mQ9xR4tV8wZ1",
+  "version": 2,
+  "kind": "intent",
+  "title": "Intent: self-serve plan downgrades",
+  "status": "draft",
+  "method": {
+    "id": "intent-lock"
+  },
+  "session": {
+    "id": "4907",
+    "title": "Intent Lock: downgrades, round 2"
+  },
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Ana",
+      "kind": "human"
+    },
+    {
+      "id": "P2",
+      "name": "Lee",
+      "kind": "human"
+    },
+    {
+      "id": "P3",
+      "name": "Facilitator",
+      "kind": "ai"
+    }
+  ],
+  "decider": "P2",
+  "parents": [
+    {
+      "rel": "previous_version",
+      "artifact": "pa_7Hk2mQ9xR4tV8wZ1",
+      "version": 1
+    },
+    {
+      "rel": "input",
+      "artifact": "pa_3fQ8nV2kLm7Xc1Rt",
+      "version": 1,
+      "kind": "critique"
+    },
+    {
+      "rel": "input",
+      "source": {
+        "kind": "ticket",
+        "title": "BILL-901 Downgrade flow",
+        "uri": "https://tracker.example.com/BILL-901"
+      }
+    }
+  ],
+  "id_counters": {
+    "G": 1,
+    "S": 3,
+    "FR": 1,
+    "ST": 1,
+    "C": 2,
+    "A": 2,
+    "N": 1,
+    "R": 1,
+    "Q": 1,
+    "D": 1,
+    "T": 1
+  },
+  "items": [
+    {
+      "id": "G1",
+      "type": "goal",
+      "text": "Customers can lower their bill without waiting for support.",
+      "status": "accepted",
+      "for": "Org admins on monthly plans"
+    },
+    {
+      "id": "S1",
+      "type": "success_signal",
+      "text": "A customer can downgrade without contacting support.",
+      "status": "accepted",
+      "verification": "The downgrade feature test passes in CI.",
+      "refs": [
+        {
+          "item": "G1",
+          "rel": "verifies"
+        }
+      ],
+      "severity": "major"
+    },
+    {
+      "id": "S3",
+      "type": "success_signal",
+      "text": "Downgrades take effect at the end of the paid period.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR1",
+      "type": "requirement",
+      "text": "The billing page lets an org admin pick a smaller plan.",
+      "status": "accepted",
+      "priority": "must",
+      "examples": [
+        {
+          "text": "An admin on Team picks Starter. The page shows Starter from 1 December.",
+          "kind": "normal"
+        },
+        {
+          "text": "An admin with 12 seats picks a plan with 10 seats. The page blocks the change and names the seat limit.",
+          "kind": "edge"
+        },
+        {
+          "text": "A member who is not an admin sees the plan picker.",
+          "kind": "forbidden"
+        }
+      ]
+    },
+    {
+      "id": "ST1",
+      "type": "story",
+      "text": "As an org admin, I want to pick a smaller plan, so that we pay less next month.",
+      "status": "accepted",
+      "acceptance_criteria": [
+        "The billing page shows the new plan and the date it starts."
+      ],
+      "refs": [
+        {
+          "item": "FR1",
+          "rel": "refines"
+        }
+      ]
+    },
+    {
+      "id": "C1",
+      "type": "constraint",
+      "text": "Never change the payment webhook contract.",
+      "status": "accepted",
+      "modality": "never",
+      "rationale": "The billing sync depends on it.",
+      "scope": [
+        "lib/billing/"
+      ],
+      "enforced_by": "Payment webhook contract tests in CI"
+    },
+    {
+      "id": "C2",
+      "type": "constraint",
+      "text": "Ask before adding a database migration.",
+      "status": "accepted",
+      "modality": "ask_first",
+      "scope": [
+        "priv/repo/migrations/"
+      ],
+      "approver": "Tech lead",
+      "bring": [
+        "The migration",
+        "A rollback plan"
+      ]
+    },
+    {
+      "id": "A1",
+      "type": "assumption",
+      "text": "The payment provider can schedule a plan change for the end of the paid period.",
+      "status": "accepted",
+      "confirmation": "confirmed",
+      "owner": "P2",
+      "evidence": [
+        {
+          "kind": "code",
+          "repo": "acme/billing",
+          "path": "lib/billing/provider.ex",
+          "line_start": 88,
+          "line_end": 97,
+          "commit": "b4c5d6e"
+        }
+      ]
+    },
+    {
+      "id": "A2",
+      "type": "assumption",
+      "text": "Fewer than 5% of customers are on annual plans.",
+      "status": "accepted",
+      "confirmation": "unconfirmed",
+      "owner": "P1",
+      "confirm_by": "2026-11-20"
+    },
+    {
+      "id": "N1",
+      "type": "non_goal",
+      "text": "Refunds for unused time.",
+      "status": "accepted",
+      "reason": "Finance decides refunds case by case.",
+      "deferred": false
+    },
+    {
+      "id": "R1",
+      "type": "risk",
+      "text": "Seats above the new plan limit lock users out.",
+      "status": "proposed",
+      "likelihood": "medium",
+      "impact": "high",
+      "mitigation": "Block the downgrade until seats fit the plan.",
+      "refs": [
+        {
+          "item": "FR1",
+          "rel": "threatens"
+        }
+      ]
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "What happens to annual plans?",
+      "status": "accepted",
+      "owner": "P1",
+      "blocking": false,
+      "options": [
+        "Downgrade at the end of the year",
+        "Refund the difference monthly"
+      ]
+    },
+    {
+      "id": "D1",
+      "type": "decision",
+      "text": "Downgrades are scheduled, never immediate.",
+      "status": "accepted",
+      "rationale": "Matches how the payment provider bills periods.",
+      "alternatives": [
+        "Immediate downgrade with proration"
+      ],
+      "consequences": [
+        "Customers pay the old price until the period ends."
+      ],
+      "decided_by": "P2",
+      "refs": [
+        {
+          "item": "CR1",
+          "artifact": "pa_3fQ8nV2kLm7Xc1Rt",
+          "version": 1,
+          "rel": "resolves"
+        }
+      ]
+    },
+    {
+      "id": "T1",
+      "type": "term",
+      "text": "Downgrade",
+      "status": "accepted",
+      "definition": "A move to a cheaper plan that starts at the end of the paid period.",
+      "aliases": [
+        "plan change down"
+      ],
+      "code_names": [
+        "Billing.schedule_plan_change/3"
+      ]
+    }
+  ],
+  "created_at": "2026-11-05T09:00:00Z"
+}

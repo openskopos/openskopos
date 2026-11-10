@@ -1,0 +1,58 @@
+{
+  "round_trip": [
+    {
+      "case": "01-edit-final-version",
+      "description": "Read back an edited rendering of a final version 2. Changes text and fields, adds a success signal with `new`, removes an example and the only non-goal, accepts a proposed risk by removing its status line, and edits copied material that the reader ignores. The result is draft version 3."
+    },
+    {
+      "case": "02-rejected-items-and-counters",
+      "description": "A glossary with a rejected term T3. The rendering leaves T3 out. The new term gets T4, because the T counter is 3. T3 stays in the next version, unchanged, at the end of the item list."
+    },
+    {
+      "case": "03-draft-version-and-copied-terms",
+      "description": "A draft version 3 that pins a glossary. The rendering copies the accepted glossary terms under \"From other artifacts\". The edit rejects C4 with a status line, adds a proposed requirement with an example, and removes the answer of Q2. The base is a draft, so the result keeps version 3 and its parents."
+    }
+  ],
+  "invalid": [
+    {
+      "case": "unknown-item-id",
+      "reason": "S9 is not an item of the rendering. Use `- new:` to add an item."
+    },
+    {
+      "case": "item-in-wrong-section",
+      "reason": "G1 is a goal, but it is under Success signals."
+    },
+    {
+      "case": "duplicate-item-id",
+      "reason": "S1 appears twice."
+    },
+    {
+      "case": "unknown-field",
+      "reason": "colour is not a field of a goal."
+    },
+    {
+      "case": "field-of-another-type",
+      "reason": "verification is a field of a success signal, not of a goal."
+    },
+    {
+      "case": "unknown-section",
+      "reason": "Notes is not a section name."
+    },
+    {
+      "case": "rejected-item-id",
+      "reason": "T3 is rejected, so it is not in the rendering. A rejected item cannot come back through Markdown."
+    },
+    {
+      "case": "front-matter-mismatch",
+      "reason": "The front matter names a different artifact ID from the base version."
+    },
+    {
+      "case": "new-critique-without-evidence",
+      "reason": "A critique needs evidence, and evidence is not in the Markdown. The result fails the schema."
+    },
+    {
+      "case": "bad-boolean",
+      "reason": "blocking is true or false."
+    }
+  ]
+}

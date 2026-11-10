@@ -1,0 +1,42 @@
+# YAML form of an OpenSkopos document. Dates, times and the keys "yes" and "no" are quoted.
+$schema: https://openskopos.org/schema/artifact/0.1.json
+id: pa_5Rt8Yu1Io4Pa7Sd0
+version: 1
+kind: agent_rules
+title: Billing team charter
+status: final
+method:
+  id: team-charter
+session:
+  id: '6001'
+  ended_at: "2026-10-20T16:00:00Z"
+participants:
+- id: P1
+  name: Ana
+  kind: human
+- id: P2
+  name: Lee
+  kind: human
+id_counters:
+  C: 2
+items:
+- id: C1
+  type: constraint
+  text: Never log card numbers.
+  status: accepted
+  modality: never
+  enforced_by: Log scrubber test
+  ratification:
+    "yes": 2
+    "no": 0
+    eligible: 2
+- id: C2
+  type: constraint
+  text: Ask before you change a price.
+  status: accepted
+  modality: ask_first
+  approver: P1
+  bring:
+  - The old and new price
+created_at: "2026-10-20T15:00:00Z"
+finalized_at: "2026-10-20T16:05:00Z"
