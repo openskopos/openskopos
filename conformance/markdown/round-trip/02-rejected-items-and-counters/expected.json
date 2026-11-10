@@ -6,13 +6,6 @@
   "title": "Billing glossary",
   "summary": "Terms for the billing area of the product.",
   "status": "draft",
-  "method": {
-    "id": "glossary-workshop"
-  },
-  "session": {
-    "id": "5120",
-    "title": "Billing terms"
-  },
   "participants": [
     {
       "id": "P1",

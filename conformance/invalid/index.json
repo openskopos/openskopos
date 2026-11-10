@@ -55,6 +55,18 @@
       "reason": "A participant has only an ID, a display name and a kind."
     },
     {
+      "file": "method-without-id.json",
+      "check": "schema",
+      "rule": "method",
+      "reason": "A method, if present, has an id."
+    },
+    {
+      "file": "session-without-id.json",
+      "check": "schema",
+      "rule": "session",
+      "reason": "A session, if present, has an id."
+    },
+    {
       "file": "final-without-finalized-at.json",
       "check": "schema",
       "rule": "final",

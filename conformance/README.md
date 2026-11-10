@@ -49,7 +49,7 @@ Each case folder holds:
 | `inputs/` | Other documents that the rendering copies material from, if any. Each file is named `<artifact id>@<version>.json`. |
 | `rendering.md` | The rendering of `document.json`. A writer must make this file byte for byte. |
 | `edited.md` | `rendering.md` after a person edited it. |
-| `expected.json` | The document that a reader makes from `document.json` and `edited.md`. A comparison ignores the order of keys and the fields `created_at`, `method` and `session`. |
+| `expected.json` | The document that a reader makes from `document.json` and `edited.md`. A comparison ignores the order of keys and the field `created_at`. |
 
 `index.json` describes what each case tests.
 

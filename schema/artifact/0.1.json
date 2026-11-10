@@ -11,8 +11,6 @@
     "kind",
     "title",
     "status",
-    "method",
-    "session",
     "participants",
     "items",
     "created_at"
@@ -50,7 +48,7 @@
       "enum": ["draft", "final"]
     },
     "method": {
-      "description": "The method that made this version.",
+      "description": "The method that made this version, if a method made it. Optional.",
       "type": "object",
       "required": ["id"],
       "properties": {
@@ -77,7 +75,7 @@
       "additionalProperties": false
     },
     "session": {
-      "description": "The session that made this version.",
+      "description": "The working session that made this version, if there was one. Optional.",
       "type": "object",
       "required": ["id"],
       "properties": {

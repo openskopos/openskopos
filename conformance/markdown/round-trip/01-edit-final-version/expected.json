@@ -5,13 +5,6 @@
   "kind": "intent",
   "title": "Intent: self-serve plan downgrades",
   "status": "draft",
-  "method": {
-    "id": "intent-lock"
-  },
-  "session": {
-    "id": "4907",
-    "title": "Intent Lock: downgrades, round 2"
-  },
   "participants": [
     {
       "id": "P1",

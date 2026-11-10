@@ -99,8 +99,8 @@ A document is a JSON object. These are its fields:
 | `title` | Yes | A short title, 1 to 200 characters. |
 | `summary` | No | A short introduction in Markdown. |
 | `status` | Yes | `draft` or `final`. A draft can change. A final version never changes. |
-| `method` | Yes | The method that made this version: `id` (lowercase letters, digits and `-`) and an optional `version`. |
-| `session` | Yes | The working session that made this version: `id`, and optional `title`, `url` and `ended_at`. |
+| `method` | No | The method that made this version, if a method made it: `id` (lowercase letters, digits and `-`) and an optional `version`. |
+| `session` | No | The working session that made this version, if there was one: `id`, and optional `title`, `url` and `ended_at`. |
 | `participants` | Yes | The people and AI agents in the session. The list can be empty. See 3.1. |
 | `decider` | No | The participant ID of the person who makes the final call when the group does not agree. |
 | `parents` | No | The material and the earlier version that this version came from. See [section 8](#8-versions-and-parents). |
@@ -125,6 +125,10 @@ matches the pattern. The kinds `ritual_plan`, `handoff_brief` and
 
 `kind` and `method` are separate fields because a different method can make the
 next version of an artifact.
+
+`method` and `session` are for tools that run structured sessions, for example
+a facilitated workshop. A person who writes or edits a document by hand leaves
+them out.
 
 ### 3.1 Participants
 
@@ -690,10 +694,14 @@ with these steps:
     assigned. The reader writes each counter that is more than 0.
 13. If the base version is final, the new document is version n+1, with the
     status `draft`. Its parents are a `previous_version` parent for version n,
-    then the other parents of the base version. It has no `finalized_at`.
+    then the other parents of the base version. It has no `finalized_at`,
+    `method` or `session`, because these describe how the base version was
+    made.
 14. If the base version is a draft, the new document replaces that draft. It
-    keeps the version number, the parents and `created_at`.
-15. The tool sets `method`, `session` and, for a new version, `created_at`.
+    keeps the version number, the parents, `created_at`, `method` and
+    `session`.
+15. For a new version, the tool sets `created_at`. If the tool runs a method or a
+    session, it can also set `method` and `session`.
 16. The new document must be valid against the schema and the rules in
     [section 9](#9-rules-that-the-schema-cannot-check). If it is not, the
     reader reports an error and makes no document.
@@ -762,6 +770,6 @@ A tool that writes and reads Markdown must also pass the cases in
 - From `document.json` and the documents in `inputs/`, it writes
   `rendering.md`, byte for byte.
 - From `document.json` and `edited.md`, it makes a document equal to
-  `expected.json`. The comparison ignores the order of keys and the fields
-  `created_at`, `method` and `session`.
+  `expected.json`. The comparison ignores the order of keys and the field
+  `created_at`.
 - For each case in `markdown/invalid/`, it reports an error.
