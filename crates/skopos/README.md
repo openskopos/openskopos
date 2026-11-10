@@ -219,7 +219,8 @@ in a "Not exported" note in the files. The tool also writes the list to
 standard error. [docs/exporters.md](../../docs/exporters.md) explains where
 each item type goes.
 
-The document must be valid. If `skopos check` finds a problem, the tool
+The document can be JSON, YAML or Markdown. It must be valid. If
+`skopos check` finds a problem, the tool
 exports nothing.
 
 ### diff
@@ -231,6 +232,9 @@ same ID.
 ```bash
 skopos diff spec-v2.skopos.json spec-v3.skopos.json
 ```
+
+Each file can be JSON, YAML or Markdown, so `skopos diff spec.skopos.json SPEC.md`
+shows what a hand edit of the Markdown file changed.
 
 ```
 pa_2Xc5Rv8Tn1Mb4Kz7@2 -> pa_2Xc5Rv8Tn1Mb4Kz7@3

@@ -645,3 +645,31 @@ fn export_to_speckit_names_the_feature_json_setting() {
         "the tool does not change Spec Kit state"
     );
 }
+
+#[test]
+fn export_and_diff_read_markdown() {
+    let md = conformance()
+        .join("markdown/round-trip/01-all-item-types/document.md")
+        .display()
+        .to_string();
+    let json = conformance()
+        .join("markdown/round-trip/01-all-item-types/document.json")
+        .display()
+        .to_string();
+    let dir = temp_dir("export-markdown");
+    let out = skopos(&["export", &md, "--to", "kiro", "-o", dir.to_str().unwrap()]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+
+    // The Markdown file and its JSON hold the same document.
+    let out = skopos(&["diff", &json, &md]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stdout).ends_with("no changes\n"));
+}

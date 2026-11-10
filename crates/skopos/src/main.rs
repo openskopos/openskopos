@@ -533,15 +533,10 @@ fn run_ids(files: &[PathBuf], check_only: bool) -> bool {
     ok
 }
 
-/// Reads a document and checks it. Reports each problem.
+/// Reads a JSON, YAML or Markdown document and checks it. Reports each
+/// problem.
 fn read_valid(path: &Path) -> Option<Value> {
-    let doc = match read(path) {
-        Ok((_, _, doc)) => doc,
-        Err(problem) => {
-            report(path, &problem);
-            return None;
-        }
-    };
+    let doc = read_or_report(path)?;
     let problems = check(&doc);
     if problems.is_empty() {
         return Some(doc);
