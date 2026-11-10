@@ -178,9 +178,10 @@ jobs:
       - name: Run the conformance cases with the npm CLI
         run: |
           skopos="$RUNNER_TEMP/project/node_modules/.bin/skopos"
-          jq -r '.cases[].file | "conformance/valid/" + .' conformance/valid/index.json | xargs "$skopos" check
+          # jq on Windows ends lines with \r\n.
+          jq -r '.cases[].file | "conformance/valid/" + .' conformance/valid/index.json | tr -d '\r' | xargs "$skopos" check
           status=0
-          for file in $(jq -r '.cases[].file' conformance/invalid/index.json); do
+          for file in $(jq -r '.cases[].file' conformance/invalid/index.json | tr -d '\r'); do
             if "$skopos" check "conformance/invalid/$file" > /dev/null 2>&1; then
               echo "::error file=conformance/invalid/$file::the npm CLI accepted an invalid document"
               status=1

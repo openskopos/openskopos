@@ -13,13 +13,16 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 
-const [native, npm] = process.argv.slice(2);
+// The commands run in other folders, so the paths of the tools must be absolute.
+const [native, npm] = process.argv.slice(2).map((p) => path.resolve(p));
 if (!native || !npm) {
   console.error("usage: node npm/test/compare.mjs <native skopos> <npm skopos>");
   process.exit(2);
 }
 const conformance = new URL("../../conformance/", import.meta.url);
+const conformanceDir = fileURLToPath(conformance);
 const work = fs.mkdtempSync(path.join(os.tmpdir(), "skopos-compare-"));
 const started = Date.now();
 
@@ -42,9 +45,10 @@ const validYaml = valid.filter((f) => !f.endsWith(".json"));
 
 // Extra files for the cases of errors and of `ids`.
 function setup(dir) {
-  fs.cpSync(conformance, path.join(dir, "c"), {
+  fs.cpSync(conformanceDir, path.join(dir, "c"), {
     recursive: true,
-    filter: (src) => !src.includes(`${path.sep}runner`),
+    // Leave out conformance/runner/, the Rust program that checks the cases.
+    filter: (src) => path.relative(conformanceDir, src).split(path.sep)[0] !== "runner",
   });
   fs.mkdirSync(path.join(dir, "folder.json"));
   fs.writeFileSync(path.join(dir, "latin1.json"), Buffer.from([0x7b, 0xe9, 0x7d]));
