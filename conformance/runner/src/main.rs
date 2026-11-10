@@ -5,9 +5,9 @@
 //! - Each `schema` case in `invalid/` fails the schema.
 //! - Each `semantic` case in `invalid/` passes the schema and breaks exactly
 //!   the rule that its index entry names.
-//! - The JSON files of the Markdown cases are valid, and each rendering names
-//!   its document in the front matter. Reading Markdown back is for an
-//!   implementation to test. This runner does not do it.
+//! - The JSON files of the Markdown cases are valid, and each Markdown file
+//!   of a stored document names it in the front matter. Reading and writing
+//!   Markdown is for an implementation to test. This runner does not do it.
 //!
 //! Usage: `cargo run --manifest-path conformance/runner/Cargo.toml [repo root]`
 
@@ -151,7 +151,9 @@ fn check_invalid(run: &mut Run, v: &Validator, dir: &Path) -> Result<(), String>
 
 fn check_markdown(run: &mut Run, v: &Validator, dir: &Path) -> Result<(), String> {
     let index = read_json(&dir.join("index.json"))?;
+    let valid = |j: &Value| schema_errors(v, j).is_empty() && semantic_errors(j).is_empty();
 
+    // round-trip: document.json and its Markdown, document.md.
     let mut listed = BTreeSet::new();
     for case in array(&index, "round_trip")? {
         let name = str_field(case, "case")?;
@@ -159,52 +161,75 @@ fn check_markdown(run: &mut Run, v: &Validator, dir: &Path) -> Result<(), String
         listed.insert(name.to_string());
         let d = dir.join("round-trip").join(name);
         let doc = read_doc(&d.join("document.json"))?;
-        let expected = read_doc(&d.join("expected.json"))?;
-        let mut jsons = vec![("document.json".to_string(), doc.clone()), ("expected.json".to_string(), expected.clone())];
+        run.check(valid(&doc), format!("markdown/round-trip/{name}/document.json is valid"));
         if d.join("inputs").is_dir() {
             for f in sorted_files(&d.join("inputs"))? {
                 let input = read_doc(&d.join("inputs").join(&f))?;
-                jsons.push((format!("inputs/{f}"), input));
+                run.check(valid(&input), format!("markdown/round-trip/{name}/inputs/{f} is valid"));
             }
         }
-        for (f, j) in &jsons {
-            let ok = schema_errors(v, j).is_empty() && semantic_errors(j).is_empty();
-            run.check(ok, format!("markdown/round-trip/{name}/{f} is valid"));
-        }
-        for f in ["rendering.md", "edited.md"] {
-            let fm = front_matter(&d.join(f))?;
-            run.check(
-                same_version(&fm, &doc),
-                format!("markdown/round-trip/{name}/{f} front matter names document.json"),
-            );
-        }
-        let next = if doc["status"] == "final" {
-            doc["version"].as_u64().unwrap_or(0) + 1
-        } else {
-            doc["version"].as_u64().unwrap_or(0)
-        };
+        let fm = front_matter(&d.join("document.md"))?;
         run.check(
-            expected["id"] == doc["id"]
-                && expected["version"].as_u64() == Some(next)
-                && expected["status"] == "draft",
-            format!("markdown/round-trip/{name}/expected.json is draft version {next} of the same artifact"),
+            same_version(&fm, &doc),
+            format!("markdown/round-trip/{name}/document.md front matter names document.json"),
         );
     }
     check_listed_dirs(run, &dir.join("round-trip"), &listed, "markdown/round-trip")?;
 
+    // generous: a hand-written file and the document that a reader makes from it.
+    let mut listed = BTreeSet::new();
+    for case in array(&index, "generous")? {
+        let name = str_field(case, "case")?;
+        let file = str_field(case, "file")?;
+        str_field(case, "description")?;
+        listed.insert(name.to_string());
+        let d = dir.join("generous").join(name);
+        run.check(d.join(file).is_file(), format!("markdown/generous/{name}/{file} exists"));
+        let expected = read_doc(&d.join("expected.json"))?;
+        run.check(valid(&expected), format!("markdown/generous/{name}/expected.json is valid"));
+    }
+    check_listed_dirs(run, &dir.join("generous"), &listed, "markdown/generous")?;
+
+    // next-version: a stored version, an edited file, and what the tool stores.
+    let mut listed = BTreeSet::new();
+    for case in array(&index, "next_version")? {
+        let name = str_field(case, "case")?;
+        str_field(case, "description")?;
+        listed.insert(name.to_string());
+        let d = dir.join("next-version").join(name);
+        let stored = read_doc(&d.join("stored.json"))?;
+        let expected = read_doc(&d.join("expected.json"))?;
+        run.check(valid(&stored), format!("markdown/next-version/{name}/stored.json is valid"));
+        run.check(valid(&expected), format!("markdown/next-version/{name}/expected.json is valid"));
+        let fm = front_matter(&d.join("edited.md"))?;
+        run.check(
+            same_version(&fm, &stored),
+            format!("markdown/next-version/{name}/edited.md front matter names stored.json"),
+        );
+        let n = stored["version"].as_u64().unwrap_or(0);
+        let next = expected["version"].as_u64().unwrap_or(0);
+        let ok = expected["id"] == stored["id"]
+            && if next == n + 1 {
+                stored["status"] == "final" && expected["status"] == "draft"
+            } else {
+                next == n
+            };
+        run.check(
+            ok,
+            format!("markdown/next-version/{name}/expected.json is version {n}, or draft {} after a final version", n + 1),
+        );
+    }
+    check_listed_dirs(run, &dir.join("next-version"), &listed, "markdown/next-version")?;
+
+    // invalid: files that a reader must reject.
     let mut listed = BTreeSet::new();
     for case in array(&index, "invalid")? {
         let name = str_field(case, "case")?;
+        let file = str_field(case, "file")?;
         str_field(case, "reason")?;
         listed.insert(name.to_string());
-        let d = dir.join("invalid").join(name);
-        let doc = read_doc(&d.join("document.json"))?;
-        let ok = schema_errors(v, &doc).is_empty() && semantic_errors(&doc).is_empty();
-        run.check(ok, format!("markdown/invalid/{name}/document.json is valid"));
-        run.check(
-            d.join("edited.md").is_file(),
-            format!("markdown/invalid/{name}/edited.md exists"),
-        );
+        let path = dir.join("invalid").join(name).join(file);
+        run.check(path.is_file(), format!("markdown/invalid/{name}/{file} exists"));
     }
     check_listed_dirs(run, &dir.join("invalid"), &listed, "markdown/invalid")
 }

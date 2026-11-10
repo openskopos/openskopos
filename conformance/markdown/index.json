@@ -1,58 +1,108 @@
 {
   "round_trip": [
     {
+      "case": "01-all-item-types",
+      "description": "Every item type and every item field: refs, all evidence kinds, votes, detail, x- keys, and a rejected item."
+    },
+    {
+      "case": "02-critique",
+      "description": "A final critique with quote, code and discussion evidence, and a rejected critique."
+    },
+    {
+      "case": "03-copied-material",
+      "description": "A writer copies the item that a ref points to under \"From other artifacts\". The reader ignores that section."
+    }
+  ],
+  "generous": [
+    {
+      "case": "01-start-from-scratch",
+      "file": "INTENT.md",
+      "description": "A first file written by hand: no front matter, no IDs, loose headings and keys. The kind comes from the file name. The reader assigns the artifact ID, version 1, the item IDs and the counters. The comparison ignores `id` and `created_at`, because the file has neither.",
+      "warnings": 0
+    },
+    {
+      "case": "02-ids-and-counters",
+      "file": "SPEC.md",
+      "description": "Written IDs in several styles, items without IDs, a duplicate ID and an ID with the prefix of another type. Written IDs keep their numbers. The others get new IDs after the highest counter. Three warnings.",
+      "warnings": 2
+    },
+    {
+      "case": "03-unknown-fields-and-sections",
+      "file": "INTENT.md",
+      "description": "A reader keeps going when it meets something it does not know: an unknown field becomes an x- key, an unknown section and text outside an item are skipped, and H3 headings only group items. Four warnings.",
+      "warnings": 4
+    },
+    {
+      "case": "04-structured-fields",
+      "file": "CRITIQUE.md",
+      "description": "Critiques with every structured field in its short and its long form: evidence with a path:lines shortcut, a quote from an artifact item, a target given as a section, a resolution with nested fields, refs and votes.",
+      "warnings": 0
+    }
+  ],
+  "next_version": [
+    {
       "case": "01-edit-final-version",
-      "description": "Read back an edited rendering of a final version 2. Changes text and fields, adds a success signal with `new`, removes an example and the only non-goal, accepts a proposed risk by removing its status line, and edits copied material that the reader ignores. The result is draft version 3."
+      "description": "A person edits the Markdown of final version 2. The tool has the stored version, sees that the content changed, and stores draft version 3 with a previous_version parent. The new item gets S4, and N1 is dropped."
     },
     {
-      "case": "02-rejected-items-and-counters",
-      "description": "A glossary with a rejected term T3. The rendering leaves T3 out. The new term gets T4, because the T counter is 3. T3 stays in the next version, unchanged, at the end of the item list."
+      "case": "02-unchanged-final-version",
+      "description": "The Markdown of a final version, read back with no edits. The content is the same, so nothing changes."
     },
     {
-      "case": "03-draft-version-and-copied-terms",
-      "description": "A draft version 3 that pins a glossary. The rendering copies the accepted glossary terms under \"From other artifacts\". The edit rejects C4 with a status line, adds a proposed requirement with an example, and removes the answer of Q2. The base is a draft, so the result keeps version 3 and its parents."
+      "case": "03-edit-draft",
+      "description": "A person edits the Markdown of a draft. The draft keeps its version number."
     }
   ],
   "invalid": [
     {
-      "case": "unknown-item-id",
-      "reason": "S9 is not an item of the rendering. Use `- new:` to add an item."
+      "case": "no-title",
+      "file": "INTENT.md",
+      "reason": "The file has no H1 title."
     },
     {
-      "case": "item-in-wrong-section",
-      "reason": "G1 is a goal, but it is under Success signals."
+      "case": "no-kind",
+      "file": "notes.md",
+      "reason": "There is no kind in the front matter, and the file name is not a kind."
     },
     {
-      "case": "duplicate-item-id",
-      "reason": "S1 appears twice."
-    },
-    {
-      "case": "unknown-field",
-      "reason": "colour is not a field of a goal."
-    },
-    {
-      "case": "field-of-another-type",
-      "reason": "verification is a field of a success signal, not of a goal."
-    },
-    {
-      "case": "unknown-section",
-      "reason": "Notes is not a section name."
-    },
-    {
-      "case": "rejected-item-id",
-      "reason": "T3 is rejected, so it is not in the rendering. A rejected item cannot come back through Markdown."
-    },
-    {
-      "case": "front-matter-mismatch",
-      "reason": "The front matter names a different artifact ID from the base version."
-    },
-    {
-      "case": "new-critique-without-evidence",
-      "reason": "A critique needs evidence, and evidence is not in the Markdown. The result fails the schema."
+      "case": "bad-enum-value",
+      "file": "SPEC.md",
+      "reason": "urgent is not a priority."
     },
     {
       "case": "bad-boolean",
-      "reason": "blocking is true or false."
+      "file": "INTENT.md",
+      "reason": "maybe is not true or false."
+    },
+    {
+      "case": "constraint-without-modality",
+      "file": "INTENT.md",
+      "reason": "A constraint needs a modality. The schema rejects the result."
+    },
+    {
+      "case": "critique-without-evidence",
+      "file": "CRITIQUE.md",
+      "reason": "A critique needs evidence. The schema rejects the result."
+    },
+    {
+      "case": "resolution-without-outcome",
+      "file": "CRITIQUE.md",
+      "reason": "A resolution needs an outcome."
+    },
+    {
+      "case": "incomplete-votes",
+      "file": "INTENT.md",
+      "reason": "Votes need yes, no and eligible."
+    },
+    {
+      "case": "bad-ref",
+      "file": "SPEC.md",
+      "reason": "A ref names an item ID or a reference string."
+    },
+    {
+      "case": "broken-front-matter",
+      "file": "INTENT.md",
+      "reason": "The front matter is not valid YAML."
     }
   ]
 }

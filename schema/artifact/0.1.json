@@ -11,7 +11,6 @@
     "kind",
     "title",
     "status",
-    "participants",
     "items",
     "created_at"
   ],
@@ -628,6 +627,7 @@
                 "additionalProperties": false
               },
               "resolution": {
+                "description": "What the team decided to do. No resolution means that the critique is open.",
                 "type": "object",
                 "required": ["outcome"],
                 "properties": {
@@ -637,16 +637,7 @@
                 },
                 "additionalProperties": false
               }
-            },
-            "allOf": [
-              {
-                "if": {
-                  "properties": { "status": { "const": "accepted" } },
-                  "required": ["status"]
-                },
-                "then": { "required": ["resolution"] }
-              }
-            ]
+            }
           }
         }
       ],

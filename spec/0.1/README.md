@@ -28,7 +28,7 @@ documents, and for people who want to know exactly what a file means.
 7. [ID counters](#7-id-counters)
 8. [Versions and parents](#8-versions-and-parents)
 9. [Rules that the schema cannot check](#9-rules-that-the-schema-cannot-check)
-10. [The Markdown layout](#10-the-markdown-layout)
+10. [Markdown](#10-markdown)
 11. [Glossaries](#11-glossaries)
 12. [Format versions](#12-format-versions)
 13. [Conformance](#13-conformance)
@@ -47,7 +47,6 @@ allowed but not required.
 | Kind | The type of a document, for example `intent` or `glossary`. |
 | Method | The process that made a version, for example a facilitated workshop. |
 | Tool | Any software that reads or writes documents. |
-| Rendering | A Markdown file made from a document. |
 
 The format version (0.1) and the version number of an artifact (1, 2, 3) are
 different numbers. Version 3 of an artifact can use format 0.1.
@@ -58,9 +57,9 @@ A document has three formats:
 
 | Format | Role | Holds every field |
 |---|---|---|
-| JSON | The canonical format. Tools store and make sure that documents are valid in this format. | Yes |
-| YAML | The same data as JSON, for people who edit every field by hand. The same JSON Schema applies. | Yes |
-| Markdown | The format that people read, commit and edit most. Its layout is fixed, so that a tool can read it back. | No (see [section 10](#10-the-markdown-layout)) |
+| JSON | The canonical format. Tools store documents and make sure that they are valid in this format. | Yes |
+| YAML | The same data as JSON. The same JSON Schema applies. | Yes |
+| Markdown | The format for people who read and write documents by hand. See [section 10](#10-markdown). | Yes |
 
 Files use UTF-8.
 
@@ -73,8 +72,9 @@ to a file by this suffix.
 A Markdown file has the kind in capital letters, for example `INTENT.md`,
 `SPEC.md`, `GLOSSARY.md` or `CRITIQUE.md`.
 
-The team chooses the folder. A team usually keeps the Markdown file next to its
-data file. If one folder holds two artifacts of the same kind, the team adds a
+The team chooses the folder. Because the Markdown file holds every field, a
+team can keep only the Markdown file, and let tools make the JSON when they
+need it. If one folder holds two artifacts of the same kind, the team adds a
 name before the kind, for example `billing.intent.skopos.json`.
 
 ### 2.2 YAML
@@ -101,7 +101,7 @@ A document is a JSON object. These are its fields:
 | `status` | Yes | `draft` or `final`. A draft can change. A final version never changes. |
 | `method` | No | The method that made this version, if a method made it: `id` (lowercase letters, digits and `-`) and an optional `version`. |
 | `session` | No | The working session that made this version, if there was one: `id`, and optional `title`, `url` and `ended_at`. |
-| `participants` | Yes | The people and AI agents in the session. The list can be empty. See 3.1. |
+| `participants` | No | The people and AI agents in the session. See 3.1. |
 | `decider` | No | The participant ID of the person who makes the final call when the group does not agree. |
 | `parents` | No | The material and the earlier version that this version came from. See [section 8](#8-versions-and-parents). |
 | `id_counters` | No | The highest number used for each item prefix. See [section 7](#7-id-counters). |
@@ -170,7 +170,7 @@ for example in a document that a language model helped to write.
 | `ratification` | No | Vote counts: `yes`, `no` and `eligible`, each an integer of 0 or more. |
 
 A rejected item stays in the version, so that the record shows what the team
-decided against. Renderings for agents leave out rejected items.
+decided against. An agent must not act on a rejected item.
 
 ### 4.2 The twelve item types
 
@@ -321,7 +321,7 @@ The `text` of a term is the word itself.
 | `evidence` | Yes | At least one evidence entry. |
 | `suggestion` | No | What the critic proposes. |
 | `target` | No | What the critique is about. |
-| `resolution` | If `accepted` | What the team decided to do. |
+| `resolution` | No | What the team decided to do. A critique with no resolution is open. |
 
 The categories are `ambiguity`, `gap`, `conflict`, `untestable`, `incorrect`,
 `unstated_assumption`, `scope_creep`, `over_specified` and `other`. `incorrect`
@@ -509,47 +509,73 @@ One more rule needs the earlier versions of the artifact: an ID that an
 earlier version used for one item is never used for a different item. A tool
 that has the earlier versions must make sure that this is true.
 
-## 10. The Markdown layout
+## 10. Markdown
 
-A Markdown rendering is for agents and for people who edit by hand. The layout
-is fixed, so that a tool can read an edited file back into a document.
+Markdown is the format for people who write documents by hand. A Markdown file
+holds every field of the document, so a tool can turn a document into Markdown
+and back with no loss. A person can also start a document in Markdown, with no
+other file.
 
-A rendering does not hold every field. These fields stay in the JSON only:
-`detail`, `evidence`, `refs`, `proposed_by`, `ratification`, `x-` keys,
-`participants`, `parents`, `method`, `session`, `id_counters`, `created_at`
-and `finalized_at`.
+A reader of Markdown is generous. It accepts many ways to write the same thing
+(10.5). It fills only bookkeeping fields, such as the artifact ID, and never
+content. It stops with an error only when it cannot make a valid document
+(10.6).
 
 ### 10.1 Layout
 
-A writer makes the rendering in this order:
+A Markdown file has these parts, in this order:
 
-1. Front matter in YAML between two `---` lines, with these keys in this
-   order: `schema` (the `$schema` URL), `id`, `version`, `kind`, `status`.
-2. One blank line, then the title as an H1: `# <title>`.
-3. If the document has a summary: one blank line, then the summary.
-4. One H2 section for each item type that has items to show, in this order:
-   Goals, Success signals, Requirements, Stories, Constraints, Assumptions,
-   Non-goals, Risks, Open questions, Decisions, Terms, Critiques. The writer
-   leaves out a section with no items.
-5. If the rendering copies material from other artifacts: the section
-   `## From other artifacts` (see 10.4).
+1. Front matter (optional): YAML between two `---` lines. It holds the fields
+   of the document in [section 3](#3-the-document), with the same names and
+   shapes as in JSON. `$schema` is written `schema`. The title, the summary
+   and the items are not in the front matter.
+2. The title, as an H1: `# <title>`.
+3. The summary (optional): the text between the H1 and the first H2.
+4. One H2 section for each item type that has items, with these names in this
+   order: Goals, Success signals, Requirements, Stories, Constraints,
+   Assumptions, Non-goals, Risks, Open questions, Decisions, Terms, Critiques.
+5. The section `## From other artifacts` (optional, see 10.7).
 
-Each H2 and H3 heading has one blank line before it and one blank line after
-it. The
-file ends with one line break.
+A short example:
 
-The writer leaves out rejected items. In each section, the items are in the
-order of `items` in the document.
+```markdown
+---
+schema: https://openskopos.org/schema/artifact/0.1.json
+id: pa_7Hk2mQ9xR4tV8wZ1
+version: 1
+kind: intent
+status: draft
+id_counters:
+  G: 1
+  C: 1
+created_at: '2026-11-05T09:00:00Z'
+---
 
-### 10.2 Item lines
+# Self-serve plan downgrades
 
-Each item is one list item:
+Customers want to pay less without talking to support.
+
+## Goals
+
+- G1: Customers can lower their bill without waiting for support.
+  - for: Org admins on monthly plans
+
+## Constraints
+
+- C1: Ask before adding a database migration.
+  - modality: ask_first
+  - approver: Tech lead
+  - bring: The migration
+  - bring: A rollback plan
+```
+
+### 10.2 Items
+
+Each item is a list item:
 
 ```
 - <id>: <text>
 ```
-
-For example `- S1: A customer can downgrade without contacting support.`
 
 The fields of the item follow as nested list items, indented by two spaces:
 
@@ -557,165 +583,233 @@ The fields of the item follow as nested list items, indented by two spaces:
   - <key>: <value>
 ```
 
-A text or a value must be on one line. If it holds a line break, the writer
-replaces the line break with one space.
+A field that has fields of its own, such as an evidence entry, has them as
+list items indented by two more spaces.
 
-### 10.3 Field lines
-
-If the status of the item is not `accepted`, the first field line is
-`status: <status>`. An item with no status line is accepted. In the sections
-of the document, this line is always `status: proposed`, because the writer
-leaves out rejected items.
-
-Then come the fields of the type, in this order:
-
-| Type | Field lines |
-|---|---|
-| Goal | `for` |
-| Success signal | `verification` |
-| Requirement | `priority`, then one line for each example |
-| Story | one `ac` line for each acceptance criterion, then one line for each example |
-| Constraint | `modality`, `rationale`, one `scope` line for each value, `enforced_by`, `approver`, one `bring` line for each value |
-| Assumption | `confirmation`, `owner`, `confirm_by` |
-| Non-goal | `reason`, `deferred` |
-| Risk | `likelihood`, `impact`, `mitigation`, `owner` |
-| Open question | `owner`, `blocking`, one `options` line for each value, `answer` |
-| Decision | `rationale`, one `alternatives` line for each value, one `consequences` line for each value, `decided_by` |
-| Term | `definition`, one `aliases` line for each value, one `code_names` line for each value |
-| Critique | `severity`, `category`, `suggestion`, `target.artifact`, `target.version`, `target.item`, `target.section`, `resolution.outcome`, `resolution.note`, `resolution.decided_by` |
-
-The writer leaves out a field that the item does not have.
-
-- An example uses its kind as the key: `example` for `normal`, `edge` for
-  `edge`, and `forbidden` for `forbidden`.
-- A list field repeats its key once for each value.
-- A field inside `target` or `resolution` uses the name of the object, a dot
-  and the name of the field.
-- A boolean is `true` or `false`.
-
-For example:
+The `detail` of an item comes after a blank line, indented by two spaces. It
+continues until the next item. It can hold any Markdown, also lists.
 
 ```markdown
-- FR1: The billing page lets an org admin pick a smaller plan.
-  - priority: must
-  - example: An admin on Team picks Starter. The page shows Starter from 1 December.
-  - edge: An admin with 12 seats picks a plan with 10 seats. The page blocks the change.
-  - forbidden: A member who is not an admin sees the plan picker.
-- C2: Ask before adding a database migration.
-  - modality: ask_first
-  - approver: Tech lead
-  - bring: The migration
-  - bring: A rollback plan
+- FR3: The seat count never goes below zero.
+  - priority: should
+
+  An invariant. A property-based test fits it.
 ```
 
-### 10.4 Material from other artifacts
+### 10.3 Where each field goes
 
-A rendering is complete on its own, so that an agent does not need other files.
-Agents do not follow links. The writer copies this material from other
-artifacts, if it has their documents:
+| Field | In Markdown |
+|---|---|
+| `id`, `text` | The item line: `- FR1: The billing page lets an admin pick a plan.` |
+| `type` | The H2 section of the item. |
+| `status` | `- status: proposed` or `- status: rejected`. An item with no status line is accepted. |
+| A field with one value | `- <field>: <value>`, for example `- priority: must` or `- deferred: true`. |
+| A field with a list of strings | One line for each value, with these keys: `ac` (`acceptance_criteria`), `scope`, `bring`, `option`, `alternative`, `consequence`, `alias`, `code_name`. |
+| `examples` | One line for each example. The key is the kind: `example` (no kind), `normal`, `edge` or `forbidden`. |
+| `target` | `- target: <item>` for an item, or `- target: <section name>` for a section. For both, the section goes on a nested `- section:` line. |
+| `resolution` | `- resolution: <outcome>`, with nested `- note:` and `- decided_by:` lines. |
+| `refs` | One line for each ref: `- <rel>: <item>`, for example `- refines: FR1`. A ref with no `rel` uses `- ref: <item>`. |
+| `evidence` | `- evidence:`, with one nested entry for each piece of evidence (see below). |
+| `proposed_by` | `- proposed_by: P3` |
+| `ratification` | `- votes: 2 yes, 0 no, 2 eligible` |
+| `x-` keys | `- x-<name>: <value>`. A value that is not a string is written as JSON. |
+| `detail` | Paragraphs after a blank line (10.2). |
+
+In this table, `<item>` is an item ID, such as `FR1`, or a reference string to
+an item in another artifact, such as `pa_7Hk2mQ9xR4tV8wZ1@2#FR1`.
+
+Evidence entries:
+
+```markdown
+  - evidence:
+    - quote: Retry each failed charge up to three times.
+      - from: Payment retry spec
+      - location: Retry policy
+    - code: lib/billing/retry.ex
+      - repo: acme/billing
+      - lines: 41-48
+      - commit: a1b2c3d
+    - discussion: Support finds out from the customer today.
+      - speaker: P2
+    - link: https://example.com/incidents/42
+      - title: Incident 42
+```
+
+The `from` of a quote is a title, or a reference string to an item. If it has
+both, the title goes on a nested `- title:` line.
+
+### 10.4 Writing Markdown
+
+A writer uses the layout in 10.1 to 10.3:
+
+- It writes the front matter fields in the order of the table in
+  [section 3](#3-the-document), then the `x-` keys.
+- It writes the status line of an item first. Then it writes the fields of the
+  type in the order of the tables in [section 4](#4-items), then refs,
+  evidence, `proposed_by`, votes and `x-` keys, and then the detail.
+- In each section, the items are in the order of `items` in the document.
+- It replaces a line break in a text or a value with one space.
+- It leaves out a section with no items.
+- It puts a blank line between two items only when one of them has a detail.
+
+Markdown does not keep the order of items between types. A reader puts the
+items in the order of the sections. Two documents that differ only in this
+order are the same.
+
+### 10.5 Reading Markdown
+
+A reader accepts all of the following. These rules exist so that writing by
+hand does not turn into a list of errors.
+
+Front matter and the file:
+
+- The front matter is optional. If a bookkeeping field is not there, the
+  reader fills it: `schema` with the URL of format 0.1, `id` with a new
+  artifact ID, `version` with 1, `status` with `draft` and `created_at` with
+  the current time.
+- If there is no `kind`, the reader takes it from a file name in capital
+  letters: `INTENT.md` gives `intent`.
+- The reader accepts `schema` and `$schema`, and a `title` in the front matter
+  if the file has no H1.
+- If a YAML value has the wrong type for its field, and the change is exact,
+  the reader changes it. For example, a session ID of `4907` becomes `"4907"`,
+  and a YAML date becomes its text.
+
+Sections:
+
+- The reader ignores case, `-` and `_`, singular and plural, and words in
+  parentheses. `## Success Signals (S)` and `## success signal` are the same
+  section. The type name, such as `open_question`, also works.
+- The reader also accepts these names: `Out of scope` (Non-goals), `User
+  stories` (Stories), `Functional requirements` (Requirements), `Questions`
+  (Open questions), `Glossary` (Terms), `Findings` (Critiques), `Rules` and
+  `Boundaries` (Constraints), `Success criteria` (Success signals).
+- H3 and smaller headings inside a section only group items. The reader
+  ignores them.
+
+Items:
+
+- An item can start with `-`, `*`, `+`, `1.` or `1)`.
+- An item ID can be written `G1:`, `G1.`, `G1 -`, `**G1**:` or `[G1]`, in
+  capital or small letters. An item can also have no ID, or start with
+  `new:`.
+- An indented line straight after the item line, which is not a list item,
+  continues the text of the item.
+
+Fields:
+
+- The reader ignores case in keys, and treats spaces, `-` and `_` as the same.
+  It accepts the singular and the plural of a key, for example `option` and
+  `options`.
+- It also accepts these keys: `acceptance criteria` and `criterion` for `ac`,
+  `also called` for `alias`, `in code` for `code_name`, `by` for
+  `proposed_by`, `due` for `confirm_by`, `vote` for `votes`, `related to` for
+  `relates_to`, `said` for `discussion` and `url` for `link`.
+- A list field can repeat its key, or have the values as nested list items
+  under one key line.
+- An example can be nested under an `examples` line. A nested example can
+  start with its kind, for example `- edge: 12 seats in use.`
+- The reader ignores case, spaces and `-` in a value from a fixed list:
+  `Ask first` gives `ask_first`.
+- A boolean can be `true`, `false`, `yes` or `no`.
+- Code evidence can give its lines in the path, for example
+  `- code: lib/billing/retry.ex:41-48`.
+- Votes can also be nested lines: `- yes: 2`, `- no: 0`, `- eligible: 2`.
+
+Item IDs:
+
+1. The reader keeps each written ID that has the prefix of its section, if it
+   is the first item with that ID.
+2. Each counter starts at the higher of its value in `id_counters` and the
+   highest written ID of its prefix.
+3. Each other item gets the next ID from the counter of its prefix, in the
+   order of the file (see [section 7](#7-id-counters)).
+4. The reader writes `id_counters` if the document has items.
+
+### 10.6 Warnings and errors
+
+The reader reports a warning and continues in these cases:
+
+| Case | What the reader does |
+|---|---|
+| A written ID has the prefix of another type. | The item gets a new ID. |
+| A written ID appears a second time. | The second item gets a new ID. |
+| An unknown key in the front matter or in an item. | It keeps the value as an `x-` key, for example `x-colour`. |
+| An unknown H2 section. | It ignores the section. |
+| Text that is not in an item. | It ignores the text. |
+| A nested list item with no key. | It ignores the line. |
+
+The reader reports an error and makes no document in these cases. Each error
+names the line and says what to write:
+
+- The front matter is not valid YAML, or it has no closing `---`.
+- The file has no title.
+- The reader cannot find the kind.
+- A value is not in the fixed list of its field, or a boolean is not `true`
+  or `false`.
+- A ref is not an item ID or a reference string.
+- A field with one value appears twice in an item.
+- An evidence entry has an unknown kind, or an evidence entry, a target or a
+  resolution has an unknown key.
+- Code lines are not a number or a range such as `41-48`.
+- A resolution has no outcome, or the votes do not give yes, no and eligible.
+- The document is not valid against the schema or the rules in
+  [section 9](#9-rules-that-the-schema-cannot-check). For example, a
+  constraint has no modality, or a critique has no evidence.
+
+### 10.7 Material from other artifacts
+
+A writer can copy material from other artifacts into a Markdown file, so that
+an agent that reads the file does not need other files. A reader ignores this
+material: it reads nothing from `## From other artifacts` to the next H2 or
+the end of the file.
+
+If the writer has the documents, it copies:
 
 1. The accepted terms of each `glossary` artifact that the document has as an
    `input` parent.
 2. The accepted constraints of each `agent_rules` artifact that the document
    has as an `input` parent.
-3. Each item in another artifact that a shown item refers to with a ref that
-   has `artifact` and `version`. The writer copies each item one time only.
+3. Each item in another artifact that an item of the document refers to with a
+   ref that has `artifact` and `version`. It copies each item one time only.
 
-The material goes under `## From other artifacts`, at the end of the file. It
-has one H3 for each source artifact and item type:
+The material has one H3 for each source artifact and item type:
 
 ```
 ### <section name> from <title> (<artifact id>@<version>)
 ```
 
 The H3 headings for items 1 and 2 come first, in the order of the parents.
-The H3 headings for item 3 follow, in the order of the item types, and then
-in the order in which the shown items refer to them.
-
-Each copied item has the same layout as an item line, with the reference string
-in place of the ID:
+The H3 headings for item 3 follow, in the order of the item types. Each copied
+item has the layout of 10.2, with the reference string in place of the ID:
 
 ```markdown
 ### Terms from Billing glossary (pa_9Lp4Wd7Ks2Hq6Nb3@1)
 
 - pa_9Lp4Wd7Ks2Hq6Nb3@1#T1: Seat
   - definition: One user who can sign in to an org.
-  - code_names: Billing.Seat
+  - code_name: Billing.Seat
 ```
 
-The JSON does not copy this material. It keeps the parents and the refs. A
-copy is a snapshot: if the glossary changes, the rendering shows the old terms
-until a tool renders it again. To change a copied item, change it in its own
+A copy is a snapshot. If the glossary changes, the file shows the old terms
+until a tool writes it again. To change a copied item, change it in its own
 artifact.
 
-### 10.5 Reading a file back
+### 10.8 Editing a stored version
 
-A reader takes an edited rendering and the document that the rendering came
-from. This document is the base version. The reader makes the next document
-with these steps:
+A tool that stores documents can read an edited Markdown file of a stored
+version. The content of a document is all of it except `version`, `status`,
+`parents`, `created_at`, `finalized_at`, `method` and `session`.
 
-1. Read the front matter. `schema`, `id`, `version` and `kind` must be equal to
-   the base version. The reader ignores `status`.
-2. The H1 is the new title. The text between the H1 and the first H2 is the new
-   summary, without blank lines at the start and the end. If there is no text,
-   the new document has no summary.
-3. Ignore all lines from `## From other artifacts` to the next H2 or the end of
-   the file.
-4. Each other H2 must be one of the section names in 10.1.
-5. In a section, read each line:
-   - A blank line: ignore it.
-   - `- <id>: <text>`: an existing item. See step 6.
-   - `- new: <text>`: a new item of the type of the section. See step 7.
-   - A line indented by two or more spaces, in the form `- <key>: <value>`: a
-     field of the item above it. The key must be a field line of that type
-     (10.3), or `status`. A field that is not a list must appear only once.
-   - Any other line is an error.
-6. For an existing item:
-   - The ID must be an item of the rendering: an item of the base version that
-     is not rejected.
-   - The ID must be under the section of its type.
-   - The ID must appear only once.
-   - The item gets its text and its field lines from the file. A field line that
-     is not in the file removes that field.
-   - The fields that stay in the JSON only keep their values from the base
-     version.
-7. For a new item, the reader assigns the next ID of the prefix (section 7). The
-   item gets its text and its field lines from the file.
-8. The status of an item comes from its `status` line. With no status line, the
-   item is accepted. A person can reject an item with `- status: rejected`.
-9. An item of the rendering that is not in the file is dropped from the new
-   version. Its ID is not used again.
-10. Rejected items of the base version do not appear in the rendering. They
-    stay in the new version without change, at the end of `items`, in their
-    base order.
-11. The order of the other items is their order in the file.
-12. Each counter in `id_counters` becomes the highest of: the base counter, the
-    highest number of the prefix in the base version, and the IDs that step 7
-    assigned. The reader writes each counter that is more than 0.
-13. If the base version is final, the new document is version n+1, with the
-    status `draft`. Its parents are a `previous_version` parent for version n,
-    then the other parents of the base version. It has no `finalized_at`,
-    `method` or `session`, because these describe how the base version was
-    made.
-14. If the base version is a draft, the new document replaces that draft. It
-    keeps the version number, the parents, `created_at`, `method` and
-    `session`.
-15. For a new version, the tool sets `created_at`. If the tool runs a method or a
-    session, it can also set `method` and `session`.
-16. The new document must be valid against the schema and the rules in
-    [section 9](#9-rules-that-the-schema-cannot-check). If it is not, the
-    reader reports an error and makes no document.
-
-Values in field lines:
-
-- `deferred` and `blocking` must be `true` or `false`.
-- `target.version` is an integer.
-- Every other value is a string.
-- The reader removes spaces at the start and the end of each text and value.
-- Each example gets a `kind`, also for `normal`.
-
-A rendering does not hold evidence. Thus a new critique, which needs evidence,
-cannot come from Markdown alone. Add critiques in JSON or YAML.
+- If the stored version is final and the content did not change, nothing
+  changes.
+- If the stored version is final and the content changed, the tool stores
+  version n+1 as a draft (see [section 8](#8-versions-and-parents)). Its first
+  parent is a `previous_version` parent for version n. The other parents come
+  from the file. It has no `finalized_at`, `method` or `session`, because
+  these describe how version n was made. `created_at` is the current time.
+- If the stored version is a draft, the document from the file replaces the
+  draft. It keeps the version number.
 
 ## 11. Glossaries
 
@@ -728,8 +822,8 @@ A glossary is an artifact of kind `glossary`. Its items are terms (`T`).
   the version of the glossary that the artifact used.
 - If two pinned glossaries define the same term in different ways, tools show
   the conflict. They do not choose a winner.
-- A rendering copies the accepted terms of the pinned glossaries (see 10.4), so
-  that an agent knows what each word means.
+- A Markdown file can copy the accepted terms of the pinned glossaries (see
+  10.7), so that an agent knows what each word means.
 
 A later format version can add an optional `scope` field to the envelope, if
 teams need the scope as data.
@@ -764,12 +858,19 @@ cases is correct. A tool that checks documents must:
 - Reject every document in `conformance/invalid/`, for the reason in its index
   entry.
 
-A tool that writes and reads Markdown must also pass the cases in
-`conformance/markdown/`:
+A tool that reads or writes Markdown must also pass the cases in
+`conformance/markdown/`. Two documents are equal if they are equal after the
+order of keys and the order of items between types are ignored.
 
-- From `document.json` and the documents in `inputs/`, it writes
-  `rendering.md`, byte for byte.
-- From `document.json` and `edited.md`, it makes a document equal to
-  `expected.json`. The comparison ignores the order of keys and the field
-  `created_at`.
-- For each case in `markdown/invalid/`, it reports an error.
+- `round-trip/`: reading `document.md` gives `document.json`. Writing
+  `document.json` and reading the result gives `document.json` again. A writer
+  does not need to make the same bytes as `document.md`.
+- `generous/`: reading the hand-written file gives `expected.json`. If the file
+  has no `id` or no `created_at`, the comparison ignores that field.
+- `next-version/`: reading `edited.md` against the stored version
+  `stored.json` (10.8) gives `expected.json`. If the version number changes,
+  the comparison ignores `created_at`.
+- `invalid/`: the reader reports an error.
+
+The index of the Markdown cases gives the number of warnings for each generous
+case. A reader can word its warnings in its own way.

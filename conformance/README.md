@@ -16,8 +16,10 @@ conformance/
     index.json
   markdown/
     index.json
-    round-trip/<case>/   A document, its rendering, an edited rendering and the next version
-    invalid/<case>/      A document and an edited rendering that a reader must reject
+    round-trip/<case>/   A document and the same document in Markdown
+    generous/<case>/     A hand-written Markdown file and the document that a reader makes from it
+    next-version/<case>/ A stored version, an edited Markdown file and what the tool stores
+    invalid/<case>/      Markdown files that a reader must reject
   runner/                The check that CI runs (Rust)
 ```
 
@@ -39,24 +41,17 @@ Each file is a document with one fault. `index.json` lists each file with:
 
 A checker must reject every case. It does not need to give the same message.
 
-### markdown/round-trip/
+### markdown/
 
-Each case folder holds:
+`index.json` lists the cases of each folder with a description. Section 13 of
+the specification says how to compare documents.
 
-| File | Meaning |
-|---|---|
-| `document.json` | The base version. |
-| `inputs/` | Other documents that the rendering copies material from, if any. Each file is named `<artifact id>@<version>.json`. |
-| `rendering.md` | The rendering of `document.json`. A writer must make this file byte for byte. |
-| `edited.md` | `rendering.md` after a person edited it. |
-| `expected.json` | The document that a reader makes from `document.json` and `edited.md`. A comparison ignores the order of keys and the field `created_at`. |
-
-`index.json` describes what each case tests.
-
-### markdown/invalid/
-
-Each case folder holds a `document.json` and an `edited.md`. A reader must
-report an error for each case. `index.json` gives the reason.
+| Folder | Files | Test |
+|---|---|---|
+| `round-trip/<case>/` | `document.json`, `document.md`, and `inputs/` if the file copies material from other artifacts | Reading `document.md` gives `document.json`. Writing `document.json` and reading it back gives `document.json`. |
+| `generous/<case>/` | A hand-written file such as `INTENT.md`, and `expected.json` | Reading the file gives `expected.json`. The index gives the file name and the number of warnings. |
+| `next-version/<case>/` | `stored.json`, `edited.md`, `expected.json` | Reading `edited.md` against the stored version gives `expected.json` (specification 10.8). |
+| `invalid/<case>/` | One Markdown file | The reader reports an error. The index gives the file name and the reason. |
 
 ## The runner
 
@@ -69,10 +64,12 @@ request. It does these checks:
   that its entry names. A semantic case that the schema also rejects tests
   nothing, so the runner reports it.
 - Each JSON file of the Markdown cases is valid, and the front matter of each
-  rendering names its `document.json`.
+  Markdown file of a stored document names that document.
+- Each `next-version` case keeps the version number, or makes draft version
+  n+1 after a final version n.
 - Each file and folder is in its `index.json`.
 
-The runner does not render or read Markdown. That is the job of the reference
+The runner does not read or write Markdown. That is the job of the reference
 implementation, which will run the Markdown cases when it exists.
 
 To run the runner with Rust installed, run this command from the root of the

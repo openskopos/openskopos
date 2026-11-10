@@ -169,12 +169,6 @@
       "reason": "A critique has a category."
     },
     {
-      "file": "accepted-critique-without-resolution.json",
-      "check": "schema",
-      "rule": "critique",
-      "reason": "An accepted critique has a resolution."
-    },
-    {
       "file": "critique-unknown-outcome.json",
       "check": "schema",
       "rule": "critique",

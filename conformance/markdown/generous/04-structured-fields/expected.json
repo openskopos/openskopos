@@ -1,0 +1,96 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_X3wZlNm1sQkHDrai",
+  "version": 1,
+  "kind": "critique",
+  "title": "Red team: payment retries",
+  "status": "draft",
+  "participants": [
+    {
+      "id": "P1",
+      "name": "Ana",
+      "kind": "human"
+    },
+    {
+      "id": "P2",
+      "name": "Sam",
+      "kind": "human"
+    }
+  ],
+  "id_counters": {
+    "CR": 2
+  },
+  "items": [
+    {
+      "id": "CR1",
+      "type": "critique",
+      "text": "The spec retries every failure, but the code treats card_declined as final.",
+      "status": "accepted",
+      "severity": "blocker",
+      "category": "incorrect",
+      "target": {
+        "section": "Retry policy"
+      },
+      "resolution": {
+        "outcome": "fix_spec",
+        "note": "Retry only network errors.",
+        "decided_by": "P1"
+      },
+      "evidence": [
+        {
+          "kind": "quote",
+          "text": "Retry each failed charge up to three times.",
+          "from": {
+            "title": "Payment retry spec"
+          },
+          "location": "Retry policy"
+        },
+        {
+          "kind": "code",
+          "path": "lib/billing/retry.ex",
+          "line_start": 41,
+          "line_end": 48,
+          "repo": "acme/billing",
+          "commit": "a1b2c3d"
+        }
+      ],
+      "ratification": {
+        "yes": 2,
+        "no": 0,
+        "eligible": 2
+      }
+    },
+    {
+      "id": "CR2",
+      "type": "critique",
+      "text": "The spec does not say who is told when the last retry fails.",
+      "status": "accepted",
+      "severity": "major",
+      "category": "gap",
+      "target": {
+        "artifact": "pa_7Hk2mQ9xR4tV8wZ1",
+        "version": 2,
+        "item": "FR1"
+      },
+      "detail": "Nobody owns the notification today. This needs a decision\nbefore the retry work starts.",
+      "evidence": [
+        {
+          "kind": "discussion",
+          "text": "Support finds out from the customer today.",
+          "speaker": "P2"
+        },
+        {
+          "kind": "link",
+          "uri": "https://example.com/incidents/7"
+        }
+      ],
+      "refs": [
+        {
+          "item": "CR1",
+          "rel": "relates_to"
+        }
+      ]
+    }
+  ],
+  "created_at": "2026-11-10T12:00:00Z"
+}

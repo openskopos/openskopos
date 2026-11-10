@@ -18,7 +18,7 @@
     },
     {
       "file": "minimal-draft.json",
-      "description": "The smallest valid document: version 1, no method, no session, no parents, no id_counters, no items."
+      "description": "The smallest valid document: version 1, no method, session, participants, parents or id_counters, and no items."
     },
     {
       "file": "agent-rules.skopos.yaml",
