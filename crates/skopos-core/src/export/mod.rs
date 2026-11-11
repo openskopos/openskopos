@@ -1,6 +1,6 @@
 //! Export a document to the files of a spec-driven development tool.
 //!
-//! Teams can keep what they agreed in OpenSkopos and give it to the tool that
+//! Teams can keep their decisions in OpenSkopos and give them to the tool that
 //! their agents already use. Each exporter writes the files of one tool:
 //!
 //! | [`Tool`] | Files |

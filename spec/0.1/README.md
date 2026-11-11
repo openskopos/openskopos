@@ -4,11 +4,11 @@ Status: draft. Format 0.1 can change until the maintainers publish it. After
 that, each 0.y version can have breaking changes (see
 [Format versions](#12-format-versions)).
 
-OpenSkopos is a file format for what a team agrees on before an AI agent builds
-the work. One document holds typed items, such as goals, requirements,
-constraints, risks and critiques. Each item has a stable ID, for example `S1`
-or `CR3`. People and agents use the ID to refer to the item, for example in
-commits and tickets.
+OpenSkopos is a file format for the decisions that a team makes before an AI
+agent builds the work. One document holds typed items, such as goals,
+requirements, constraints, risks and critiques. Each item has a stable ID, for
+example `S1` or `CR3`. People and agents use the ID to refer to the item, for
+example in commits and tickets.
 The ID keeps its meaning in every version of the document.
 
 This specification is for people who write tools that read or write OpenSkopos

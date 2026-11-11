@@ -217,7 +217,7 @@ is 1.
 `skopos export` changes a document into the files of a spec-driven
 development tool: [OpenSpec](https://github.com/Fission-AI/OpenSpec),
 [Kiro](https://kiro.dev) or [Spec Kit](https://github.com/github/spec-kit).
-Thus a team can keep its agreements in OpenSkopos, and also give them to the
+Thus a team can keep its decisions in OpenSkopos, and also give them to the
 tool that its agents use.
 
 ```bash

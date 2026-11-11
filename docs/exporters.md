@@ -4,7 +4,7 @@ A spec-driven development tool gives a written spec to an AI agent before the
 agent writes code. OpenSpec, Kiro and Spec Kit are three of these tools. Each
 tool keeps its spec in Markdown files with its own layout.
 
-OpenSkopos does not replace these tools. A team can keep its agreements in an
+OpenSkopos does not replace these tools. A team can keep its decisions in an
 OpenSkopos document, and export the document to the tool that its agents use:
 
 ```bash

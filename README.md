@@ -7,12 +7,12 @@
 
 # OpenSkopos
 
-OpenSkopos is an open format for what a team agrees before an AI agent builds
-the work. A document holds typed items: goals, success signals, requirements,
-stories, constraints, assumptions, non-goals, risks, open questions,
-decisions, terms and critiques. Each item has a stable ID such as `S1` or
-`CR3`. The ID stays the same in every version of the document, so people,
-commits, tickets and agents can refer to it.
+OpenSkopos is an open format for the decisions that a team makes before an AI
+agent builds the work. A document holds typed items: goals, success signals,
+requirements, stories, constraints, assumptions, non-goals, risks, open
+questions, decisions, terms and critiques. Each item has a stable ID such as
+`S1` or `CR3`. The ID stays the same in every version of the document, so
+people, commits, tickets and agents can refer to it.
 
 *Skopos* is Greek for aim or purpose.
 
