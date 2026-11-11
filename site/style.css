@@ -45,10 +45,10 @@ a:hover { text-decoration-thickness: 2px; }
 .top nav a:hover, .top nav a[aria-current] { text-decoration: underline; text-decoration-color: var(--dot); }
 footer {
   max-width: 760px; margin: 0 auto; padding: 24px 16px 48px;
-  border-top: 1px solid var(--line); color: var(--muted); font-size: 14px;
+  border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center;
 }
 footer p { margin: 6px 0; }
-footer .credit { margin-top: 16px; text-align: center; }
+footer .credit { margin-top: 16px; }
 
 /* Content */
 main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
