@@ -3,18 +3,26 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>OpenSkopos</title>
-<meta name="description" content="OpenSkopos is an open format for the decisions that a team makes before an AI agent builds the work.">
+<title>OpenSkopos: an open format for team decisions in spec-driven development</title>
+<meta name="description" content="OpenSkopos records the decisions that a team makes before an AI agent builds the work. It comes before OpenSpec, GitHub Spec Kit and Kiro, and exports to them.">
+<link rel="canonical" href="https://openskopos.org/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenSkopos">
+<meta property="og:title" content="OpenSkopos: an open format for team decisions in spec-driven development">
+<meta property="og:description" content="OpenSkopos records the decisions that a team makes before an AI agent builds the work. It comes before OpenSpec, GitHub Spec Kit and Kiro, and exports to them.">
+<meta property="og:url" content="https://openskopos.org/">
+<meta property="og:image" content="https://openskopos.org/og.png">
+<meta name="twitter:card" content="summary">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
 </head>
 <body>
 <main class="home">
-  <div class="logo">
+  <h1 class="logo">
     <img class="light" src="/mark-light.svg" alt="">
     <img class="dark" src="/mark-dark.svg" alt="">
     <span><span class="open">Open</span><span class="skopos">Skopos</span></span>
-  </div>
+  </h1>
   <p class="lead">An open format for the decisions that a team makes before an AI agent builds the work: goals, requirements, rules, assumptions, and the reasons behind them. Every item has a stable ID that people, commits and agents can cite.</p>
   <ul class="links">
     <li><a href="/spec/0.1/">Specification 0.1</a></li>
@@ -22,6 +30,10 @@
     <li><a href="/docs/install/">Install the skopos tool</a></li>
     <li><a href="https://github.com/openskopos/openskopos">GitHub</a></li>
   </ul>
+
+  <h2>Before spec-driven development</h2>
+  <p>An OpenSkopos document records the structured thinking of a team before implementation starts. It holds what the work is for, how the team knows that it worked, the rules, the assumptions, the risks and the open questions.</p>
+  <p>Spec-driven development tools, such as OpenSpec, GitHub Spec Kit and Kiro, give an AI agent a spec before it writes code. The OpenSkopos document comes first. The <code>skopos</code> tool <a href="/docs/exporters/">exports the document</a> to each of these tools. Thus the spec starts from the decisions of the team, not from the guesses of one person or one agent.</p>
 
   <h2>Open and vendor-neutral</h2>
   <p>The specification, the JSON Schema and the reference implementation are under the <a href="https://github.com/openskopos/openskopos/blob/main/LICENSE">Apache License 2.0</a>. No company owns the format. Any tool can read and write it. You do not need an account, and you do not pay a fee. <a href="https://github.com/openskopos/openskopos/blob/main/GOVERNANCE.md">GOVERNANCE.md</a> says who decides on changes.</p>
