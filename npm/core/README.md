@@ -60,13 +60,13 @@ A `Problem` has three fields:
 |---|---|
 | `path` | The location of the problem, as a JSON Pointer. An empty string is the full document. `/items/3/id` is the `id` of the fourth item. |
 | `rule` | The name of the rule in section 9 of the specification, for example `unique-item-ids`. For a schema problem, `rule` is `null`. |
-| `message` | A description of the problem, for people to read. |
+| `message` | What is wrong, in plain words. |
 
-A value goes into the WebAssembly module as JSON text. Thus the rules of
+A value goes into the WebAssembly module as JSON text, so the rules of
 `JSON.stringify` apply:
 
 - If the value of a key is `undefined`, the key is not in the text.
-- A JavaScript number does not keep a decimal point in a whole number. Thus
+- A JavaScript number does not keep a decimal point in a whole number, so
   `version: 3.0` in a file becomes `3` in the object, and `write` writes `3`.
   The `skopos fmt` command reads the text directly and keeps `3.0`.
 - An integer that is more than 2^53 is not exact, the same as in all
@@ -88,7 +88,7 @@ worker.
 | Function | What it does |
 |---|---|
 | `check(doc)` | Finds all problems in a document. The schema problems are first, then the problems with the rules in section 9. If the list is empty, the document is valid. |
-| `checkSchema(doc)`, `checkRules(doc)` | The two parts of `check`. |
+| `checkSchema(doc)`, `checkRules(doc)` | Run only the schema checks, or only the section 9 rules. |
 | `parse(text, format)` | Reads JSON or YAML text. `format` is `"json"` or `"yaml"`. The function does not check the document. |
 | `write(doc, format)` | Writes a document as JSON or YAML with the canonical layout. `toJson(doc)` and `toYaml(doc)` do the same for one format. |
 | `assignIds(doc)` | Adds an ID to each item that has no ID, and updates `id_counters`. Returns `{ doc, assigned, counters_changed }`. It does not change the document that you give to it. |

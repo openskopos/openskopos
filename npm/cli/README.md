@@ -1,8 +1,8 @@
 # @openskopos/cli
 
 `@openskopos/cli` is the `skopos` command line tool for
-[OpenSkopos](https://openskopos.org) documents. One package operates in Node
-on Linux, macOS and Windows.
+[OpenSkopos](https://openskopos.org) documents. One package runs in Node on
+Linux, macOS and Windows.
 
 The commands are the commands of the native `skopos` tool, built to
 WebAssembly in [`@openskopos/core`](https://www.npmjs.com/package/@openskopos/core).
@@ -17,7 +17,7 @@ You can use the tool without an installation. Use `npx`:
 npx @openskopos/cli check intent.skopos.json
 ```
 
-To install the command `skopos`, enter this command:
+To install the `skopos` command globally, run:
 
 ```bash
 npm install --global @openskopos/cli
@@ -37,11 +37,11 @@ The package needs Node 20 or later.
 | `skopos export FILE --to openspec\|kiro\|speckit` | Writes the files of a spec-driven development tool. |
 | `skopos diff OLD NEW` | Shows the items that are different in two versions. |
 
-For the flags, enter `skopos --help` or `skopos <command> --help`. The
+For the flags, run `skopos --help` or `skopos <command> --help`. The
 [README of the native tool](https://github.com/openskopos/openskopos/blob/main/crates/skopos/README.md)
 describes each command.
 
-These are the exit codes:
+Exit codes:
 
 - 0: the command found no problem.
 - 1: the command found a problem.

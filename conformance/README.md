@@ -64,8 +64,8 @@ request. It does these checks:
 - Each document in `valid/` passes the schema and the rules of section 9.
 - Each `schema` case in `invalid/` fails the schema.
 - Each `semantic` case in `invalid/` passes the schema, and does not obey
-  only the rule that its entry gives. If the schema also rejects a semantic
-  case, the case tests nothing. Thus the runner reports it.
+  only the rule that its entry gives. A semantic case that the schema also
+  rejects tests nothing, so the runner reports it.
 - Each JSON file of the Markdown cases is valid. The front matter of each
   Markdown file of a stored document identifies that document.
 - Each `next-version` case keeps the version number, or makes draft version
@@ -78,11 +78,10 @@ The runner does not read or write Markdown. The reference implementation in
 The tests of the reference implementation also use the cases in `valid/`,
 `invalid/` and `markdown/`. They use them through the library `skopos-core`
 and through the `skopos` command line tool. They also write each document in
-`valid/` as Markdown and read it again. To do these tests, enter `cargo test`
-in the root folder of the repository.
+`valid/` as Markdown and read it again. To run them, run `cargo test` from
+the root of the repository.
 
-If Rust is installed, enter this command in the root folder of the repository
-to start the runner:
+With Rust installed, run the runner from the root of the repository:
 
 ```bash
 cargo run --locked --manifest-path conformance/runner/Cargo.toml
@@ -98,7 +97,7 @@ docker run --rm -v "$PWD":/repo -w /repo -e CARGO_TARGET_DIR=/tmp/target rust:1 
 
 1. Add the file or the folder.
 2. Add an entry to the `index.json` of its folder.
-3. Start the runner.
+3. Run the runner.
 
-Make each invalid case break only one rule. Thus a failure has only one
+Make each invalid case break only one rule, so that a failure points to one
 cause. Start with a valid document and change one thing.

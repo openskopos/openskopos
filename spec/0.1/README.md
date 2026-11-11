@@ -81,7 +81,7 @@ The name of a Markdown file is the kind in capital letters, for example
 `INTENT.md`,
 `SPEC.md`, `GLOSSARY.md` or `CRITIQUE.md`.
 
-The team chooses the folder. The Markdown file holds every field. Thus, a
+The team chooses the folder. The Markdown file holds every field, so a
 team can keep only the Markdown file, and let tools make the JSON when they
 need it. If one folder holds two artifacts of the same kind, the team adds a
 name before the kind, for example `billing.intent.skopos.json`.
@@ -525,7 +525,7 @@ that has the earlier versions must make sure that this is true.
 ## 10. Markdown
 
 Markdown is the format for people who write documents by hand. A Markdown file
-holds every field of the document. Thus, a tool can change a document to
+holds every field of the document, so a tool can convert a document to
 Markdown and back with no loss of data. A person can also start a document in
 Markdown, with no other file.
 

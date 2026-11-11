@@ -24,18 +24,17 @@ This page shows where each item type goes in each tool. The code is in
    (specification section 4.1).
 2. Each exported item keeps its reference string. Each line or section that
    comes from an item ends with the reference string of the item, in
-   backticks, for example `` `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4` ``. Thus a person who
-   reviews the files later can find the source item of each line. The
-   reference string contains the version. Thus it points to the version that
-   the team exported.
-3. The exporter tells you about each item that it does not export. It puts
-   each of these items, with the reason, in a "Not exported" section at the
-   end of the main file. `skopos export` also writes the list to standard
-   error. The section contains proposed items, rejected items, critiques, and
-   the item types that the tool cannot hold.
-4. The output does not change between exports. The same document always makes
-   the same bytes. The files do not contain the date of the export. If a tool
-   needs a date, the exporter uses the date of `created_at`.
+   backticks, for example `` `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4` ``, so a reviewer can
+   trace each line back to its item. The reference string includes the
+   version, so it points to exactly what the team exported.
+3. Nothing is dropped silently. Each item that is not exported goes in a
+   "Not exported" section at the end of the main file, with the reason.
+   `skopos export` also writes the list to standard error. The section lists
+   proposed items, rejected items, critiques, and the item types that the
+   tool has no place for.
+4. The output is stable. The same document always produces the same bytes.
+   The files do not contain the date of the export. If a tool needs a date,
+   the exporter uses the date of `created_at`.
 5. Free text cannot change the layout of a file. `detail` and `summary` are
    Markdown. The exporter changes each heading in them, for example
    `## Background`, into a bold line. The tools read the headings of their
@@ -43,19 +42,19 @@ This page shows where each item type goes in each tool. The code is in
    in code fences do not change. If a text starts with `#`, the exporter puts
    a backslash before it.
 6. The exporter does not export all fields. Evidence, votes, `proposed_by`,
-   refs and `x-` keys stay in the OpenSkopos document. To read them, use the
-   reference string to find the item. The exporter uses refs to find the
+   refs and `x-` keys stay in the OpenSkopos document. Follow the reference
+   string to read them. The exporter uses refs to find the
    location of items: for example, a story goes with the requirement that it
    `refines`.
 
 When `skopos export --force` writes the files again, it also removes the
-files of an earlier export that this export does not write. An example is a
-`design.md` for a version that does not have decisions now. Without
-`--force`, the tool writes the names of those files and does not write files.
+files of an earlier export that this export does not write, for example a
+`design.md` for a version that no longer has decisions. Without `--force`,
+it lists those files and writes nothing.
 
 The tool makes the name of the change or feature from the title of the
-document, in kebab case, for example `spec-seat-limits-on-plan-changes`. To
-use a different name, use `--name`.
+document, in kebab case, for example `spec-seat-limits-on-plan-changes`. Use
+`--name` to choose a different one.
 
 ## Where each item type goes
 
@@ -92,7 +91,7 @@ artifact (see "Tests" on this page).
 
 OpenSpec keeps the agreed behavior of a project in main specs,
 `openspec/specs/<capability>/spec.md`. A change folder holds deltas to these
-specs. `openspec archive` applies the deltas to the main specs. Thus the
+specs. `openspec archive` applies the deltas to the main specs. So the
 exporter writes one change folder, `openspec/changes/<name>-v<version>/`:
 
 | File | Content |
@@ -112,8 +111,8 @@ Purpose for a new capability.
 ### Later exports
 
 `skopos export` reads the main specs and the open changes of the project.
-Each exported requirement block contains the reference string of its item.
-Thus the exporter finds the blocks that earlier exports of the same artifact
+Each exported requirement block contains the reference string of its item,
+so the exporter can find the blocks that earlier exports of the same artifact
 wrote. The team can change the name or the location of a capability, for
 example to `billing/seat-limits`. The exporter finds the blocks at their new
 location.
@@ -131,7 +130,7 @@ Then the exporter compares each accepted requirement with its block:
 In two cases, the exporter stops with an error and writes nothing:
 
 - An earlier export of the artifact is a change that is not archived. Its
-  deltas are not in the main specs. Thus a new delta would be wrong. Archive
+  deltas are not in the main specs yet, so a new delta would be wrong. Archive
   the change with `openspec archive <change>`, or delete the change. Then
   export again. An export of the same version writes over its own open change.
 - The requirements of the artifact are in two or more capabilities, with the
@@ -150,8 +149,8 @@ comment, the export replaces it without a warning.
 - The name of a new requirement is its ID and the start of its text, for
   example `FR4 - A plan change that leaves more seats in use than the new...`.
   The ID makes sure that each name is unique.
-- `openspec validate` gives an error for a requirement that has no scenario.
-  Thus the exporter makes a scenario for each requirement from each example
+- `openspec validate` gives an error for a requirement that has no scenario,
+  so the exporter makes a scenario for each requirement from each example
   and from each success signal that verifies the requirement. If a
   requirement has no examples and no success signals, the exporter makes one
   scenario that repeats the text of the requirement.
@@ -161,7 +160,7 @@ comment, the export replaces it without a warning.
   write the requirement with SHALL or MUST.
 - The exporter does not write `tasks.md`. OpenSpec makes the tasks from the
   proposal, the design and the specs, and its apply step needs these tasks.
-- OpenSpec cannot hold terms. If the agent needs the terms, add them to
+- OpenSpec has no place for terms. If the agent needs them, add them to
   `openspec/config.yaml` under `context`.
 
 ## Kiro
@@ -187,10 +186,11 @@ Notes:
   …"). The exporter keeps the words of the team and does not change them.
 - The exporter does not write `tasks.md` or `.config.kiro`. Kiro makes the
   tasks from the requirements and the design.
-- A Kiro spec cannot hold assumptions, non-goals, risks and open questions. A
-  constraint for the full project can also go into a steering file in
-  `.kiro/steering/`. The exporter keeps the constraint in `design.md`, because
-  a steering file applies to all work, and a spec is for one feature.
+- A Kiro spec has no place for assumptions, non-goals, risks and open
+  questions. A constraint for the full project can also go into a steering
+  file in `.kiro/steering/`. The exporter keeps the constraint in
+  `design.md`, because a steering file applies to all work, and a spec is for
+  one feature.
 
 ## Spec Kit
 
@@ -227,10 +227,10 @@ Notes:
   over it. The plan step then adds its own sections after the exported
   Summary and Technical Context.
 - Spec Kit has no "Out of scope" section. Its template puts the limits of the
-  scope in "Assumptions". Thus the non-goals go there.
+  scope in "Assumptions", so the non-goals go there.
 - The exporter does not change `.specify/memory/constitution.md`. The
   constitution applies to the full project, and an export is for one feature.
-- Spec Kit cannot hold risks.
+- Spec Kit has no place for risks.
 
 ## Tests
 
@@ -242,16 +242,16 @@ uses `openspec validate` and `openspec archive`. The versions add, change,
 replace, supersede, reject and drop requirements. The script compares each
 change with the golden files. It compares each archived state with the
 fixtures in `crates/skopos-core/tests/fixtures/openspec/`. The golden tests
-read the same fixtures. Thus they test the exporter with main specs that
-OpenSpec wrote. Other tests change those fixtures: a hand edit, a capability
-with a new name in a subfolder, requirements in two capabilities, and an open
+read the same fixtures, so they test the exporter against main specs that
+OpenSpec itself wrote. Other tests change those fixtures: a hand edit, a
+capability with a new name in a subfolder, requirements in two capabilities, and an open
 change.
 
 ## Import is planned
 
 A later release will import from these tools. It will read OpenSpec or Kiro
-files into a new OpenSkopos artifact. Thus a team that has specs can start
-from them. An imported item gets a new ID (specification section 6). The
+files into a new OpenSkopos artifact, so a team that already has specs can
+start from them. An imported item gets a new ID (specification section 6). The
 importer will use the reference strings in exported files to find the items
 that came from OpenSkopos.
 

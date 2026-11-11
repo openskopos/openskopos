@@ -7,13 +7,13 @@ documents. The tool reads and writes the files. The library
 The commands are in the library of this crate (`src/lib.rs`). They read and
 write the files and the terminal through the trait `Host`. The `skopos`
 binary implements `Host` with the Rust standard library. The WebAssembly build
-in [`skopos-wasm`](../skopos-wasm/README.md) implements `Host` with Node. Thus
+in [`skopos-wasm`](../skopos-wasm/README.md) implements `Host` with Node. So
 the npm package `@openskopos/cli` has the same commands, output and exit
 codes.
 
 ## Install
 
-If you use Homebrew on macOS or Linux, enter this command:
+With Homebrew on macOS or Linux, run:
 
 ```bash
 brew install openskopos/tap/skopos
@@ -27,12 +27,12 @@ cargo install --locked skopos
 
 [docs/install.md](../../docs/install.md) has the install scripts for the
 shell and PowerShell, and the binaries for each platform. To install the tool
-from a clone of the repository, enter
-`cargo install --locked --path crates/skopos` in the root folder of the
+from a clone of the repository, run
+`cargo install --locked --path crates/skopos` from the root of the
 repository.
 
 The npm package [`@openskopos/cli`](../../npm/cli/README.md) has the same
-tool for Node. You can use it without an installation:
+tool for Node. To use it without installing anything, run
 `npx @openskopos/cli check FILE`.
 
 ## Commands
@@ -42,13 +42,12 @@ Markdown, with the layout of section 10 of the specification. The commands
 `check`, `convert` and `import` read Markdown. The commands `fmt` and `ids`
 read only JSON and YAML.
 
-The Markdown reader accepts many different ways to write the same data. Thus
-a file that a person writes by hand does not cause many errors. The reader
-adds only bookkeeping fields, for example the artifact ID. If the front
-matter has no `kind`, the reader gets the kind from the file name. The file
-name must be in capital letters. For example, the kind of `INTENT.md` is
-`intent`. For each change that the reader makes, and for each part of the
-file that it ignores, it writes a warning to standard error:
+The Markdown reader accepts many different ways to write the same thing, so
+a file written by hand does not produce a long list of errors. It fills in
+only bookkeeping fields, such as the artifact ID. If the front matter has no
+`kind`, the reader takes it from a file name in capital letters: `INTENT.md`
+has the kind `intent`. The reader writes a warning to standard error for each
+thing that it skips or changes:
 
 ```
 SPEC.md: warning: line 16: FR5 appears twice, so the second item gets a new ID
@@ -56,8 +55,8 @@ SPEC.md: warning: line 16: FR5 appears twice, so the second item gets a new ID
 
 ### check
 
-`skopos check` finds the problems in one or more documents. It compares each
-document with the JSON Schema and with the rules in section 9 of the
+`skopos check` finds the problems in one or more documents. It checks each
+document against the JSON Schema and the rules in section 9 of the
 specification.
 
 ```bash
@@ -119,9 +118,8 @@ tool removes comments from YAML files.
 skopos fmt intent.skopos.json
 ```
 
-With `--check`, the tool does not change files. It writes the name of each
-file that does not have the canonical layout. If one or more files do not
-have the canonical layout, the exit code is 1.
+With `--check`, the tool changes nothing. It lists each file that is not in
+the canonical layout, and exits with code 1 if there are any.
 
 ### convert
 
@@ -136,13 +134,12 @@ skopos convert --to json INTENT.md -o intent.skopos.json
 
 Without `-o`, the tool writes the document to standard output.
 
-A Markdown file holds all fields of the document. Markdown does not keep the
-order of items that have different types. In Markdown, the items are in the
-order of the sections.
+A Markdown file keeps every field of the document. It does not keep the order
+of items across types, because Markdown groups the items by section.
 
-A Markdown file can also hold data from other artifacts. Thus an agent that
-reads the file does not need the other files (section 10.7 of the
-specification). To copy this data, add each of the other documents with
+A Markdown file can also include material from other artifacts, so an agent
+that reads the file does not need the other files (section 10.7 of the
+specification). To include it, pass each of the other documents with
 `--input`:
 
 ```bash
@@ -155,13 +152,13 @@ The tool copies these items:
 - The accepted constraints of each pinned `agent_rules` artifact.
 - Each item that a ref of the document points to.
 
-A reader ignores the copied data.
+Readers ignore this copied material.
 
 ### import
 
-`skopos import` reads a Markdown file that a person edited, and the stored
-version that the file came from. Then it writes the version that you must
-store, as section 10.8 of the specification says:
+`skopos import` reads an edited Markdown file together with the stored
+version that it came from, and writes the version to store next, as section
+10.8 of the specification says:
 
 - If the stored version is final and the content did not change, the result
   is the stored version.
@@ -189,7 +186,7 @@ counter, as section 7 of the specification says. If a counter is less than
 the highest ID number of its prefix, the tool first increases the counter to
 that number.
 
-To add an item by hand, do not write its `id`. Then use the tool:
+To add an item by hand, leave out its `id` and run the tool:
 
 ```yaml
 items:
@@ -205,20 +202,19 @@ skopos ids intent.skopos.yaml
 ```
 
 The tool writes each change, for example
-`intent.skopos.yaml: /items/0 gets C4, id_counters changes`. It writes a
-changed file with the canonical layout.
+`intent.skopos.yaml: /items/0 gets C4, id_counters changes`. Changed files
+are written in the canonical layout.
 
-With `--check`, the tool does not change files. It writes the name of each
-file that needs a change. If one or more files need a change, the exit code
-is 1.
+With `--check`, the tool changes nothing. It lists each file that needs
+IDs, and exits with code 1 if there are any.
 
 ### export
 
-`skopos export` changes a document into the files of a spec-driven
+`skopos export` turns a document into the files of a spec-driven
 development tool: [OpenSpec](https://github.com/Fission-AI/OpenSpec),
 [Kiro](https://kiro.dev) or [Spec Kit](https://github.com/github/spec-kit).
-Thus a team can keep its decisions in OpenSkopos, and also give them to the
-tool that its agents use.
+A team can keep its decisions in OpenSkopos and still hand them to the tool
+that its agents use.
 
 ```bash
 skopos export spec.skopos.json --to openspec
@@ -238,20 +234,18 @@ skopos export spec.skopos.json --to speckit -o ../billing
 - For Spec Kit, `--number` sets the feature number. Without `--number`, the
   tool uses the number of a folder in `specs/` that has the same name. If
   there is no such folder, it uses the next free number.
-- The tool does not write over a file that exists. To write over it, use
-  `--force`. With `--force`, the tool also removes the files of an earlier
-  export that this export does not write. Thus no old items stay in the
-  project.
-- With `--dry-run`, the tool writes the names of the files, but it does not
-  write the files.
+- The tool does not overwrite existing files unless you pass `--force`.
+  With `--force`, the tool also removes the files of an earlier
+  export that this export does not write, so no stale items stay behind.
+- `--dry-run` lists the files without writing them.
 - For OpenSpec, the tool reads `openspec/specs/` and the open changes. A
   later export writes MODIFIED and REMOVED requirements for the items that
   earlier exports put into the specs. If an earlier export is not archived,
   the tool stops with an error. See
   [docs/exporters.md](../../docs/exporters.md#openspec).
-- For Spec Kit, the tool writes the value of `.specify/feature.json` that
-  makes Spec Kit work on the exported feature. The tool does not change that
-  file.
+- For Spec Kit, the tool prints the `.specify/feature.json` setting that
+  points Spec Kit at the exported feature. It does not change that file
+  itself.
 
 The tool exports only accepted items. Each exported line ends with the
 reference string of its item, for example `pa_2Xc5Rv8Tn1Mb4Kz7@3#FR4`. The
@@ -263,22 +257,22 @@ tool puts these items in a "Not exported" note in the files:
 The tool also writes this list to standard error.
 [docs/exporters.md](../../docs/exporters.md) shows where each item type goes.
 
-The document can be JSON, YAML or Markdown. The document must be valid. If
+The document can be JSON, YAML or Markdown, and it must be valid. If
 `skopos check` finds a problem, the tool exports nothing.
 
 ### diff
 
 `skopos diff` compares two versions of an artifact, item by item. An item ID
-has the same meaning in all versions. Thus the tool compares the items that
+means the same item in every version, so the tool compares the items that
 have the same ID.
 
 ```bash
 skopos diff spec-v2.skopos.json spec-v3.skopos.json
 ```
 
-Each file can be JSON, YAML or Markdown. Thus
-`skopos diff spec.skopos.json SPEC.md` shows the changes that a person made
-by hand in the Markdown file.
+Each file can be JSON, YAML or Markdown, so
+`skopos diff spec.skopos.json SPEC.md` shows what a hand edit of the
+Markdown file changed.
 
 ```
 pa_2Xc5Rv8Tn1Mb4Kz7@2 -> pa_2Xc5Rv8Tn1Mb4Kz7@3
@@ -298,8 +292,8 @@ dropped    N2   Emails to members above the limit.
 | `dropped` | The ID is only in the old version, and no item supersedes it. |
 | `envelope` | The fields of the document that are different, for example `title` or `summary`. The tool does not compare `version`, `status`, `parents`, `created_at`, `finalized_at`, `method`, `session` and `id_counters`. |
 
-With `--json`, the tool writes the differences as JSON. If the two documents
-are valid, the exit code is 0, also when the documents are different.
+With `--json`, the tool writes the differences as JSON. The exit code is 0
+when both documents are valid, even if they differ.
 
 ## License
 

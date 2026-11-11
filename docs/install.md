@@ -7,25 +7,24 @@ Linux and Windows.
 
 ## Homebrew
 
-If you use [Homebrew](https://brew.sh) on macOS or Linux, enter this
-command:
+With [Homebrew](https://brew.sh) on macOS or Linux, run:
 
 ```bash
 brew install openskopos/tap/skopos
 ```
 
-To install a new release later, enter `brew upgrade skopos`.
+To update to a new release later, run `brew upgrade skopos`.
 
 ## Install script
 
-On macOS or Linux, enter this command. The script downloads the binary for
+On macOS or Linux, run this command. The script downloads the binary for
 your system and puts it in `~/.cargo/bin`:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/openskopos/openskopos/releases/latest/download/skopos-installer.sh | sh
 ```
 
-On Windows, enter this command in PowerShell:
+On Windows, run this in PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/openskopos/openskopos/releases/latest/download/skopos-installer.ps1 | iex"
@@ -41,14 +40,14 @@ cargo install --locked skopos
 
 ## npm
 
-The npm package `@openskopos/cli` has the same commands. It operates in Node
-20 or later on all platforms. You can use it without an installation:
+The npm package `@openskopos/cli` has the same commands and runs on any
+platform with Node 20 or later. To try it without installing anything:
 
 ```bash
 npx @openskopos/cli check intent.skopos.json
 ```
 
-To install it, enter `npm install --global @openskopos/cli`.
+To install it, run `npm install --global @openskopos/cli`.
 
 ## Download a binary
 
@@ -70,11 +69,11 @@ in a folder that is on your `PATH`.
 
 ## Make sure that the tool works
 
-Enter this command:
+Run:
 
 ```bash
 skopos --version
 ```
 
-The tool writes its version. For all commands, see
+It prints the version number. For all commands, see
 [the skopos command line tool](../crates/skopos/README.md).

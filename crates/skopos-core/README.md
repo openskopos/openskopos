@@ -13,7 +13,7 @@ does not use the network. It builds for `wasm32-unknown-unknown`.
 | Function | What it does |
 |---|---|
 | `check(&Value) -> Vec<Problem>` | Finds all problems in a document. The schema problems are first, then the problems with the rules in section 9 of the specification. If the list is empty, the document is valid. |
-| `check_schema`, `check_rules` | The two parts of `check`. |
+| `check_schema`, `check_rules` | Run only the schema checks, or only the section 9 rules. |
 | `parse(&str, Format) -> Result<Value, Problem>` | Reads JSON or YAML text. |
 | `write(&Value, Format) -> String` | Writes a document as JSON or YAML with the canonical layout. If you parse the text again, you get the same value. |
 | `assign_ids(&mut Value) -> Result<IdReport, Vec<Problem>>` | Adds an ID to each item that has no ID, and updates `id_counters` (specification section 7). |
@@ -27,13 +27,13 @@ A `Problem` has three fields:
 |---|---|
 | `path` | The location of the problem, as a JSON Pointer. An empty string is the full document. `/items/3/id` is the `id` of the fourth item. |
 | `rule` | The name of the rule in section 9, for example `unique-item-ids`. For a schema problem, `rule` is `None`. |
-| `message` | A description of the problem, for people to read. |
+| `message` | What is wrong, in plain words. |
 
 The module `model` has serde types for a valid document, for example
 `Document`, `Item` and `ItemType`. Use `check` on the value before you
 deserialize it. If a document is not valid, deserialization can fail. The
-types keep all fields. Thus, if you change a value into a `Document` and back,
-you get the same value.
+types keep every field, so a value that goes through `Document` and back comes
+out unchanged.
 
 The module `rules` has the names of the four rules in section 9.
 
@@ -53,8 +53,8 @@ The reader accepts many different ways to write the same data. For example,
 it accepts `## Out of scope` for the non-goals and `[FR2]` for an item ID. A
 warning tells you that the reader ignored or changed a part of the file, and
 continued. An error tells you that the reader cannot make a valid document.
-Section 10.6 of the specification lists the two. The reader uses `check` on
-the document. Thus a schema problem is also an error.
+Section 10.6 of the specification lists the two. The reader runs `check` on
+the result, so a schema problem is also an error.
 
 A `Warning` has the `line` (the first line is 1) and the `message`. An
 `Error` has these fields:
@@ -68,7 +68,7 @@ A `Warning` has the `line` (the first line is 1) and the `message`. An
 If the file has no `id` or `created_at`, `read` makes a new random artifact
 ID and uses the current time. `next_version` uses the current time for a new
 version. To set these values yourself, use `markdown::read_with` and
-`markdown::next_version_at`. The WebAssembly build has no clock. Thus it has
+`markdown::next_version_at`. The WebAssembly build has no clock, so it has
 only these two functions.
 
 ```rust
@@ -101,8 +101,8 @@ for problem in check(&doc) {
 let yaml = write(&doc, Format::Yaml);
 ```
 
-`check` gets only one version. Thus it cannot find a problem with this rule:
-an ID of an earlier version must not identify a different item.
+`check` sees one version at a time, so it cannot enforce the rule that an ID
+from an earlier version is never reused for a different item.
 
 ## WebAssembly
 
@@ -122,7 +122,7 @@ configuration.
 ## The schema
 
 The crate contains a copy of `schema/artifact/0.1.json` in
-`schema/0.1.json`. Thus the published crate has the schema. A test makes sure
+`schema/0.1.json`, so the published crate includes the schema. A test makes sure
 that the two files are the same. If you change the schema, copy it again.
 
 ## License

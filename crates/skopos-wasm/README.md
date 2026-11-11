@@ -10,13 +10,13 @@ The crate has a `wasm-bindgen` export for each public function of
 `skopos-core`. The inputs and the outputs are strings or plain JavaScript
 objects.
 
-The crate also exports `runCli`, which operates the commands of the `skopos`
+The crate also exports `runCli`, which runs the commands of the `skopos`
 tool. The commands are in the library of the `skopos` crate. They get access
 to the file system and the terminal through the trait `skopos::Host`. The
 native tool implements `Host` with the Rust standard library. `runCli` gets
-its `Host` as an object from JavaScript. The two tools use the same Rust code.
-Thus they write the same output and have the same exit codes.
+its `Host` as an object from JavaScript. The two tools run the same Rust
+code, so their output and exit codes are the same.
 
-On targets other than WebAssembly, the crate is empty. Thus a native build of
-the workspace does not compile the dependencies of this crate. To build the
+On targets other than WebAssembly, the crate is empty, so a native build of
+the workspace does not compile its dependencies. To build the
 npm packages, see [npm/README.md](../../npm/README.md).
