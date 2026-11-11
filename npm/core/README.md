@@ -61,10 +61,22 @@ A `Problem` has three fields:
 | `rule` | The name of the rule in section 9 of the specification, for example `unique-item-ids`. `null` for a schema problem. |
 | `message` | What is wrong, in words for people. |
 
+A value crosses into the WebAssembly module as JSON text, so the rules of
+`JSON.stringify` apply. A key with the value `undefined` is left out. A
+JavaScript number has no separate form for a whole number with a decimal
+point, so `version: 3.0` in a file becomes `3` in the object, and `write` then
+writes `3`. The `skopos fmt` command reads the text itself and keeps `3.0`.
+An integer above 2^53 loses precision, as it does in any JavaScript number.
+
 If a function cannot give a result, it throws an `Error` with the name
 `SkoposError`. The error has the details in `problems` (a list of `Problem`)
 or in `errors` (a list of Markdown errors, each with a `line` and a
 `message`). A wrong argument, such as an unknown format, gives a `TypeError`.
+
+If the Rust code panics, the call throws an `Error` with the panic message.
+A panic is a bug: please report it. After a panic, the module is in an
+unknown state. Load it again before the next call, for example in a new
+worker.
 
 ## Functions
 

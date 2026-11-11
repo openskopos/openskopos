@@ -30,8 +30,13 @@ npm/build.sh
 ```
 
 The script runs `cargo build -p skopos-wasm --target wasm32-unknown-unknown --profile wasm --locked`,
-and then `wasm-bindgen --target web`. The `wasm` profile is in the root
-`Cargo.toml`.
+and then `wasm-bindgen --target web --remove-name-section --remove-producers-section`.
+The `wasm` profile is in the root `Cargo.toml`. It optimizes for size.
+
+getrandom needs the flag `--cfg getrandom_backend="wasm_js"` for this target.
+`.cargo/config.toml` sets it. Cargo ignores that file if the environment
+variable `RUSTFLAGS` is set, so in that case the script adds the flag to
+`RUSTFLAGS`.
 
 ## Test
 

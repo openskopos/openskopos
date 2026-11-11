@@ -13,6 +13,15 @@
 //! `runCli` runs the commands of the `skopos` tool. The caller gives a host
 //! object that reads and writes files and the terminal. The npm package
 //! `@openskopos/cli` gives a host for Node.
+//!
+//! If the Rust code panics, the call throws a JavaScript `Error` with the
+//! panic message. The module is then in an unknown state: load it again
+//! before the next call.
+//!
+//! The crate is empty on other targets, so that native builds of the
+//! workspace do not compile it.
+
+#![cfg(target_arch = "wasm32")]
 
 use std::io;
 use std::path::Path;
@@ -21,9 +30,20 @@ use js_sys::{Array, Reflect, Uint8Array};
 use serde::Serialize;
 use serde_json::Value;
 use skopos_core::export::{self, Options, Tool};
-use skopos_core::markdown::{self, Fill};
-use skopos_core::{Format, Problem};
+use skopos_core::markdown::{self, Fill, Warning};
+use skopos_core::{AssignedId, Format, Problem};
 use wasm_bindgen::prelude::*;
+
+/// Runs when the module loads. A panic then throws a JavaScript `Error` with
+/// the panic message, not only `RuntimeError: unreachable`.
+#[wasm_bindgen(start)]
+fn start() {
+    std::panic::set_hook(Box::new(|info| {
+        wasm_bindgen::throw_str(&format!(
+            "skopos panicked: {info}. Load the module again before the next call."
+        ));
+    }));
+}
 
 #[wasm_bindgen(typescript_custom_section)]
 const TYPES: &str = r#"
@@ -210,10 +230,23 @@ export interface CliHost {
   stderr(text: string): void;
   /** True if text for standard error (true) or standard output (false) can have colors. */
   color(stderr: boolean): boolean;
+  /**
+   * The platform, as `process.platform` gives it, for example "linux" or
+   * "darwin". On Linux and macOS, file errors get the same messages as in
+   * the native tool. Without this method, they keep the message of the host.
+   */
+  platform?(): string;
 }
 "#;
 
 // ------------------------------------------------------------------ values
+//
+// Values cross the boundary as JSON text: JSON.stringify and serde_json on
+// the way in, serde_json and JSON.parse on the way out. A conversion value by
+// value (serde-wasm-bindgen) makes a call across the boundary for each field,
+// which is slower for documents with many items than the native JSON parsers
+// of the engine. JSON also gives the rules that JavaScript users know: a key
+// with the value `undefined` is left out, and `toJSON` applies.
 
 /// A JavaScript value as JSON.
 fn from_js(value: &JsValue, what: &str) -> Result<Value, JsValue> {
@@ -270,6 +303,29 @@ fn format_of(format: &str) -> Result<Format, JsValue> {
             "unknown format {format:?}: use json or yaml"
         ))),
     }
+}
+
+/// The result of `assignIds`.
+#[derive(Serialize)]
+struct AssignIdsResult<'a> {
+    doc: &'a Value,
+    assigned: &'a [AssignedId],
+    counters_changed: bool,
+}
+
+/// The result of `markdownRead`.
+#[derive(Serialize)]
+struct MarkdownReadResult<'a> {
+    doc: &'a Value,
+    warnings: &'a [Warning],
+}
+
+/// The result of `parseItemId`.
+#[derive(Serialize)]
+struct ItemId {
+    #[serde(rename = "type")]
+    item_type: &'static str,
+    number: u64,
 }
 
 /// A string field of an options object, if it is there.
@@ -390,11 +446,11 @@ pub fn assign_ids(
 ) -> Result<JsValue, JsValue> {
     let mut doc = from_js(&doc, "doc")?;
     match skopos_core::assign_ids(&mut doc) {
-        Ok(report) => Ok(to_js(&serde_json::json!({
-            "doc": doc,
-            "assigned": report.assigned,
-            "counters_changed": report.counters_changed,
-        }))),
+        Ok(report) => Ok(to_js(&AssignIdsResult {
+            doc: &doc,
+            assigned: &report.assigned,
+            counters_changed: report.counters_changed,
+        })),
         Err(problems) => Err(problems_error(&problems)),
     }
 }
@@ -407,10 +463,10 @@ pub fn assign_ids(
 )]
 pub fn parse_item_id(id: &str) -> JsValue {
     match skopos_core::parse_item_id(id) {
-        Some((item_type, number)) => to_js(&serde_json::json!({
-            "type": item_type.as_str(),
-            "number": number,
-        })),
+        Some((item_type, number)) => to_js(&ItemId {
+            item_type: item_type.as_str(),
+            number,
+        }),
         None => JsValue::UNDEFINED,
     }
 }
@@ -475,10 +531,10 @@ pub fn markdown_read(
     };
     let filename = option_string(&options, "filename");
     match markdown::read_with(md, filename.as_deref(), &fill) {
-        Ok((doc, warnings)) => Ok(to_js(&serde_json::json!({
-            "doc": doc,
-            "warnings": warnings,
-        }))),
+        Ok((doc, warnings)) => Ok(to_js(&MarkdownReadResult {
+            doc: &doc,
+            warnings: &warnings,
+        })),
         Err(errors) => {
             let message = errors
                 .iter()
@@ -631,45 +687,52 @@ extern "C" {
     fn stderr(this: &CliHost, text: &str) -> Result<(), JsValue>;
     #[wasm_bindgen(method, catch)]
     fn color(this: &CliHost, stderr: bool) -> Result<bool, JsValue>;
+    #[wasm_bindgen(method, catch)]
+    fn platform(this: &CliHost) -> Result<String, JsValue>;
 }
 
 /// The text of the common errors of the file system, as the C library of
-/// Linux and macOS gives it. The native tool shows these texts, so the same
-/// error gives the same message in both tools.
-fn strerror(code: &str) -> Option<&'static str> {
-    Some(match code {
-        "EPERM" => "Operation not permitted",
-        "ENOENT" => "No such file or directory",
-        "EIO" => "Input/output error",
-        "EACCES" => "Permission denied",
-        "EEXIST" => "File exists",
-        "ENOTDIR" => "Not a directory",
-        "EISDIR" => "Is a directory",
-        "EINVAL" => "Invalid argument",
-        "EMFILE" => "Too many open files",
-        "EFBIG" => "File too large",
-        "ENOSPC" => "No space left on device",
-        "EROFS" => "Read-only file system",
-        "EPIPE" => "Broken pipe",
-        "ENAMETOOLONG" => "File name too long",
-        "ENOTEMPTY" => "Directory not empty",
-        "ELOOP" => "Too many levels of symbolic links",
+/// Linux (`linux`) or macOS (`darwin`) gives it. The native tool shows these
+/// texts, so the same error gives the same message in both tools.
+fn strerror(code: &str, platform: &str) -> Option<&'static str> {
+    Some(match (code, platform) {
+        ("EPERM", _) => "Operation not permitted",
+        ("ENOENT", _) => "No such file or directory",
+        ("EIO", _) => "Input/output error",
+        ("EACCES", _) => "Permission denied",
+        ("EBUSY", "darwin") => "Resource busy",
+        ("EBUSY", _) => "Device or resource busy",
+        ("EEXIST", _) => "File exists",
+        ("EXDEV", "darwin") => "Cross-device link",
+        ("EXDEV", _) => "Invalid cross-device link",
+        ("ENOTDIR", _) => "Not a directory",
+        ("EISDIR", _) => "Is a directory",
+        ("EINVAL", _) => "Invalid argument",
+        ("ENFILE", _) => "Too many open files in system",
+        ("EMFILE", _) => "Too many open files",
+        ("ETXTBSY", _) => "Text file busy",
+        ("EFBIG", _) => "File too large",
+        ("ENOSPC", _) => "No space left on device",
+        ("EROFS", _) => "Read-only file system",
+        ("EPIPE", _) => "Broken pipe",
+        ("ENAMETOOLONG", _) => "File name too long",
+        ("ENOTEMPTY", _) => "Directory not empty",
+        ("ELOOP", _) => "Too many levels of symbolic links",
+        ("EDQUOT", "darwin") => "Disc quota exceeded",
+        ("EDQUOT", _) => "Disk quota exceeded",
         _ => return None,
     })
 }
 
-/// A JavaScript error from a host method as an `io::Error`. A Node error on
-/// Linux or macOS gets the message that Rust gives for the same error, for
-/// example `No such file or directory (os error 2)`.
-fn io_error(err: JsValue) -> io::Error {
+/// A JavaScript error from a host method as an `io::Error`. On Linux and
+/// macOS, a Node error gets the message that Rust gives for the same error,
+/// for example `No such file or directory (os error 2)`. Other errors, and
+/// all errors on other platforms, keep the message of Node.
+fn io_error(err: JsValue, platform: &str) -> io::Error {
     let field = |key: &str| Reflect::get(&err, &JsValue::from_str(key)).ok();
     let code = field("code").and_then(|v| v.as_string());
-    // Node gives the negative errno. On Windows, errno is a libuv number
-    // (for example -4058), not an errno of the C library.
-    let errno = field("errno")
-        .and_then(|v| v.as_f64())
-        .map(f64::abs)
-        .filter(|n| *n < 4000.0);
+    // Node gives the negative errno of the C library.
+    let errno = field("errno").and_then(|v| v.as_f64()).map(f64::abs);
     let kind = match code.as_deref() {
         Some("ENOENT") => io::ErrorKind::NotFound,
         Some("EACCES" | "EPERM") => io::ErrorKind::PermissionDenied,
@@ -677,7 +740,11 @@ fn io_error(err: JsValue) -> io::Error {
         Some("EPIPE") => io::ErrorKind::BrokenPipe,
         _ => io::ErrorKind::Other,
     };
-    let message = match (code.as_deref().and_then(strerror), errno) {
+    let text = match platform {
+        "linux" | "darwin" => code.as_deref().and_then(|c| strerror(c, platform)),
+        _ => None,
+    };
+    let message = match (text, errno) {
         (Some(text), Some(n)) => format!("{text} (os error {n})"),
         _ => field("message")
             .and_then(|v| v.as_string())
@@ -691,50 +758,77 @@ fn path_str(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
-impl skopos::Host for CliHost {
+/// A host object from JavaScript, and its platform.
+struct JsHost {
+    js: CliHost,
+    platform: String,
+}
+
+impl JsHost {
+    fn error(&self, err: JsValue) -> io::Error {
+        io_error(err, &self.platform)
+    }
+}
+
+impl skopos::Host for JsHost {
     fn read(&mut self, path: &Path) -> io::Result<Vec<u8>> {
-        Ok(self.read_file(&path_str(path)).map_err(io_error)?.to_vec())
+        match self.js.read_file(&path_str(path)) {
+            Ok(bytes) => Ok(bytes.to_vec()),
+            Err(e) => Err(self.error(e)),
+        }
     }
 
     fn write(&mut self, path: &Path, text: &str) -> io::Result<()> {
-        self.write_file(&path_str(path), text).map_err(io_error)
+        self.js
+            .write_file(&path_str(path), text)
+            .map_err(|e| self.error(e))
     }
 
     fn exists(&mut self, path: &Path) -> bool {
-        CliHost::exists(self, &path_str(path)).unwrap_or(false)
+        self.js.exists(&path_str(path)).unwrap_or(false)
     }
 
     fn is_dir(&mut self, path: &Path) -> bool {
-        CliHost::is_dir(self, &path_str(path)).unwrap_or(false)
+        self.js.is_dir(&path_str(path)).unwrap_or(false)
     }
 
     fn read_dir(&mut self, path: &Path) -> io::Result<Vec<String>> {
-        let names = CliHost::read_dir(self, &path_str(path)).map_err(io_error)?;
-        Ok(names.iter().filter_map(|n| n.as_string()).collect())
+        match self.js.read_dir(&path_str(path)) {
+            Ok(names) => Ok(names.iter().filter_map(|n| n.as_string()).collect()),
+            Err(e) => Err(self.error(e)),
+        }
     }
 
     fn create_dir_all(&mut self, path: &Path) -> io::Result<()> {
-        CliHost::create_dir_all(self, &path_str(path)).map_err(io_error)
+        self.js
+            .create_dir_all(&path_str(path))
+            .map_err(|e| self.error(e))
     }
 
     fn remove_file(&mut self, path: &Path) -> io::Result<()> {
-        CliHost::remove_file(self, &path_str(path)).map_err(io_error)
+        self.js
+            .remove_file(&path_str(path))
+            .map_err(|e| self.error(e))
     }
 
     fn remove_dir(&mut self, path: &Path) -> io::Result<()> {
-        CliHost::remove_dir(self, &path_str(path)).map_err(io_error)
+        self.js
+            .remove_dir(&path_str(path))
+            .map_err(|e| self.error(e))
     }
 
     fn stdout(&mut self, text: &str) -> io::Result<()> {
-        CliHost::stdout(self, text).map_err(io_error)
+        self.js.stdout(text).map_err(|e| self.error(e))
     }
 
     fn stderr(&mut self, text: &str) {
-        let _ = CliHost::stderr(self, text);
+        let _ = self.js.stderr(text);
     }
 
     fn color(&mut self, stream: skopos::Stream) -> bool {
-        CliHost::color(self, stream == skopos::Stream::Stderr).unwrap_or(false)
+        self.js
+            .color(stream == skopos::Stream::Stderr)
+            .unwrap_or(false)
     }
 
     fn fill(&mut self) -> Fill {
@@ -747,7 +841,9 @@ impl skopos::Host for CliHost {
 /// are the same as those of the native tool. Returns the exit code: 0 if all
 /// went well, 1 if a command found a problem, 2 if the arguments are wrong.
 #[wasm_bindgen(js_name = runCli)]
-pub fn run_cli(args: Vec<String>, mut host: CliHost) -> u8 {
+pub fn run_cli(args: Vec<String>, host: CliHost) -> u8 {
+    let platform = host.platform().unwrap_or_default();
+    let mut host = JsHost { js: host, platform };
     let argv = std::iter::once("skopos".to_string()).chain(args);
     skopos::run(argv, &mut host)
 }

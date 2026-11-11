@@ -16,4 +16,6 @@ terminal. The native tool gives a host that uses the standard library.
 `runCli` takes a host object from JavaScript. Both tools run the same Rust
 code, so they give the same output and exit codes.
 
-See [npm/README.md](../../npm/README.md) for how to build the packages.
+The crate is empty on targets other than WebAssembly, so a native build of
+the workspace does not compile its dependencies. See
+[npm/README.md](../../npm/README.md) for how to build the packages.

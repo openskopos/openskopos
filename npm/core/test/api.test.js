@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { test } from "node:test";
 
 import init, {
+  runCli,
   assignIds,
   check,
   diff,
@@ -130,4 +131,58 @@ test("diff and diffText", () => {
   assert.equal(d.same_artifact, true);
   assert.equal(d.from.version + 1, d.to.version);
   assert.equal(typeof diffText(a, b), "string");
+});
+
+// A host with files in memory, for runCli.
+function memoryHost(files, platform) {
+  const out = { stdout: "", stderr: "" };
+  const host = {
+    readFile: (path) => {
+      if (!(path in files)) {
+        throw Object.assign(new Error(`ENOENT: no such file or directory, open '${path}'`), {
+          code: "ENOENT",
+          errno: -2,
+        });
+      }
+      return new TextEncoder().encode(files[path]);
+    },
+    writeFile: (path, text) => {
+      files[path] = text;
+    },
+    exists: (path) => path in files,
+    isDir: () => false,
+    readDir: () => [],
+    createDirAll: () => {},
+    removeFile: (path) => {
+      delete files[path];
+    },
+    removeDir: () => {},
+    stdout: (text) => {
+      out.stdout += text;
+    },
+    stderr: (text) => {
+      out.stderr += text;
+    },
+    color: () => false,
+  };
+  if (platform) host.platform = () => platform;
+  return { host, out };
+}
+
+test("runCli takes the kind from a file name with \\ or /", () => {
+  // skopos-core splits file names at both separators, on every platform.
+  for (const name of ["docs\\INTENT.md", "docs/INTENT.md"]) {
+    const { host, out } = memoryHost({ [name]: "# Faster invoices\n\n## Goals\n\n- Ship it.\n" });
+    assert.equal(runCli(["check", name], host), 0, out.stdout);
+    assert.equal(out.stderr, "1 file: no problems.\n");
+  }
+});
+
+test("runCli gives Rust messages for Node errors on Linux and macOS only", () => {
+  const linux = memoryHost({}, "linux");
+  assert.equal(runCli(["check", "a.json"], linux.host), 1);
+  assert.match(linux.out.stdout, /cannot read the file: No such file or directory \(os error 2\)/);
+  const windows = memoryHost({}, "win32");
+  runCli(["check", "a.json"], windows.host);
+  assert.match(windows.out.stdout, /cannot read the file: ENOENT: no such file/);
 });

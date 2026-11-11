@@ -32,6 +32,7 @@ const host = {
   },
   color: (stderr) =>
     (stderr ? process.stderr : process.stdout).hasColors?.() ?? false,
+  platform: () => process.platform,
 };
 
 process.exitCode = runCli(process.argv.slice(2), host);

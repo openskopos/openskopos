@@ -44,9 +44,15 @@ explains each command.
 The exit code is 0 if all went well, 1 if a command found a problem, and 2 if
 the arguments are wrong.
 
-On Windows, two things are different from the native tool. A path that the
-tool makes, such as the path of an exported file, has `/` between folders. A
-message about a file error, such as a missing file, comes from Node.
+Some details are different from the native tool:
+
+- On Windows, a path that the tool makes, such as the path of an exported
+  file, has `/` between folders.
+- On Windows, a message about a file error, such as a missing file, comes
+  from Node.
+- On Linux and macOS, the message about a common file error is the same as
+  the message of the native tool. A rare error, such as a broken network
+  drive, can have the message of Node.
 
 ## License
 

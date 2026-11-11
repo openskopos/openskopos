@@ -110,6 +110,17 @@ jobs:
         run: npm/build.sh
       - name: Run the conformance cases through @openskopos/core
         run: npm test --prefix npm/core
+      # The package supports Node 20 and later.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run the package tests on Node 20
+        run: npm test --prefix npm/core
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run the package tests on Node 24
+        run: npm test --prefix npm/core
       - name: Pack the packages
         run: |
           mkdir packs

@@ -53,8 +53,18 @@ if ! command -v wasm-bindgen > /dev/null 2>&1 ||
   bindgen=$dir/$name/wasm-bindgen
 fi
 
+# getrandom needs this flag for wasm32-unknown-unknown. .cargo/config.toml
+# sets it, but cargo ignores that file's rustflags if RUSTFLAGS is set.
+if [ -n "${RUSTFLAGS:-}" ]; then
+  RUSTFLAGS="$RUSTFLAGS --cfg getrandom_backend=\"wasm_js\""
+  export RUSTFLAGS
+fi
+
 cargo build -p skopos-wasm --target wasm32-unknown-unknown --profile wasm --locked
 rm -rf npm/core/dist
+# The name section holds the names of the Rust functions, about a third of
+# the file. The package does not need it.
 "$bindgen" --target web --out-dir npm/core/dist --out-name skopos \
+  --remove-name-section --remove-producers-section \
   "$target_dir/wasm32-unknown-unknown/wasm/skopos_wasm.wasm"
 echo "build.sh: built npm/core/dist" >&2

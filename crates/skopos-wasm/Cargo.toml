@@ -12,7 +12,9 @@ rust-version.workspace = true
 [lib]
 crate-type = ["cdylib", "rlib"]
 
-[dependencies]
+# The crate is for WebAssembly only. On other targets it is empty and has no
+# dependencies.
+[target.'cfg(target_arch = "wasm32")'.dependencies]
 getrandom = { version = "0.3", features = ["wasm_js"] }
 js-sys = "0.3"
 serde = { workspace = true }

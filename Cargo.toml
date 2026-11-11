@@ -18,7 +18,6 @@ serde_yaml_ng = "0.10"
 # optimizer sees all of it. `cargo build --profile wasm` uses it.
 [profile.wasm]
 inherits = "release"
-opt-level = "s"
+opt-level = "z"
 lto = true
 codegen-units = 1
-panic = "abort"
