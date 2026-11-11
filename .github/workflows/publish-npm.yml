@@ -49,7 +49,7 @@ jobs:
       # The packages must have the version of the crates and of the release.
       - name: Check the package versions
         run: |
-          node npm/check-versions.mjs
+          node scripts/check-versions.mjs
           release=$(echo "$PLAN" | jq -r '.releases[] | select(.app_name == "skopos") | .app_version')
           version=$(node -p 'require("./npm/core/package.json").version')
           if [ "$version" != "$release" ]; then

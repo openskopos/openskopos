@@ -2,7 +2,8 @@
 
 This file lists the changes to the `skopos` tool, the Rust crates and the npm
 packages, by release. [spec/CHANGELOG.md](spec/CHANGELOG.md) lists the changes
-to the format.
+to the format. The first two numbers of a release are the format version that
+it reads and writes (see "Versions" in [CONTRIBUTING.md](CONTRIBUTING.md)).
 
 ## 0.1.0
 

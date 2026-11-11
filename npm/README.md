@@ -7,10 +7,11 @@ This folder has the two npm packages of OpenSkopos:
 | [`@openskopos/core`](core/README.md) | The WebAssembly build of `skopos-core`, with TypeScript types. It works in Node and in browsers. |
 | [`@openskopos/cli`](cli/README.md) | The `skopos` command line tool for Node. It depends on `@openskopos/core` and has no logic of its own. |
 
-The packages have the version of the Rust crates. When the crate version
-changes, change `version` in both `package.json` files and the dependency of
-`@openskopos/cli` on `@openskopos/core`. `node npm/check-versions.mjs` makes
-sure that the versions are the same.
+The packages have the version of the Rust crates (see "Versions" in
+[CONTRIBUTING.md](../CONTRIBUTING.md)). When the version changes, change
+`version` in both `package.json` files and the dependency of `@openskopos/cli`
+on `@openskopos/core`. `node scripts/check-versions.mjs` checks that all
+versions match.
 
 ## Build
 

@@ -31,9 +31,11 @@ jobs:
             echo "::error::The secret CARGO_REGISTRY_TOKEN is not set. Make a crates.io API token and add it to the repository secrets."
             exit 1
           fi
-      # Each crate must have the version of the release.
+      # Each crate must have the version of the release, and the version
+      # policy must hold (see "Versions" in CONTRIBUTING.md).
       - name: Check the crate versions
         run: |
+          node scripts/check-versions.mjs
           release=$(echo "$PLAN" | jq -r '.releases[] | select(.app_name == "skopos") | .app_version')
           status=0
           for crate in skopos-core skopos; do

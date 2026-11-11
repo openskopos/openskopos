@@ -12,6 +12,15 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  # All packages have one version, and its major and minor numbers are the
+  # format version. See "Versions" in CONTRIBUTING.md.
+  versions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the package versions
+        run: node scripts/check-versions.mjs
+
   conformance:
     runs-on: ubuntu-latest
     steps:
@@ -104,8 +113,6 @@ jobs:
         with:
           node-version: 22
       - run: rustup target add wasm32-unknown-unknown
-      - name: Make sure that the package versions are the crate version
-        run: node npm/check-versions.mjs
       - name: Build the WebAssembly module
         run: npm/build.sh
       - name: Run the conformance cases through @openskopos/core
