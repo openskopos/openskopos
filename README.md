@@ -30,8 +30,8 @@ Version 0.1 is in draft. The format can change between 0.x versions.
 | `spec/` | The specification, by version |
 | `schema/` | The JSON Schema files. A tagged version is published at `https://openskopos.org/schema/`. |
 | `conformance/` | Valid and invalid documents that every implementation must handle |
-| `crates/` | The reference implementation in Rust: the library [`skopos-core`](crates/skopos-core/README.md) and the command line tool [`skopos`](crates/skopos/README.md) |
-| `npm/` | Planned: the WebAssembly build for JavaScript |
+| `crates/` | The reference implementation in Rust: the library [`skopos-core`](crates/skopos-core/README.md), the command line tool [`skopos`](crates/skopos/README.md) and the WebAssembly build [`skopos-wasm`](crates/skopos-wasm/README.md) |
+| `npm/` | The npm packages [`@openskopos/core`](npm/core/README.md) and [`@openskopos/cli`](npm/cli/README.md), from the WebAssembly build |
 | `site/` | The website at [openskopos.org](https://openskopos.org) |
 | `brand/` | The logo and the brand rules ([BRAND.md](brand/BRAND.md)) |
 
@@ -56,6 +56,16 @@ cargo install --locked --path crates/skopos
 
 Then run `skopos check intent.skopos.json`. See
 [crates/skopos/README.md](crates/skopos/README.md) for all commands.
+
+The same tool is on npm, for Node on every platform. It needs no Rust:
+
+```bash
+npx @openskopos/cli check intent.skopos.json
+```
+
+For JavaScript and TypeScript code, the package
+[`@openskopos/core`](npm/core/README.md) reads, checks and writes documents in
+Node and in browsers.
 
 ## Reference user
 

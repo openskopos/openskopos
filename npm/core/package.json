@@ -1,0 +1,46 @@
+{
+  "name": "@openskopos/core",
+  "version": "0.1.0",
+  "description": "Read, check and write OpenSkopos documents in Node and in browsers. The reference implementation, built to WebAssembly.",
+  "keywords": [
+    "openskopos",
+    "specification",
+    "json-schema",
+    "ai-agents",
+    "webassembly"
+  ],
+  "homepage": "https://openskopos.org",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/openskopos/openskopos.git",
+    "directory": "npm/core"
+  },
+  "license": "Apache-2.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/skopos.d.ts",
+      "node": "./node.js",
+      "default": "./dist/skopos.js"
+    },
+    "./skopos_bg.wasm": "./dist/skopos_bg.wasm",
+    "./package.json": "./package.json"
+  },
+  "types": "./dist/skopos.d.ts",
+  "files": [
+    "node.js",
+    "dist/skopos.js",
+    "dist/skopos.d.ts",
+    "dist/skopos_bg.wasm",
+    "dist/skopos_bg.wasm.d.ts"
+  ],
+  "sideEffects": [
+    "./node.js"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test"
+  }
+}

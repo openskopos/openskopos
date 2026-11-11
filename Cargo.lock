@@ -796,6 +796,7 @@ dependencies = [
 name = "skopos"
 version = "0.1.0"
 dependencies = [
+ "anstream",
  "clap",
  "serde",
  "serde_json",
@@ -821,6 +822,19 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml_ng",
+]
+
+[[package]]
+name = "skopos-wasm"
+version = "0.1.0"
+dependencies = [
+ "getrandom",
+ "js-sys",
+ "serde",
+ "serde_json",
+ "skopos",
+ "skopos-core",
+ "wasm-bindgen",
 ]
 
 [[package]]

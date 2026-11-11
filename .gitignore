@@ -1,1 +1,4 @@
 target/
+npm/core/dist/
+node_modules/
+*.tgz

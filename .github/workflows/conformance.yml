@@ -40,7 +40,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Check the layout of the Rust code
-        run: cargo fmt --check -p skopos-core -p skopos
+        run: cargo fmt --check -p skopos-core -p skopos -p skopos-wasm
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --locked -- -D warnings
       # The tests run every conformance case through skopos-core and through
@@ -56,6 +56,8 @@ jobs:
       # .cargo/config.toml sets the getrandom backend for this target.
       - name: Build skopos-core for WebAssembly
         run: cargo build -p skopos-core --target wasm32-unknown-unknown --locked
+      - name: Run clippy on the WebAssembly bindings
+        run: cargo clippy -p skopos-wasm --target wasm32-unknown-unknown --locked -- -D warnings
 
   # Exports four versions of one artifact to OpenSpec, and runs the real
   # OpenSpec CLI on each: validate, then archive. The archived specs must be
@@ -87,6 +89,112 @@ jobs:
           for file in $(jq -r '.cases[].file' conformance/invalid/index.json); do
             if skopos check "conformance/invalid/$file" > /dev/null 2>&1; then
               echo "::error file=conformance/invalid/$file::skopos accepted an invalid document"
+              status=1
+            fi
+          done
+          exit $status
+
+  # Builds the npm packages @openskopos/core and @openskopos/cli, and runs
+  # the conformance cases through @openskopos/core.
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: rustup target add wasm32-unknown-unknown
+      - name: Make sure that the package versions are the crate version
+        run: node npm/check-versions.mjs
+      - name: Build the WebAssembly module
+        run: npm/build.sh
+      - name: Run the conformance cases through @openskopos/core
+        run: npm test --prefix npm/core
+      # The package supports Node 20 and later.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Run the package tests on Node 20
+        run: npm test --prefix npm/core
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run the package tests on Node 24
+        run: npm test --prefix npm/core
+      - name: Pack the packages
+        run: |
+          mkdir packs
+          npm pack ./npm/core --pack-destination packs
+          npm pack ./npm/cli --pack-destination packs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: npm-packages
+          path: packs/*.tgz
+
+  # Installs the packed packages on each platform. Runs the npm CLI and the
+  # native CLI on the same files and compares the output, the exit codes and
+  # the files that they write.
+  npm-cli:
+    needs: npm
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22]
+        include:
+          - os: ubuntu-latest
+            node: 20
+          - os: ubuntu-latest
+            node: 24
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-packages
+          path: packs
+      - name: Install the packed packages
+        run: |
+          mkdir "$RUNNER_TEMP/project"
+          cd "$RUNNER_TEMP/project"
+          npm init --yes > /dev/null
+          npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/packs/*.tgz
+      - name: Build the native skopos
+        run: cargo build -p skopos --release --locked
+      # On Windows, the WebAssembly build joins paths with / and takes the
+      # messages of file errors from Node, so the comparison runs on Linux
+      # and macOS only.
+      - name: Compare the npm CLI with the native CLI
+        if: runner.os != 'Windows'
+        run: node npm/test/compare.mjs target/release/skopos "$RUNNER_TEMP/project/node_modules/.bin/skopos"
+      - name: Run npx on the packed CLI
+        run: |
+          native=target/release/skopos
+          npx="npx --yes -p ./packs/$(cd packs && ls openskopos-core-*.tgz) -p ./packs/$(cd packs && ls openskopos-cli-*.tgz) skopos"
+          files="conformance/valid/glossary-v1.json conformance/invalid/duplicate-item-id.json"
+          set +e
+          $native check $files > native.txt 2>&1
+          echo "exit $?" >> native.txt
+          $npx check $files > npx.txt 2>&1
+          echo "exit $?" >> npx.txt
+          set -e
+          cat npx.txt
+          diff native.txt npx.txt
+      - name: Run the conformance cases with the npm CLI
+        run: |
+          skopos="$RUNNER_TEMP/project/node_modules/.bin/skopos"
+          # jq on Windows ends lines with \r\n.
+          jq -r '.cases[].file | "conformance/valid/" + .' conformance/valid/index.json | tr -d '\r' | xargs "$skopos" check
+          status=0
+          for file in $(jq -r '.cases[].file' conformance/invalid/index.json | tr -d '\r'); do
+            if "$skopos" check "conformance/invalid/$file" > /dev/null 2>&1; then
+              echo "::error file=conformance/invalid/$file::the npm CLI accepted an invalid document"
               status=1
             fi
           done
