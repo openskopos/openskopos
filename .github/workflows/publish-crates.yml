@@ -1,0 +1,62 @@
+name: Publish crates
+
+# The Release workflow (release.yml) calls this workflow after it makes the
+# GitHub release. It publishes the crates to crates.io in dependency order:
+# skopos-core first, then skopos. skopos-wasm and the conformance runner have
+# `publish = false` and are not published.
+#
+# Secret: CARGO_REGISTRY_TOKEN, a crates.io API token with the scopes
+# publish-new and publish-update.
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    env:
+      PLAN: ${{ inputs.plan }}
+      CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check the token
+        run: |
+          if [ -z "$CARGO_REGISTRY_TOKEN" ]; then
+            echo "::error::The secret CARGO_REGISTRY_TOKEN is not set. Make a crates.io API token and add it to the repository secrets."
+            exit 1
+          fi
+      # Each crate must have the version of the release.
+      - name: Check the crate versions
+        run: |
+          release=$(echo "$PLAN" | jq -r '.releases[] | select(.app_name == "skopos") | .app_version')
+          status=0
+          for crate in skopos-core skopos; do
+            version=$(cargo metadata --no-deps --format-version 1 | jq -r --arg crate "$crate" '.packages[] | select(.name == $crate) | .version')
+            if [ "$version" != "$release" ]; then
+              echo "::error::$crate has version $version, but the release is $release."
+              status=1
+            fi
+          done
+          exit $status
+      # cargo publish waits until crates.io has the new version, so the next
+      # crate can use it. If a run stops part of the way, run it again: it
+      # skips the versions that are already on crates.io.
+      - name: Publish skopos-core, then skopos
+        run: |
+          for crate in skopos-core skopos; do
+            version=$(cargo metadata --no-deps --format-version 1 | jq -r --arg crate "$crate" '.packages[] | select(.name == $crate) | .version')
+            code=$(curl --silent --output /dev/null --write-out '%{http_code}' \
+              --user-agent 'openskopos release (https://github.com/openskopos/openskopos)' \
+              "https://crates.io/api/v1/crates/$crate/$version")
+            if [ "$code" = 200 ]; then
+              echo "$crate $version is already on crates.io."
+              continue
+            fi
+            cargo publish --locked -p "$crate"
+          done

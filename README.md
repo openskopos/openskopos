@@ -24,12 +24,14 @@ Version 0.1 is in draft. The format can change between 0.x versions.
 - [JSON Schema 0.1](schema/artifact/0.1.json)
 - [Conformance cases](conformance/README.md)
 - [Changelog](spec/CHANGELOG.md)
+- [Documentation](docs/README.md), also on [openskopos.org](https://openskopos.org)
 
 | Folder | Contents |
 |---|---|
 | `spec/` | The specification, by version |
 | `schema/` | The JSON Schema files. A tagged version is published at `https://openskopos.org/schema/`. |
 | `conformance/` | Valid and invalid documents that every implementation must handle |
+| `docs/` | The documentation of the tools and the libraries |
 | `crates/` | The reference implementation in Rust: the library [`skopos-core`](crates/skopos-core/README.md), the command line tool [`skopos`](crates/skopos/README.md) and the WebAssembly build [`skopos-wasm`](crates/skopos-wasm/README.md) |
 | `npm/` | The npm packages [`@openskopos/core`](npm/core/README.md) and [`@openskopos/cli`](npm/cli/README.md), from the WebAssembly build |
 | `site/` | The website at [openskopos.org](https://openskopos.org) |
@@ -47,12 +49,16 @@ The `skopos` command line tool checks, formats and converts documents in
 JSON, YAML and Markdown, and gives IDs to new items. It also reads an edited
 Markdown file back into the next version of a document. It compares two
 versions item by item, and exports a document to OpenSpec, Kiro or Spec Kit
-(see [docs/exporters.md](docs/exporters.md)). To install it from a clone of
-this repository, run this command:
+(see [docs/exporters.md](docs/exporters.md)). To install it with Homebrew on
+macOS or Linux, run this command:
 
 ```bash
-cargo install --locked --path crates/skopos
+brew install openskopos/tap/skopos
 ```
+
+[docs/install.md](docs/install.md) has the other ways to install it: install
+scripts for the shell and PowerShell, binaries for each platform, and
+`cargo install --locked skopos`.
 
 Then run `skopos check intent.skopos.json`. See
 [crates/skopos/README.md](crates/skopos/README.md) for all commands.

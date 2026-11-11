@@ -6,33 +6,29 @@
 <title>OpenSkopos</title>
 <meta name="description" content="OpenSkopos is an open format for what a team agrees before an AI agent builds the work.">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<style>
-  :root { --bg: #FFF7EA; --ink: #242433; --muted: #52525B; --dot: #E8512F; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg: #18181B; --ink: #FAFAFA; --muted: #A1A1AA; --dot: #FF6848; }
-  }
-  html, body { margin: 0; background: var(--bg); color: var(--ink); }
-  body { font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.6; }
-  main { max-width: 640px; margin: 0 auto; padding: 72px 20px; }
-  .logo { display: flex; align-items: center; gap: 12px; font-size: 34px; letter-spacing: -0.01em; line-height: 1; }
-  .logo img { width: 44px; height: 44px; }
-  .logo .open { font-weight: 400; }
-  .logo .skopos { font-weight: 500; }
-  .dark { display: none; }
-  @media (prefers-color-scheme: dark) { .light { display: none; } .dark { display: inline; } }
-  p { font-size: 18px; margin: 28px 0 0; }
-  .muted { color: var(--muted); font-size: 16px; }
-  a { color: var(--ink); text-decoration-color: var(--dot); text-underline-offset: 3px; }
-</style>
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
-<main>
+<main class="home">
   <div class="logo">
     <img class="light" src="/mark-light.svg" alt="">
     <img class="dark" src="/mark-dark.svg" alt="">
     <span><span class="open">Open</span><span class="skopos">Skopos</span></span>
   </div>
-  <p>An open format for what a team agrees before an AI agent builds the work: goals, requirements, rules, assumptions, and the reasons behind them. Every item has a stable ID that people, commits and agents can cite.</p>
+  <p class="lead">An open format for what a team agrees before an AI agent builds the work: goals, requirements, rules, assumptions, and the reasons behind them. Every item has a stable ID that people, commits and agents can cite.</p>
+  <ul class="links">
+    <li><a href="/spec/0.1/">Specification 0.1</a></li>
+    <li><a href="/docs/">Documentation</a></li>
+    <li><a href="/docs/install/">Install the skopos tool</a></li>
+    <li><a href="https://github.com/openskopos/openskopos">GitHub</a></li>
+  </ul>
+
+  <h2>Open and vendor-neutral</h2>
+  <p>The specification, the JSON Schema and the reference implementation are under the <a href="https://github.com/openskopos/openskopos/blob/main/LICENSE">Apache License 2.0</a>. The format belongs to no vendor. Any tool can read and write it, with no account and no fee. <a href="https://github.com/openskopos/openskopos/blob/main/GOVERNANCE.md">GOVERNANCE.md</a> says who decides on changes.</p>
+
+  <h2>Reference user</h2>
+  <p><a href="https://clarvelo.com">Clarvelo</a> facilitates the team sessions that produce OpenSkopos documents. Any tool can use the format without Clarvelo.</p>
+
   <p class="muted">Version 0.1 is in draft. Follow the work on <a href="https://github.com/openskopos/openskopos">GitHub</a>.</p>
 </main>
 </body>

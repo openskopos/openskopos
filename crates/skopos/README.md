@@ -12,12 +12,22 @@ npm package `@openskopos/cli` has the same commands, output and exit codes.
 
 ## Install
 
-To install the tool from a clone of the repository, run this command from the
-root of the repository:
+With Homebrew on macOS or Linux, run this command:
 
 ```bash
-cargo install --locked --path crates/skopos
+brew install openskopos/tap/skopos
 ```
+
+With a Rust toolchain, install the tool from crates.io:
+
+```bash
+cargo install --locked skopos
+```
+
+[docs/install.md](../../docs/install.md) has install scripts for the shell and
+PowerShell, and the binaries for each platform. To install the tool from a
+clone of the repository, run `cargo install --locked --path crates/skopos`
+from the root of the repository.
 
 The npm package [`@openskopos/cli`](../../npm/cli/README.md) has the same
 tool for Node. To run it with no installation, use

@@ -1,0 +1,80 @@
+name: Publish npm packages
+
+# The Release workflow (release.yml) calls this workflow after it makes the
+# GitHub release. It builds the WebAssembly module and stages the packages
+# @openskopos/core and @openskopos/cli on npm.
+#
+# A staged version is not public. A maintainer approves it with two-factor
+# authentication, @openskopos/core first and then @openskopos/cli, in the
+# "Staged Packages" tab on npmjs.com or with `npm stage approve <stage-id>`.
+#
+# Secret: NPM_TOKEN, a granular npm access token with the permission
+# "Read and write (stage only)" for the scope @openskopos.
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # For the provenance statement.
+      id-token: write
+    env:
+      PLAN: ${{ inputs.plan }}
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # npm stage needs npm 11.15.0 or later.
+      - name: Install npm 11
+        run: npm install --global npm@11
+      - name: Check the token
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "::error::The secret NPM_TOKEN is not set. Make a granular npm access token with the permission \"Read and write (stage only)\" and add it to the repository secrets."
+            exit 1
+          fi
+      - run: rustup target add wasm32-unknown-unknown
+      # The packages must have the version of the crates and of the release.
+      - name: Check the package versions
+        run: |
+          node npm/check-versions.mjs
+          release=$(echo "$PLAN" | jq -r '.releases[] | select(.app_name == "skopos") | .app_version')
+          version=$(node -p 'require("./npm/core/package.json").version')
+          if [ "$version" != "$release" ]; then
+            echo "::error::The npm packages have version $version, but the release is $release."
+            exit 1
+          fi
+      - name: Build the WebAssembly module
+        run: npm/build.sh
+      - name: Run the conformance cases through @openskopos/core
+        run: npm test --prefix npm/core
+      # If a run stops part of the way, run it again: it skips the versions
+      # that are already staged or published.
+      - name: Stage @openskopos/core, then @openskopos/cli
+        run: |
+          for dir in core cli; do
+            name=$(node -p "require('./npm/$dir/package.json').name")
+            version=$(node -p "require('./npm/$dir/package.json').version")
+            if npm view "$name@$version" version > /dev/null 2>&1; then
+              echo "$name $version is already published."
+              continue
+            fi
+            if npm stage list "$name" --json 2> /dev/null | grep -q "\"$version\""; then
+              echo "$name $version is already staged."
+              continue
+            fi
+            npm stage publish "./npm/$dir" --access public --provenance
+          done
+          echo "Approve the staged versions on npmjs.com: @openskopos/core first, then @openskopos/cli."
