@@ -202,7 +202,7 @@ fn diff_of_two_versions() {
     assert!(back.superseded.is_empty());
 }
 
-/// A document whose free text holds Markdown that could break the files of a
+/// A document whose free text contains Markdown that could break the files of a
 /// tool: headings in `detail` and `summary`, and brackets in a question.
 fn tricky() -> Value {
     serde_json::json!({
@@ -476,7 +476,7 @@ fn openspec_finds_a_renamed_and_nested_capability() {
 }
 
 /// Moves the FR3 block of the after-v3 tree into a second capability, so
-/// that each capability holds one requirement of the artifact.
+/// that each capability contains one requirement of the artifact.
 fn split_tree() -> Vec<File> {
     let mut tree = openspec_tree("after-v3");
     let spec = tree
@@ -541,7 +541,7 @@ fn openspec_refuses_while_an_earlier_export_is_open() {
     let err = export(&version_doc(5), Tool::OpenSpec, &options).unwrap_err();
     assert!(
         err.message.contains(
-            "openspec/changes/spec-seat-limits-on-plan-changes-v4 holds an earlier export"
+            "openspec/changes/spec-seat-limits-on-plan-changes-v4 contains an earlier export"
         ),
         "{err}"
     );

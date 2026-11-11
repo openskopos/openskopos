@@ -5,7 +5,7 @@ that, each 0.y version can have breaking changes (see
 [Format versions](#12-format-versions)).
 
 OpenSkopos is a file format for the decisions that a team makes before an AI
-agent builds the work. One document holds typed items, such as goals,
+agent builds the work. One document contains typed items, such as goals,
 requirements, constraints, risks and critiques. Each item has a stable ID, for
 example `S1` or `CR3`. People and agents use the ID to refer to the item, for
 example in commits and tickets.
@@ -58,7 +58,7 @@ different numbers. Version 3 of an artifact can use format 0.1.
 
 There are three formats for a document:
 
-| Format | Role | Holds every field |
+| Format | Role | Contains every field |
 |---|---|---|
 | JSON | The canonical format. Tools store documents and make sure that they are valid in this format. | Yes |
 | YAML | The same data as JSON. The same JSON Schema applies. | Yes |
@@ -81,10 +81,10 @@ The name of a Markdown file is the kind in capital letters, for example
 `INTENT.md`,
 `SPEC.md`, `GLOSSARY.md` or `CRITIQUE.md`.
 
-The team chooses the folder. The Markdown file holds every field, so a
+The team chooses the folder. The Markdown file contains every field, so a
 team can keep only the Markdown file, and let tools make the JSON when they
-need it. If one folder holds two artifacts of the same kind, the team adds a
-name before the kind, for example `billing.intent.skopos.json`.
+need it. If one folder contains two artifacts of the same kind, the team adds
+a name before the kind, for example `billing.intent.skopos.json`.
 
 ### 2.2 YAML
 
@@ -149,7 +149,7 @@ A participant has three fields, and no others:
 | `name` | A display name, 1 to 100 characters. |
 | `kind` | `human` or `ai`. |
 
-A document must not hold personal identifiers, for example an email address
+A document must not contain personal identifiers, for example an email address
 or an account ID. Teams commit these files to repositories, and some
 repositories are public.
 
@@ -379,7 +379,8 @@ A tool that writes a `snippet` must remove secrets from it first.
 
 ## 5. Links between items
 
-A ref goes from the item that holds it to the linked item. It has these fields:
+A ref goes from the item that contains it to the linked item. It has these
+fields:
 
 | Field | Required | Meaning |
 |---|---|---|
@@ -388,7 +389,7 @@ A ref goes from the item that holds it to the linked item. It has these fields:
 | `version` | No | The version of that artifact. A ref with `version` must have `artifact`. |
 | `rel` | No | How the two items relate. |
 
-| `rel` | The item that holds the link… | Example |
+| `rel` | The item that contains the link… | Example |
 |---|---|---|
 | `refines` | gives more detail about the linked item. | `ST1` refines `FR1` |
 | `derived_from` | comes from the linked item. | `FR2` is derived from `G1` |
@@ -435,7 +436,7 @@ For example `pa_7Hk2mQ9xR4tV8wZ1@2#CR3`. A reference string without
 
 ## 7. ID counters
 
-`id_counters` holds the highest number ever used for each item prefix in the
+`id_counters` contains the highest number ever used for each item prefix in the
 artifact, in all versions, for example `{"S": 4, "CR": 7}`. If a prefix is
 not in `id_counters`, its counter is 0. With the counters, a tool can assign
 IDs without a server.
@@ -525,7 +526,7 @@ that has the earlier versions must make sure that this is true.
 ## 10. Markdown
 
 Markdown is the format for people who write documents by hand. A Markdown file
-holds every field of the document, so a tool can convert a document to
+contains every field of the document, so a tool can convert a document to
 Markdown and back with no loss of data. A person can also start a document in
 Markdown, with no other file.
 
@@ -538,7 +539,7 @@ content. It stops with an error only when it cannot make a valid document
 
 A Markdown file has these parts, in this order:
 
-1. Front matter (optional): YAML between two `---` lines. It holds the fields
+1. Front matter (optional): YAML between two `---` lines. It contains the fields
    of the document in [section 3](#3-the-document), with the same names and
    structure as in JSON. The key for `$schema` is `schema`. The title, the
    summary and the items are not in the front matter.
@@ -600,7 +601,7 @@ If a field has fields of its own, for example an evidence entry, these fields
 are list items, indented by two more spaces.
 
 The `detail` of an item comes after a blank line, indented by two spaces. It
-continues until the next item. It can hold all types of Markdown, for example
+continues until the next item. It can contain any Markdown, for example
 lists.
 
 ```markdown

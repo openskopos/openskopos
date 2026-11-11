@@ -147,7 +147,7 @@ pub struct NotExported {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Export {
     pub tool: Tool,
-    /// The folder that holds the files, from the root of the project.
+    /// The folder that contains the files, from the root of the project.
     pub folder: String,
     /// The files, in a fixed order.
     pub files: Vec<File>,

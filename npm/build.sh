@@ -62,7 +62,7 @@ fi
 
 cargo build -p skopos-wasm --target wasm32-unknown-unknown --profile wasm --locked
 rm -rf npm/core/dist
-# The name section holds the names of the Rust functions, about a third of
+# The name section contains the names of the Rust functions, about a third of
 # the file. The package does not need it.
 "$bindgen" --target web --out-dir npm/core/dist --out-name skopos \
   --remove-name-section --remove-producers-section \

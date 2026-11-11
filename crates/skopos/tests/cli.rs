@@ -664,7 +664,7 @@ fn export_and_diff_read_markdown() {
         String::from_utf8_lossy(&out.stderr)
     );
 
-    // The Markdown file and its JSON hold the same document.
+    // The Markdown file and its JSON contain the same document.
     let out = skopos(&["diff", &json, &md]);
     assert!(
         out.status.success(),

@@ -8,7 +8,7 @@
 # OpenSkopos
 
 OpenSkopos is an open format for the decisions that a team makes before an AI
-agent builds the work. A document holds typed items: goals, success signals,
+agent builds the work. A document contains typed items: goals, success signals,
 requirements, stories, constraints, assumptions, non-goals, risks, open
 questions, decisions, terms and critiques. Each item has a stable ID such as
 `S1` or `CR3`. The ID stays the same in every version of the document, so
@@ -76,8 +76,7 @@ Node and in browsers.
 ## Reference user
 
 [Clarvelo](https://clarvelo.com) facilitates team sessions that produce
-OpenSkopos documents. Any tool can read and write the format without
-Clarvelo.
+OpenSkopos documents.
 
 ## Contributing
 

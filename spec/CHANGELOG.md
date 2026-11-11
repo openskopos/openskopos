@@ -17,5 +17,5 @@ The first version of the format.
 - Stable item IDs, reference strings and ID counters.
 - Versions with `previous_version` parents, and `input` parents for other
   artifacts and external material.
-- A Markdown format that holds every field, and generous rules to read it.
+- A Markdown format that contains every field, and generous rules to read it.
 - Glossaries as artifacts of kind `glossary`.

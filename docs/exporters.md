@@ -90,7 +90,7 @@ templates of its `spec-driven` schema, its parser and validator, and
 artifact (see "Tests" on this page).
 
 OpenSpec keeps the agreed behavior of a project in main specs,
-`openspec/specs/<capability>/spec.md`. A change folder holds deltas to these
+`openspec/specs/<capability>/spec.md`. A change folder contains deltas to these
 specs. `openspec archive` applies the deltas to the main specs. So the
 exporter writes one change folder, `openspec/changes/<name>-v<version>/`:
 

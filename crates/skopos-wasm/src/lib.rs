@@ -1,6 +1,6 @@
 //! The WebAssembly build of `skopos-core` and of the `skopos` commands.
 //!
-//! The npm package `@openskopos/core` holds this build. Each public function
+//! The npm package `@openskopos/core` contains this build. Each public function
 //! of `skopos-core` has an export here. Inputs and outputs are strings or
 //! plain JavaScript objects. A document goes in and out as the object that
 //! `JSON.parse` gives. Problems, warnings and errors are plain objects with

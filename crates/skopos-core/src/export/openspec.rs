@@ -7,7 +7,7 @@
 //! capability. A later export reads the main specs in `openspec/specs/`
 //! (from [`Options::existing`]) and finds the blocks of earlier exports by
 //! their reference strings. Then it writes a delta for each capability that
-//! holds them: ADDED for new requirements, MODIFIED for changed ones and
+//! contains them: ADDED for new requirements, MODIFIED for changed ones and
 //! REMOVED for requirements that the artifact dropped.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -101,7 +101,7 @@ fn refuse_open_changes(
     match open.first() {
         None => Ok(()),
         Some(other) => Err(ExportError::new(format!(
-            "openspec/changes/{other} holds an earlier export of {} that is not archived yet. \
+            "openspec/changes/{other} contains an earlier export of {} that is not archived yet. \
              Archive it with `openspec archive {other}`, or delete it, and export again.",
             source.artifact
         ))),
@@ -247,7 +247,7 @@ impl Plan {
 }
 
 /// The capability for new requirements: the one that `--name` names, or the
-/// one that holds the most requirements of this artifact. With no earlier
+/// one that contains the most requirements of this artifact. With no earlier
 /// export, a new capability with the name of the export.
 fn main_capability(
     source: &Source,
@@ -287,7 +287,7 @@ fn edited_warning(block: &Block) -> String {
     )
 }
 
-/// True if `have` holds every name of `need`, as many times as `need` does.
+/// True if `have` contains every name of `need`, as many times as `need` does.
 fn contains_all(have: &[String], need: &[String]) -> bool {
     let mut left: Vec<&String> = have.iter().collect();
     need.iter()

@@ -40,11 +40,11 @@ The module `rules` has the names of the four rules in section 9.
 ## Markdown
 
 The module `markdown` reads and writes Markdown, as section 10 of the
-specification says. A Markdown file holds all fields of a document.
+specification says. A Markdown file contains all fields of a document.
 
 | Function | What it does |
 |---|---|
-| `markdown::write(&Value, &[Value]) -> String` | Writes a document as Markdown. The slice holds other documents. The function copies data from these documents (section 10.7). If the slice is empty, the function copies no data. |
+| `markdown::write(&Value, &[Value]) -> String` | Writes a document as Markdown. The slice contains other documents. The function copies data from these documents (section 10.7). If the slice is empty, the function copies no data. |
 | `markdown::read(&str, Option<&str>) -> Result<(Value, Vec<Warning>), Vec<Error>>` | Reads a Markdown file and returns a document. The second argument is the file name. The function uses it to find the kind (the kind of `INTENT.md` is `intent`). The reader does not need other files. |
 | `markdown::next_version(&Value, &Value) -> Value` | Returns the document that you must store after a person edits the Markdown of a stored version (section 10.8). The arguments are the stored version and the document from `read`. |
 | `markdown::same_content(&Value, &Value) -> bool` | Compares the content of two documents, as section 10.8 defines it. |

@@ -240,7 +240,7 @@ fn different_keys(a: &Map<String, Value>, b: &Map<String, Value>, skip: &[&str])
         .collect()
 }
 
-/// Two lists hold the same values, in any order.
+/// Two lists contain the same values, in any order.
 fn same_set(x: &[Value], y: &[Value]) -> bool {
     let mut unmatched: Vec<&Value> = y.iter().collect();
     x.len() == y.len()
