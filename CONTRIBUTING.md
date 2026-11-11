@@ -51,6 +51,48 @@ cargo test --workspace
 access or a dependency that cannot build for `wasm32-unknown-unknown`. CI
 builds the crate for this target on each pull request.
 
+## Versions
+
+The format and the tools share one version number, so you never need a table
+to know which tools go with which format.
+
+- The format has a two-part version, such as `0.1`. The specification is in
+  `spec/0.1/`, and the schema is at `https://openskopos.org/schema/artifact/0.1.json`.
+- Every package has the same three-part version: the crates `skopos-core`,
+  `skopos` and `skopos-wasm`, and the npm packages `@openskopos/core` and
+  `@openskopos/cli`. Its first two numbers are the format version that the
+  tools read and write. `skopos` 0.1.3 and `@openskopos/core` 0.1.3 both work
+  with format 0.1.
+- A bug fix or an addition that breaks nothing, such as a new command, a new
+  exporter or a new library function, increases the last number: 0.1.0, then
+  0.1.1.
+- A new format version moves every package to it. Format 0.2 ships as
+  packages 0.2.0.
+- Within one format version, the library APIs can only grow. A change that
+  breaks code that uses `skopos-core` or `@openskopos/core` waits for the
+  next format version.
+- After 1.0, the same rules apply: format 1.1 ships as packages 1.1.0, and
+  format 2.0 as packages 2.0.0.
+
+CI runs `node scripts/check-versions.mjs`, which fails if the packages have
+different versions or if their version does not match the format version.
+
+## Make a release
+
+1. Change the version of all crates and both `package.json` files, also the
+   dependency of `@openskopos/cli` on `@openskopos/core`. Run
+   `node scripts/check-versions.mjs`.
+2. Add a section for the version to [RELEASES.md](RELEASES.md). The GitHub
+   release uses it as its notes.
+3. Merge the change, then push the tag, for example `v0.1.1`. The Release
+   workflow builds the binaries, makes the GitHub release, updates the
+   Homebrew formula, publishes the crates and stages the npm packages.
+4. Approve the staged npm packages on npmjs.com, `@openskopos/core` first and
+   then `@openskopos/cli`.
+
+For a new format version, also push the tag `schema-<version>`, for example
+`schema-0.2`, to publish the schema.
+
 ## Writing style
 
 The specification is for readers in many countries, and many of them do not
