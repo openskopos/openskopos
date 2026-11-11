@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>$pagetitle$ · OpenSkopos</title>
+$if(description)$
+<meta name="description" content="$description$">
+<meta property="og:description" content="$description$">
+$endif$
+<link rel="canonical" href="https://openskopos.org/$folder$/">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="OpenSkopos">
+<meta property="og:title" content="$pagetitle$ · OpenSkopos">
+<meta property="og:url" content="https://openskopos.org/$folder$/">
+<meta property="og:image" content="https://openskopos.org/og.png">
+<meta name="twitter:card" content="summary">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="brand" href="/">
+    <img class="light" src="/mark-light.svg" alt="">
+    <img class="dark" src="/mark-dark.svg" alt="">
+    <span><span class="open">Open</span><span class="skopos">Skopos</span></span>
+  </a>
+  <nav>
+    <a href="/spec/0.1/">Specification</a>
+    <a href="/docs/">Docs</a>
+    <a href="/docs/install/">Install</a>
+    <a href="https://github.com/openskopos/openskopos">GitHub</a>
+  </nav>
+</header>
+<main>
+$if(toc)$
+<details class="toc">
+<summary>Contents</summary>
+$table-of-contents$
+</details>
+$endif$
+$body$
+</main>
+<footer>
+  <p>OpenSkopos is an open, vendor-neutral format under the <a href="https://github.com/openskopos/openskopos/blob/main/LICENSE">Apache License 2.0</a>.</p>
+  <p class="credit">Created with 🧡 by <a href="https://clarvelo.com">Clarvelo</a> in Berlin • <a href="https://github.com/openskopos/openskopos/blob/main/$source$">Source of this page</a></p>
+</footer>
+</body>
+</html>

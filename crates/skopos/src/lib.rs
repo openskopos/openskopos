@@ -796,7 +796,7 @@ impl Commands<'_> {
         };
 
         // Files of an earlier export that this export does not write. They
-        // hold old items, so they must go.
+        // contain old items, so they must go.
         let stale: Vec<PathBuf> = self
             .owned_files(root, &out.owned)
             .into_iter()

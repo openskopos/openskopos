@@ -1,7 +1,7 @@
 //! Read, check and write OpenSkopos documents.
 //!
-//! OpenSkopos is a file format for what a team agrees before an AI agent
-//! builds the work. This crate is the reference implementation of format 0.1.
+//! OpenSkopos is a file format for the decisions that a team makes before an
+//! AI agent builds the work. This crate is the reference implementation of format 0.1.
 //! See the specification in `spec/0.1/README.md` of the repository.
 //!
 //! All functions are pure: they take strings or [`serde_json::Value`] and

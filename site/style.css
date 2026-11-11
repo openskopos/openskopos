@@ -1,0 +1,91 @@
+/* The styles of openskopos.org. Colors and fonts are from brand/BRAND.md. */
+:root {
+  --bg: #FFF7EA;
+  --ink: #242433;
+  --muted: #52525B;
+  --dot: #E8512F;
+  --line: #E7DCC9;
+  --code-bg: #F7EEDD;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #18181B;
+    --ink: #FAFAFA;
+    --muted: #A1A1AA;
+    --dot: #FF6848;
+    --line: #3F3F46;
+    --code-bg: #27272A;
+  }
+}
+
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 17px;
+  line-height: 1.6;
+}
+a { color: var(--ink); text-decoration-color: var(--dot); text-underline-offset: 3px; }
+a:hover { text-decoration-thickness: 2px; }
+
+.dark { display: none; }
+@media (prefers-color-scheme: dark) { .light { display: none; } .dark { display: inline; } }
+
+/* Header and footer of the inner pages */
+.top {
+  max-width: 760px; margin: 0 auto; padding: 20px 16px;
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.brand { display: flex; align-items: center; gap: 8px; font-size: 20px; line-height: 1; text-decoration: none; }
+.brand img { width: 26px; height: 26px; }
+.open { font-weight: 400; }
+.skopos { font-weight: 500; }
+.top nav { display: flex; flex-wrap: wrap; gap: 18px; font-size: 15px; }
+.top nav a { text-decoration: none; }
+.top nav a:hover, .top nav a[aria-current] { text-decoration: underline; text-decoration-color: var(--dot); }
+footer {
+  max-width: 760px; margin: 0 auto; padding: 24px 16px 48px;
+  border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; text-align: center;
+}
+footer p { margin: 6px 0; }
+footer .credit { margin-top: 16px; }
+
+/* Content */
+main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
+h1, h2, h3, h4 { line-height: 1.25; font-weight: 600; margin: 1.8em 0 0.5em; }
+h1 { font-size: 34px; margin-top: 0.6em; letter-spacing: -0.01em; }
+h2 { font-size: 24px; padding-top: 0.4em; border-top: 1px solid var(--line); }
+h3 { font-size: 19px; }
+h4 { font-size: 17px; }
+code, pre {
+  font-family: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.88em;
+}
+code { background: var(--code-bg); padding: 0.1em 0.3em; border-radius: 3px; overflow-wrap: anywhere; }
+pre { background: var(--code-bg); padding: 12px 14px; border-radius: 4px; overflow-x: auto; line-height: 1.45; }
+pre code { background: none; padding: 0; overflow-wrap: normal; }
+table { border-collapse: collapse; display: block; overflow-x: auto; margin: 1em 0; font-size: 15px; }
+th, td { border: 1px solid var(--line); padding: 6px 10px; text-align: left; vertical-align: top; }
+/* In a table, code breaks only at spaces. Code with no spaces, such as a field
+   name, never breaks (site/pandoc/links.lua marks it). A wide table scrolls. */
+td code, th code { overflow-wrap: normal; }
+code.nowrap { white-space: nowrap; }
+th { background: var(--code-bg); }
+blockquote { margin: 1em 0; padding: 0 16px; border-left: 3px solid var(--dot); color: var(--muted); }
+img { max-width: 100%; }
+
+/* Table of contents */
+.toc { margin: 16px 0 8px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 4px; font-size: 15px; }
+.toc summary { cursor: pointer; font-weight: 500; }
+.toc ul { padding-left: 20px; margin: 6px 0; }
+
+/* Landing page */
+main.home { max-width: 640px; padding-top: 72px; }
+h1.logo { margin: 0; font-weight: 400; }
+footer.home { max-width: 640px; }
+.logo { display: flex; align-items: center; gap: 12px; font-size: 34px; letter-spacing: -0.01em; line-height: 1; }
+.logo img { width: 44px; height: 44px; }
+.lead { font-size: 18px; margin: 28px 0 0; }
+.links { list-style: none; padding: 0; margin: 28px 0 0; display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 17px; }
+.home h2 { font-size: 19px; border-top: 0; padding-top: 0; margin-top: 40px; }
+.muted { color: var(--muted); font-size: 16px; }

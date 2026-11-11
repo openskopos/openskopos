@@ -1,6 +1,6 @@
 //! Export a document to the files of a spec-driven development tool.
 //!
-//! Teams can keep what they agreed in OpenSkopos and give it to the tool that
+//! Teams can keep their decisions in OpenSkopos and give them to the tool that
 //! their agents already use. Each exporter writes the files of one tool:
 //!
 //! | [`Tool`] | Files |
@@ -147,7 +147,7 @@ pub struct NotExported {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Export {
     pub tool: Tool,
-    /// The folder that holds the files, from the root of the project.
+    /// The folder that contains the files, from the root of the project.
     pub folder: String,
     /// The files, in a fixed order.
     pub files: Vec<File>,

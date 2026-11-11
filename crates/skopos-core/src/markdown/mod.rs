@@ -1,6 +1,6 @@
 //! Markdown (specification section 10).
 //!
-//! A Markdown file holds every field of a document, so a document can go to
+//! A Markdown file contains every field of a document, so a document can go to
 //! Markdown and back with no loss. People can also write a file by hand, with
 //! no other file, and the reader makes a document from it.
 //!
@@ -223,7 +223,7 @@ mod clock {
 
 pub(crate) const SCHEMA_KEY: &str = "$schema";
 
-/// The H2 that holds material from other artifacts (10.7).
+/// The H2 that contains material from other artifacts (10.7).
 pub(crate) const OTHER: &str = "From other artifacts";
 
 /// Envelope keys in the order of specification section 3.

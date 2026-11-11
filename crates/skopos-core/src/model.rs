@@ -652,7 +652,7 @@ pub struct Ref {
     pub rel: Option<RefRel>,
 }
 
-/// How the item that holds a ref relates to the linked item.
+/// How the item that contains a ref relates to the linked item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RefRel {

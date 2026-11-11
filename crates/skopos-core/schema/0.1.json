@@ -254,7 +254,7 @@
         "artifact": { "$ref": "#/$defs/artifactId" },
         "version": { "$ref": "#/$defs/version" },
         "rel": {
-          "description": "How the item that holds the link relates to the linked item.",
+          "description": "How the item that contains the link relates to the linked item.",
           "enum": [
             "refines",
             "derived_from",

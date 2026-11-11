@@ -199,3 +199,20 @@ jobs:
             fi
           done
           exit $status
+
+  # Builds openskopos.org as the Deploy site workflow does, and fails on a
+  # broken link inside the site.
+  site:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pandoc
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf -o "$RUNNER_TEMP/pandoc.deb" "https://github.com/jgm/pandoc/releases/download/$PANDOC_VERSION/pandoc-$PANDOC_VERSION-1-amd64.deb"
+          echo "$PANDOC_SHA256  $RUNNER_TEMP/pandoc.deb" | sha256sum --check
+          sudo dpkg -i "$RUNNER_TEMP/pandoc.deb"
+        env:
+          PANDOC_VERSION: "3.11"
+          PANDOC_SHA256: 89d4c9d97818c62a97157f0072844e4602c6cee795bf84abd1aee7273abcda99
+      - name: Build the site
+        run: site/build.sh _site

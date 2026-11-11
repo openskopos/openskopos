@@ -1,10 +1,10 @@
 # Changelog
 
 This file lists the changes to the OpenSkopos format, by format version. While
-the format is at 0.x, each 0.y version can break the one before. Each entry
+the format is at 0.x, each 0.y version can have breaking changes. Each entry
 lists every breaking change, so that tools can migrate documents.
 
-## 0.1 (draft, not published)
+## 0.1 (2026-11-11)
 
 The first version of the format.
 
@@ -17,5 +17,5 @@ The first version of the format.
 - Stable item IDs, reference strings and ID counters.
 - Versions with `previous_version` parents, and `input` parents for other
   artifacts and external material.
-- A Markdown format that holds every field, and generous rules to read it.
+- A Markdown format that contains every field, and generous rules to read it.
 - Glossaries as artifacts of kind `glossary`.

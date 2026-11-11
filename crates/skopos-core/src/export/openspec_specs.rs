@@ -8,7 +8,7 @@
 
 use super::File;
 
-/// The comment at the end of each exported requirement block. It holds a
+/// The comment at the end of each exported requirement block. It contains a
 /// hash of the block as the exporter wrote it, so that a later export can
 /// see a hand edit.
 pub(super) const HASH_PREFIX: &str = "<!-- skopos-export: ";
@@ -92,7 +92,7 @@ pub(super) fn blocks_of(files: &[File], artifact: &str) -> Vec<Block> {
     out
 }
 
-/// True if a text holds a reference string of this artifact.
+/// True if a text contains a reference string of this artifact.
 pub(super) fn mentions(text: &str, artifact: &str) -> bool {
     references(text).any(|(a, _)| a == artifact)
 }

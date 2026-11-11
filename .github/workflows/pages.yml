@@ -1,14 +1,22 @@
 name: Deploy site
 
-# The site deploys from main. A schema version is published only by pushing
-# the tag schema-<version>, for example schema-0.1. Each deploy serves every
-# tagged schema file exactly as it was at its tag, so later changes on main
-# never change a published file.
+# The site deploys from main. site/build.sh renders the specification and the
+# documentation from Markdown with pandoc. A schema version is published only
+# by pushing the tag schema-<version>, for example schema-0.1. Each deploy
+# serves every tagged schema file exactly as it was at its tag, so later
+# changes on main never change a published file.
 
 on:
   push:
     branches: [main]
-    paths: ["site/**", ".github/workflows/pages.yml"]
+    paths:
+      - "site/**"
+      - "spec/**"
+      - "docs/**"
+      - "crates/*/README.md"
+      - "npm/*/README.md"
+      - "conformance/README.md"
+      - ".github/workflows/pages.yml"
     tags: ["schema-*"]
   workflow_dispatch:
 
@@ -32,10 +40,19 @@ jobs:
         with:
           ref: main
           fetch-depth: 0
-      - name: Assemble site
+      - name: Install pandoc
+        run: |
+          curl --proto '=https' --tlsv1.2 -LsSf -o "$RUNNER_TEMP/pandoc.deb" "https://github.com/jgm/pandoc/releases/download/$PANDOC_VERSION/pandoc-$PANDOC_VERSION-1-amd64.deb"
+          echo "$PANDOC_SHA256  $RUNNER_TEMP/pandoc.deb" | sha256sum --check
+          sudo dpkg -i "$RUNNER_TEMP/pandoc.deb"
+        env:
+          PANDOC_VERSION: "3.11"
+          PANDOC_SHA256: 89d4c9d97818c62a97157f0072844e4602c6cee795bf84abd1aee7273abcda99
+      - name: Build the site
+        run: site/build.sh _site
+      - name: Add the published schema files
         run: |
           mkdir -p _site/schema/artifact
-          cp -R site/. _site/
           for tag in $(git tag --list 'schema-*'); do
             version="${tag#schema-}"
             git show "$tag:schema/artifact/$version.json" > "_site/schema/artifact/$version.json"
