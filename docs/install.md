@@ -1,30 +1,31 @@
 # Install the skopos tool
 
 `skopos` is the command line tool for OpenSkopos documents. It checks,
-formats and converts documents, gives IDs to new items, compares versions and
-exports documents to other tools. Each release has binaries for macOS, Linux
-and Windows.
+formats and converts documents. It adds IDs to new items, compares versions,
+and exports documents to other tools. Each release has binaries for macOS,
+Linux and Windows.
 
 ## Homebrew
 
-On macOS or Linux with [Homebrew](https://brew.sh), run this command:
+If you use [Homebrew](https://brew.sh) on macOS or Linux, enter this
+command:
 
 ```bash
 brew install openskopos/tap/skopos
 ```
 
-To get a new release later, run `brew upgrade skopos`.
+To install a new release later, enter `brew upgrade skopos`.
 
 ## Install script
 
-On macOS or Linux, run this command. The script downloads the binary for your
-system and puts it in `~/.cargo/bin`:
+On macOS or Linux, enter this command. The script downloads the binary for
+your system and puts it in `~/.cargo/bin`:
 
 ```bash
 curl --proto '=https' --tlsv1.2 -LsSf https://github.com/openskopos/openskopos/releases/latest/download/skopos-installer.sh | sh
 ```
 
-On Windows, run this command in PowerShell:
+On Windows, enter this command in PowerShell:
 
 ```powershell
 powershell -ExecutionPolicy Bypass -c "irm https://github.com/openskopos/openskopos/releases/latest/download/skopos-installer.ps1 | iex"
@@ -40,14 +41,14 @@ cargo install --locked skopos
 
 ## npm
 
-The npm package `@openskopos/cli` has the same commands for Node 20 and
-later, on every platform. To run it with no installation, use `npx`:
+The npm package `@openskopos/cli` has the same commands. It operates in Node
+20 or later on all platforms. You can use it without an installation:
 
 ```bash
 npx @openskopos/cli check intent.skopos.json
 ```
 
-To install it, run `npm install --global @openskopos/cli`.
+To install it, enter `npm install --global @openskopos/cli`.
 
 ## Download a binary
 
@@ -64,16 +65,16 @@ archive for each platform:
 | Windows, x86-64 | `skopos-x86_64-pc-windows-msvc.zip` |
 
 Each archive has a `.sha256` file with its checksum. The file `sha256.sum`
-has the checksums of all archives. Extract the archive and put `skopos` on
-your `PATH`.
+contains the checksums of all archives. Extract the archive, and put `skopos`
+in a folder that is on your `PATH`.
 
-## Make sure that it works
+## Make sure that the tool works
 
-Run this command:
+Enter this command:
 
 ```bash
 skopos --version
 ```
 
-Then see [the skopos command line tool](../crates/skopos/README.md) for all
-commands.
+The tool writes its version. For all commands, see
+[the skopos command line tool](../crates/skopos/README.md).

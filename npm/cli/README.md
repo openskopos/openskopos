@@ -1,23 +1,23 @@
 # @openskopos/cli
 
 `@openskopos/cli` is the `skopos` command line tool for
-[OpenSkopos](https://openskopos.org) documents. It runs in Node on Linux,
-macOS and Windows, from one package.
+[OpenSkopos](https://openskopos.org) documents. One package operates in Node
+on Linux, macOS and Windows.
 
 The commands are the commands of the native `skopos` tool, built to
 WebAssembly in [`@openskopos/core`](https://www.npmjs.com/package/@openskopos/core).
 They have the same flags, output and exit codes. This package only connects
-them to the files and the terminal.
+the commands to the files and the terminal.
 
-## Run
+## Use
 
-To run the tool with no installation, use `npx`:
+You can use the tool without an installation. Use `npx`:
 
 ```bash
 npx @openskopos/cli check intent.skopos.json
 ```
 
-To install the command `skopos`, run this command:
+To install the command `skopos`, enter this command:
 
 ```bash
 npm install --global @openskopos/cli
@@ -29,30 +29,33 @@ The package needs Node 20 or later.
 
 | Command | What it does |
 |---|---|
-| `skopos check FILE...` | Checks documents against the schema and the rules of the specification. |
-| `skopos fmt FILE...` | Writes documents again in the canonical layout. |
-| `skopos convert FILE --to json\|yaml\|md` | Converts a document between JSON, YAML and Markdown. |
-| `skopos import FILE.md --stored FILE` | Reads an edited Markdown file and writes the version to store. |
-| `skopos ids FILE...` | Gives an ID to each item that has none. |
+| `skopos check FILE...` | Compares documents with the schema and the rules of the specification. |
+| `skopos fmt FILE...` | Writes documents again with the canonical layout. |
+| `skopos convert FILE --to json\|yaml\|md` | Changes a document from JSON, YAML or Markdown to one of the other formats. |
+| `skopos import FILE.md --stored FILE` | Reads an edited Markdown file, and writes the version that you must store. |
+| `skopos ids FILE...` | Adds an ID to each item that has no ID. |
 | `skopos export FILE --to openspec\|kiro\|speckit` | Writes the files of a spec-driven development tool. |
-| `skopos diff OLD NEW` | Shows the items that changed between two versions. |
+| `skopos diff OLD NEW` | Shows the items that are different in two versions. |
 
-Run `skopos --help` or `skopos <command> --help` for the flags. The
+For the flags, enter `skopos --help` or `skopos <command> --help`. The
 [README of the native tool](https://github.com/openskopos/openskopos/blob/main/crates/skopos/README.md)
-explains each command.
+describes each command.
 
-The exit code is 0 if all went well, 1 if a command found a problem, and 2 if
-the arguments are wrong.
+These are the exit codes:
+
+- 0: the command found no problem.
+- 1: the command found a problem.
+- 2: the arguments are not correct.
 
 Some details are different from the native tool:
 
-- On Windows, a path that the tool makes, such as the path of an exported
-  file, has `/` between folders.
-- On Windows, a message about a file error, such as a missing file, comes
-  from Node.
-- On Linux and macOS, the message about a common file error is the same as
-  the message of the native tool. A rare error, such as a broken network
-  drive, can have the message of Node.
+- On Windows, the paths that the tool makes have `/` between folders, for
+  example the path of an exported file.
+- On Windows, Node writes the message about a file error, for example a
+  missing file.
+- On Linux and macOS, the message about a usual file error is the same as the
+  message of the native tool. For an unusual error, for example a network
+  drive that does not work, Node can write the message.
 
 ## License
 

@@ -1,8 +1,8 @@
 # Documentation
 
-These pages explain how to use OpenSkopos documents and the tools of the
+These pages tell you how to use OpenSkopos documents and the tools of the
 reference implementation. The [specification](../spec/0.1/README.md) defines
-the format itself.
+the format.
 
 ## Start here
 
@@ -30,5 +30,5 @@ the format itself.
 - [Specification 0.1](../spec/0.1/README.md)
 - [Changelog of the format](../spec/CHANGELOG.md)
 - [JSON Schema 0.1](../schema/artifact/0.1.json)
-- [Conformance cases](../conformance/README.md): the documents that every
-  implementation must accept or reject.
+- [Conformance cases](../conformance/README.md): the documents that all
+  implementations must accept or reject.

@@ -1,7 +1,7 @@
 # Changelog
 
 This file lists the changes to the OpenSkopos format, by format version. While
-the format is at 0.x, each 0.y version can break the one before. Each entry
+the format is at 0.x, each 0.y version can have breaking changes. Each entry
 lists every breaking change, so that tools can migrate documents.
 
 ## 0.1 (draft, not published)

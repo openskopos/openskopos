@@ -1,20 +1,22 @@
 # OpenSkopos 0.1
 
-Status: draft. Format 0.1 can change until it is published. After that, each
-0.y version can break the one before (see [Format versions](#12-format-versions)).
+Status: draft. Format 0.1 can change until the maintainers publish it. After
+that, each 0.y version can have breaking changes (see
+[Format versions](#12-format-versions)).
 
-OpenSkopos is a file format for what a team agrees before an AI agent builds
+OpenSkopos is a file format for what a team agrees on before an AI agent builds
 the work. One document holds typed items, such as goals, requirements,
 constraints, risks and critiques. Each item has a stable ID, for example `S1`
-or `CR3`. People, commits, tickets and agents use the ID to refer to the item.
+or `CR3`. People and agents use the ID to refer to the item, for example in
+commits and tickets.
 The ID keeps its meaning in every version of the document.
 
 This specification is for people who write tools that read or write OpenSkopos
 documents, and for people who want to know exactly what a file means.
 
 - JSON Schema: [`schema/artifact/0.1.json`](../../schema/artifact/0.1.json),
-  served at `https://openskopos.org/schema/artifact/0.1.json` once it is
-  published
+  served at `https://openskopos.org/schema/artifact/0.1.json` after the
+  maintainers publish it
 - Conformance cases: [`conformance/`](../../conformance/)
 - Changes between versions: [CHANGELOG.md](../CHANGELOG.md)
 
@@ -47,14 +49,14 @@ allowed but not required.
 | Item | One typed statement in a document, for example a goal or a risk. |
 | Kind | The type of a document, for example `intent` or `glossary`. |
 | Method | The process that made a version, for example a facilitated workshop. |
-| Tool | Any software that reads or writes documents. |
+| Tool | Software that reads or writes documents. |
 
 The format version (0.1) and the version number of an artifact (1, 2, 3) are
 different numbers. Version 3 of an artifact can use format 0.1.
 
 ## 2. Files and formats
 
-A document has three formats:
+There are three formats for a document:
 
 | Format | Role | Holds every field |
 |---|---|---|
@@ -62,23 +64,24 @@ A document has three formats:
 | YAML | The same data as JSON. The same JSON Schema applies. | Yes |
 | Markdown | The format for people who read and write documents by hand. See [section 10](#10-markdown). | Yes |
 
-A tool, for example an AI agent that helps a team write a document, writes
-JSON or YAML directly and makes sure that the document is valid against the
-schema. Markdown is for people. Its reader is generous (10.5), because people
-write by hand. A tool does not need it.
+A tool writes JSON or YAML directly. An example of a tool is an AI agent that
+helps a team write a document. The tool makes sure that the document is valid
+against the schema. Markdown is for people. A reader of Markdown is generous
+(10.5), because people write Markdown by hand. A tool does not need Markdown.
 
 Files use UTF-8.
 
 ### 2.1 File names
 
-A data file has the kind of the document and the suffix `.skopos.json` or
-`.skopos.yaml`, for example `intent.skopos.json`. Editors can match the schema
-to a file by this suffix.
+The name of a data file is the kind of the document and the suffix
+`.skopos.json` or `.skopos.yaml`, for example `intent.skopos.json`. Editors can
+use this suffix to match the schema to a file.
 
-A Markdown file has the kind in capital letters, for example `INTENT.md`,
+The name of a Markdown file is the kind in capital letters, for example
+`INTENT.md`,
 `SPEC.md`, `GLOSSARY.md` or `CRITIQUE.md`.
 
-The team chooses the folder. Because the Markdown file holds every field, a
+The team chooses the folder. The Markdown file holds every field. Thus, a
 team can keep only the Markdown file, and let tools make the JSON when they
 need it. If one folder holds two artifacts of the same kind, the team adds a
 name before the kind, for example `billing.intent.skopos.json`.
@@ -101,14 +104,14 @@ A document is a JSON object. These are its fields:
 | `$schema` | Yes | The URL of the format version, for example `https://openskopos.org/schema/artifact/0.1.json`. |
 | `id` | Yes | The artifact ID: `pa_` and 16 to 32 letters and digits, for example `pa_7Hk2mQ9xR4tV8wZ1`. All versions of an artifact have the same ID. The ID has no meaning of its own. |
 | `version` | Yes | The version of the artifact. An integer that starts at 1. |
-| `kind` | Yes | The type of document. Lowercase letters, digits and `_`, starting with a letter. The kind does not change between versions. |
+| `kind` | Yes | The type of document. Lowercase letters, digits and `_`, that starts with a letter. The kind does not change between versions. |
 | `title` | Yes | A short title, 1 to 200 characters. |
 | `summary` | No | A short introduction in Markdown. |
 | `status` | Yes | `draft` or `final`. A draft can change. A final version never changes. |
 | `method` | No | The method that made this version, if a method made it: `id` (lowercase letters, digits and `-`) and an optional `version`. |
 | `session` | No | The working session that made this version, if there was one: `id`, and optional `title`, `url` and `ended_at`. |
 | `participants` | No | The people and AI agents in the session. See 3.1. |
-| `decider` | No | The participant ID of the person who makes the final call when the group does not agree. |
+| `decider` | No | The participant ID of the person who decides when the group does not agree. |
 | `parents` | No | The material and the earlier version that this version came from. See [section 8](#8-versions-and-parents). |
 | `id_counters` | No | The highest number used for each item prefix. See [section 7](#7-id-counters). |
 | `items` | Yes | The items, in display order. The list can be empty. |
@@ -125,16 +128,16 @@ Known kinds:
 | `critique` | Problems that a team found in an input | `CRITIQUE.md` |
 | `glossary` | Terms with agreed meanings | `GLOSSARY.md` |
 
-A new kind does not need a new format version. The schema accepts any kind that
-matches the pattern. The kinds `ritual_plan`, `handoff_brief` and
-`drift_report` are planned but not defined yet.
+A new kind does not need a new format version. The schema accepts all kinds
+that match the pattern. The maintainers plan the kinds `ritual_plan`,
+`handoff_brief` and `drift_report`, but did not define them yet.
 
 `kind` and `method` are separate fields because a different method can make the
 next version of an artifact.
 
-`method` and `session` are for tools that run structured sessions, for example
-a facilitated workshop. A person who writes or edits a document by hand leaves
-them out.
+`method` and `session` are for tools that lead structured sessions, for
+example a facilitated workshop. A person who writes or edits a document by hand
+does not write these fields.
 
 ### 3.1 Participants
 
@@ -146,8 +149,8 @@ A participant has three fields, and no others:
 | `name` | A display name, 1 to 100 characters. |
 | `kind` | `human` or `ai`. |
 
-A document must not hold an email address, an account ID or any other
-personal identifier. Teams commit these files to repositories, and some
+A document must not hold personal identifiers, for example an email address
+or an account ID. Teams commit these files to repositories, and some
 repositories are public.
 
 ### 3.2 Extension keys
@@ -156,8 +159,9 @@ The document and each item accept keys that start with `x-`, for example
 `x-tracker`. A tool can store its own data in these keys. Other tools keep them
 when they copy an item, and can ignore them.
 
-Every other unknown key makes the document invalid. This finds typing errors,
-for example in a document that a language model helped to write.
+Every other unknown key makes the document invalid. With this rule, a tool
+can find typing errors, for example in a document that a language model helped
+to write.
 
 ## 4. Items
 
@@ -186,14 +190,14 @@ decided against. An agent must not act on a rejected item.
 | `S` | `success_signal` | How the team knows that a goal is met. |
 | `FR` | `requirement` | A behavior that the system must have. |
 | `ST` | `story` | A requirement told from the view of a user. |
-| `C` | `constraint` | A rule on how the work is done. |
-| `A` | `assumption` | Something that the team takes as true but did not check, or a fact about the domain. |
+| `C` | `constraint` | A rule about how to do the work. |
+| `A` | `assumption` | Something that the team takes as true without a check, or a fact about the domain. |
 | `N` | `non_goal` | Something that the work will not do. |
-| `R` | `risk` | Something that can go wrong. |
+| `R` | `risk` | A problem that can occur. |
 | `Q` | `open_question` | A question that the team did not answer. |
 | `D` | `decision` | A choice that the team made. |
 | `T` | `term` | A word with an agreed meaning, and its names in the code. |
-| `CR` | `critique` | A problem that the team found in an input or in shipped work. |
+| `CR` | `critique` | A problem that the team found in an input or in released work. |
 
 Each type has its own fields, in addition to the fields of every item. A field
 of one type is not allowed on an item of another type.
@@ -219,8 +223,8 @@ met. A success signal usually links to its goal with `verifies`.
 
 #### Requirement (`FR`)
 
-A requirement can also be an invariant: a property that must always hold, for
-example "the output never contains unbalanced tags".
+A requirement can also be an invariant: a property that must always be true,
+for example "the output never contains unbalanced tags".
 
 | Field | Meaning |
 |---|---|
@@ -251,7 +255,7 @@ A constraint applies to this work or to the whole project.
 
 The modalities:
 
-- `always` and `never` are hard rules.
+- `always` and `never` are rules with no exceptions.
 - `prefer` and `avoid` are defaults. An agent can break them if it gives a
   reason.
 - `ask_first` means that the agent stops and asks before it acts. The
@@ -274,12 +278,12 @@ someone must confirm.
 
 | Field | Meaning |
 |---|---|
-| `reason` | Why the work leaves this out. |
-| `deferred` | `true` means later, not never. |
+| `reason` | Why the work does not include this. |
+| `deferred` | `true` means that the work does not include this now, but can include it later. |
 
 #### Risk (`R`)
 
-A risk links to what it threatens with `threatens`.
+A risk links with `threatens` to what it threatens.
 
 | Field | Meaning |
 |---|---|
@@ -299,7 +303,7 @@ A risk links to what it threatens with `threatens`.
 
 #### Decision (`D`)
 
-A decision links to the question or critique that it settles with `resolves`.
+A decision links with `resolves` to the question or critique that it settles.
 
 | Field | Meaning |
 |---|---|
@@ -348,7 +352,8 @@ The `resolution` has these fields:
 | `decided_by` | No | A participant ID. |
 
 `fix_code` means that the code is wrong and the spec is right. If the team
-thinks that a critique is wrong, the critique gets the status `rejected`.
+thinks that a critique is wrong, the team gives the critique the status
+`rejected`.
 
 ### 4.3 Examples
 
@@ -392,11 +397,11 @@ A ref goes from the item that holds it to the linked item. It has these fields:
 | `mitigates` | makes the linked risk smaller. | `C2` mitigates `R1` |
 | `resolves` | settles the linked question or critique. | `D1` resolves `Q1` |
 | `verifies` | tests the linked item. | `S1` verifies `G1` |
-| `supersedes` | replaces the linked item, which the team dropped. | `FR4` supersedes `FR2` |
+| `supersedes` | replaces the linked item, which the team removed. | `FR4` supersedes `FR2` |
 | `contradicts` | cannot be true together with the linked item. | `A2` contradicts `A1` |
 | `relates_to` | has another relation to the linked item. | |
 
-A ref can point to an item that an earlier version dropped. This is normal for
+A ref can point to an item that an earlier version removed. This is normal for
 `supersedes`.
 
 ## 6. Item IDs and reference strings
@@ -407,9 +412,10 @@ A ref can point to an item that an earlier version dropped. This is normal for
    ID. A tool assigns IDs with the counters in [section 7](#7-id-counters).
 3. An ID belongs to one item for the life of the artifact, in all versions. If
    the text of the item changes, the ID stays the same.
-4. An ID is never used again. If version 3 drops `S2` and the highest success
-   signal ever used is `S4`, the next success signal is `S5`. Gaps are normal.
-5. If the meaning of an item changes, the team drops the old item and adds a
+4. An ID is never used again. If version 3 removes `S2` and the highest
+   success signal ever used is `S4`, the next success signal is `S5`. Gaps in
+   the numbers are normal.
+5. If the meaning of an item changes, the team removes the old item and adds a
    new item with a new ID. The new item links to the old one with
    `supersedes`.
 6. The order of `items` is the display order. A change of order does not change
@@ -430,8 +436,9 @@ For example `pa_7Hk2mQ9xR4tV8wZ1@2#CR3`. A reference string without
 ## 7. ID counters
 
 `id_counters` holds the highest number ever used for each item prefix in the
-artifact, in all versions, for example `{"S": 4, "CR": 7}`. A missing prefix
-means 0. With the counters, any tool can assign IDs without a server.
+artifact, in all versions, for example `{"S": 4, "CR": 7}`. If a prefix is
+not in `id_counters`, its counter is 0. With the counters, a tool can assign
+IDs without a server.
 
 To add an item, a tool does these steps:
 
@@ -443,8 +450,8 @@ If a tool does not write the counter back, the next tool can give the same ID
 to a different item.
 
 Each counter must be equal to or more than the highest number of its prefix in
-`items`. A counter can be higher, because items that earlier versions dropped
-used numbers too.
+`items`. A counter can be higher, because items that earlier versions removed
+also used numbers.
 
 ## 8. Versions and parents
 
@@ -495,14 +502,14 @@ An external parent is material that is not an OpenSkopos document:
 | `digest` | No | `sha256:` and the hex SHA-256 hash of the text that the team used. |
 
 `previous_version` names the version that this version changes. It has the
-same artifact ID. `input` names material that the method worked from. With the
-`digest`, a tool can find out if an input changed after the session.
+same artifact ID. `input` names material that the method used. With the
+`digest`, a tool can find if an input changed after the session.
 
 ## 9. Rules that the schema cannot check
 
 JSON Schema cannot express these rules. A tool that writes a document must
-make sure that they are true. A tool that checks a document must report each
-one that is false. The conformance cases use the names in the first column.
+make sure that they are true. A tool that validates a document must report
+each one that is false. The conformance cases use the names in the first column.
 
 | Name | Rule |
 |---|---|
@@ -518,12 +525,12 @@ that has the earlier versions must make sure that this is true.
 ## 10. Markdown
 
 Markdown is the format for people who write documents by hand. A Markdown file
-holds every field of the document, so a tool can turn a document into Markdown
-and back with no loss. A person can also start a document in Markdown, with no
-other file.
+holds every field of the document. Thus, a tool can change a document to
+Markdown and back with no loss of data. A person can also start a document in
+Markdown, with no other file.
 
 A reader of Markdown is generous. It accepts many ways to write the same thing
-(10.5). It fills only bookkeeping fields, such as the artifact ID, and never
+(10.5). It adds only bookkeeping fields, such as the artifact ID, and never
 content. It stops with an error only when it cannot make a valid document
 (10.6).
 
@@ -533,8 +540,8 @@ A Markdown file has these parts, in this order:
 
 1. Front matter (optional): YAML between two `---` lines. It holds the fields
    of the document in [section 3](#3-the-document), with the same names and
-   shapes as in JSON. `$schema` is written `schema`. The title, the summary
-   and the items are not in the front matter.
+   structure as in JSON. The key for `$schema` is `schema`. The title, the
+   summary and the items are not in the front matter.
 2. The title, as an H1: `# <title>`.
 3. The summary (optional): the text between the H1 and the first H2.
 4. One H2 section for each item type that has items, with these names in this
@@ -589,11 +596,12 @@ The fields of the item follow as nested list items, indented by two spaces:
   - <key>: <value>
 ```
 
-A field that has fields of its own, such as an evidence entry, has them as
-list items indented by two more spaces.
+If a field has fields of its own, for example an evidence entry, these fields
+are list items, indented by two more spaces.
 
 The `detail` of an item comes after a blank line, indented by two spaces. It
-continues until the next item. It can hold any Markdown, also lists.
+continues until the next item. It can hold all types of Markdown, for example
+lists.
 
 ```markdown
 - FR3: The seat count never goes below zero.
@@ -618,7 +626,7 @@ continues until the next item. It can hold any Markdown, also lists.
 | `evidence` | `- evidence:`, with one nested entry for each piece of evidence (see below). |
 | `proposed_by` | `- proposed_by: P3` |
 | `ratification` | `- votes: 2 yes, 0 no, 2 eligible` |
-| `x-` keys | `- x-<name>: <value>`. A value that is not a string is written as JSON. |
+| `x-` keys | `- x-<name>: <value>`. A writer writes a value that is not a string as JSON. |
 | `detail` | Paragraphs after a blank line (10.2). |
 
 In this table, `<item>` is an item ID, such as `FR1`, or a reference string to
@@ -655,7 +663,7 @@ A writer uses the layout in 10.1 to 10.3:
   evidence, `proposed_by`, votes and `x-` keys, and then the detail.
 - In each section, the items are in the order of `items` in the document.
 - It replaces a line break in a text or a value with one space.
-- It leaves out a section with no items.
+- It does not write a section with no items.
 - It puts a blank line between two items only when one of them has a detail.
 
 Markdown does not keep the order of items between types. A reader puts the
@@ -664,17 +672,17 @@ order are the same.
 
 ### 10.5 Reading Markdown
 
-A reader accepts all of the following. These rules exist so that writing by
-hand does not turn into a list of errors.
+A reader accepts all of the following. These rules exist so that a person who
+writes by hand does not get many errors.
 
 Front matter and the file:
 
 - The front matter is optional. If a bookkeeping field is not there, the
-  reader fills it: `schema` with the URL of format 0.1, `id` with a new
+  reader adds it: `schema` with the URL of format 0.1, `id` with a new
   artifact ID, `version` with 1, `status` with `draft` and `created_at` with
   the current time.
 - If there is no `kind`, the reader takes it from a file name in capital
-  letters: `INTENT.md` gives `intent`.
+  letters. For example, the kind of `INTENT.md` is `intent`.
 - The reader accepts `schema` and `$schema`, and a `title` in the front matter
   if the file has no H1.
 - If a YAML value has the wrong type for its field, and the change is exact,
@@ -685,7 +693,7 @@ Sections:
 
 - The reader ignores case, `-` and `_`, singular and plural, and words in
   parentheses. `## Success Signals (S)` and `## success signal` are the same
-  section. The type name, such as `open_question`, also works.
+  section. The reader also accepts the type name, such as `open_question`.
 - The reader also accepts these names: `Out of scope` (Non-goals), `User
   stories` (Stories), `Functional requirements` (Requirements), `Questions`
   (Open questions), `Glossary` (Terms), `Findings` (Critiques), `Rules` and
@@ -699,8 +707,8 @@ Items:
 - An item ID can be written `G1:`, `G1.`, `G1 -`, `**G1**:` or `[G1]`, in
   capital or small letters. An item can also have no ID, or start with
   `new:`.
-- An indented line straight after the item line, which is not a list item,
-  continues the text of the item.
+- An indented line immediately after the item line continues the text of the
+  item, if the line is not a list item.
 
 Fields:
 
@@ -716,9 +724,9 @@ Fields:
 - An example can be nested under an `examples` line. A nested example can
   start with its kind, for example `- edge: 12 seats in use.`
 - The reader ignores case, spaces and `-` in a value from a fixed list:
-  `Ask first` gives `ask_first`.
+  `Ask first` becomes `ask_first`.
 - A boolean can be `true`, `false`, `yes` or `no`.
-- Code evidence can give its lines in the path, for example
+- Code evidence can have its lines in the path, for example
   `- code: lib/billing/retry.ex:41-48`.
 - Votes can also be nested lines: `- yes: 2`, `- no: 0`, `- eligible: 2`.
 
@@ -758,7 +766,7 @@ names the line and says what to write:
 - An evidence entry has an unknown kind, or an evidence entry, a target or a
   resolution has an unknown key.
 - Code lines are not a number or a range such as `41-48`.
-- A resolution has no outcome, or the votes do not give yes, no and eligible.
+- A resolution has no outcome, or the votes do not have yes, no and eligible.
 - The document is not valid against the schema or the rules in
   [section 9](#9-rules-that-the-schema-cannot-check). For example, a
   constraint has no modality, or a critique has no evidence.
@@ -827,7 +835,7 @@ A glossary is an artifact of kind `glossary`. Its items are terms (`T`).
 - An artifact can pin several glossaries as `input` parents. Each parent names
   the version of the glossary that the artifact used.
 - If two pinned glossaries define the same term in different ways, tools show
-  the conflict. They do not choose a winner.
+  the conflict. They do not choose one of the definitions.
 - A Markdown file can copy the accepted terms of the pinned glossaries (see
   10.7), so that an agent knows what each word means.
 
@@ -843,7 +851,7 @@ https://openskopos.org/schema/artifact/<format version>.json
 ```
 
 - The format stays at 0.x while early users try it. The first version is 0.1.
-- Each 0.y version can break the one before. [CHANGELOG.md](../CHANGELOG.md)
+- Each 0.y version can have breaking changes. [CHANGELOG.md](../CHANGELOG.md)
   lists each breaking change. The reference implementation will migrate
   documents to the new version.
 - From 1.0, a minor version (1.0 to 1.1) only adds things: optional fields,
@@ -852,35 +860,37 @@ https://openskopos.org/schema/artifact/<format version>.json
   `schema-<version>`, for example `schema-0.1`. The site then serves the file
   as it was at the tag. Before the tag exists, the version is a draft and can
   change.
-- A published schema file never changes. CI fails if it changes. A change
-  publishes a new file with a new version.
+- A published schema file never changes. CI fails if it changes. To make a
+  change, the maintainers publish a new file with a new version.
 
-The schema for 0.1 accepts any 0.y URL in `$schema`, so that a 0.1 tool can
+The schema for 0.1 accepts all 0.y URLs in `$schema`, so that a 0.1 tool can
 read a document of a later 0.y version and report what it does not know.
 
 ## 13. Conformance
 
 The JSON Schema and the conformance cases in [`conformance/`](../../conformance/)
-define correct behavior. An implementation in any language that passes all
-cases is correct. A tool that checks documents must:
+define correct behavior. If an implementation passes all cases, it is correct.
+The programming language is not important. A tool that validates documents
+must:
 
 - Accept every document in `conformance/valid/`.
 - Reject every document in `conformance/invalid/`, for the reason in its index
   entry.
 
 A tool that reads or writes Markdown must also pass the cases in
-`conformance/markdown/`. Two documents are equal if they are equal after the
-order of keys and the order of items between types are ignored.
+`conformance/markdown/`. Two documents are equal if they are equal when you
+ignore the order of keys and the order of items between types.
 
-- `round-trip/`: reading `document.md` gives `document.json`. Writing
-  `document.json` and reading the result gives `document.json` again. A writer
-  does not need to make the same bytes as `document.md`.
-- `generous/`: reading the hand-written file gives `expected.json`. If the file
-  has no `id` or no `created_at`, the comparison ignores that field.
-- `next-version/`: reading `edited.md` against the stored version
-  `stored.json` (10.8) gives `expected.json`. If the version number changes,
-  the comparison ignores `created_at`.
+- `round-trip/`: the result of reading `document.md` is `document.json`. If a
+  tool writes `document.json` and reads the result, it gets `document.json`
+  again. A writer does not need to make the same bytes as `document.md`.
+- `generous/`: the result of reading the hand-written file is `expected.json`.
+  If the file has no `id` or no `created_at`, the comparison ignores that
+  field.
+- `next-version/`: the result of reading `edited.md` against the stored
+  version `stored.json` (10.8) is `expected.json`. If the version number
+  changes, the comparison ignores `created_at`.
 - `invalid/`: the reader reports an error.
 
-The index of the Markdown cases gives the number of warnings for each generous
-case. A reader can word its warnings in its own way.
+The index of the Markdown cases states the number of warnings for each
+generous case. A reader can use its own words for its warnings.
