@@ -1,29 +1,33 @@
 # Editor support
 
 Your editor can check an OpenSkopos document against the JSON Schema as you
-type, show errors, and complete field names and values.
-The schema for format 0.1 is at this URL:
+type, show errors, and complete field names and values. The schema for format
+0.1 is at this URL:
 
 ```
 https://openskopos.org/schema/artifact/0.1.json
 ```
 
+## VS Code
+
+Every document has a `$schema` field with the URL of its format version.
+VS Code uses this field to find the schema, so a document gets validation and
+completion as soon as it has its `$schema` line.
+
+JSON works with no extension. For YAML, install the
+[YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
+from Red Hat.
+
 ## File names
 
 Give a data file the suffix `.skopos.json` or `.skopos.yaml`, for example
-`intent.skopos.yaml`. The [SchemaStore](https://www.schemastore.org) catalog
-connects these suffixes to the OpenSkopos schema, so editors that use the
-catalog, such as VS Code and JetBrains IDEs, find the schema automatically.
+`intent.skopos.yaml`. A
+[pull request](https://github.com/SchemaStore/schemastore/pull/6625) adds
+these suffixes to the [SchemaStore](https://www.schemastore.org) catalog. Once
+it is merged, editors that use the catalog, such as VS Code and JetBrains
+IDEs, will find the schema for a new file before it has a `$schema` line.
 
-For YAML files in VS Code, install the
-[YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
-from Red Hat. JSON works in VS Code without an extension.
-
-## The schema URL in the file
-
-Every document has a `$schema` field with the URL of its format version.
-Some editors, including VS Code, use that field to find the schema for a
-JSON file.
+## Other editors
 
 If your editor does not find the schema of a YAML file, add this comment as
 the first line of the file:
