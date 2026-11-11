@@ -18,7 +18,8 @@ people, commits, tickets and agents can refer to it.
 
 ## Status
 
-Version 0.1 is in draft. The format can change between 0.x versions.
+Version 0.1 is published. All 0.x versions are unstable, and each new 0.y
+version can have breaking changes.
 
 - [Specification 0.1](spec/0.1/README.md)
 - [JSON Schema 0.1](schema/artifact/0.1.json)

@@ -1,8 +1,7 @@
 # OpenSkopos 0.1
 
-Status: draft. Format 0.1 can change until the maintainers publish it. After
-that, each 0.y version can have breaking changes (see
-[Format versions](#12-format-versions)).
+Status: published. All 0.x versions are unstable, and each new 0.y version can
+have breaking changes (see [Format versions](#12-format-versions)).
 
 OpenSkopos is a file format for the decisions that a team makes before an AI
 agent builds the work. One document contains typed items, such as goals,
