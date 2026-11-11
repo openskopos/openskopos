@@ -5,6 +5,9 @@
 -- * A link to any other file goes to the file on GitHub.
 --
 -- So the same Markdown files work on GitHub and on the site.
+--
+-- It also marks the code in tables that must not break across lines (see
+-- Table at the end of this file).
 
 local pages = {
   ["spec/0.1/README.md"] = "/spec/0.1/",
@@ -55,4 +58,17 @@ function Link(link)
     link.target = github .. "blob/main/" .. file .. fragment
   end
   return link
+end
+
+-- In a table, code with no spaces, such as a field name or a rule name, must
+-- not break across lines. The class "nowrap" in style.css does this.
+function Table(tbl)
+  return tbl:walk({
+    Code = function(code)
+      if not code.text:find("%s") then
+        code.classes:insert("nowrap")
+      end
+      return code
+    end,
+  })
 end
