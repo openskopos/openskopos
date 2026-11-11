@@ -75,7 +75,7 @@ Node and in browsers.
 
 ## Reference user
 
-[Clarvelo](https://clarvelo.com) facilitates the team sessions that produce
+[Clarvelo](https://clarvelo.com) facilitates team sessions that produce
 OpenSkopos documents. Any tool can read and write the format without
 Clarvelo.
 

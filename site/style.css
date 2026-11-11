@@ -79,7 +79,8 @@ img { max-width: 100%; }
 .toc ul { padding-left: 20px; margin: 6px 0; }
 
 /* Landing page */
-.home { max-width: 640px; padding-top: 72px; }
+main.home { max-width: 640px; padding-top: 72px; }
+footer.home { max-width: 640px; }
 .logo { display: flex; align-items: center; gap: 12px; font-size: 34px; letter-spacing: -0.01em; line-height: 1; }
 .logo img { width: 44px; height: 44px; }
 .lead { font-size: 18px; margin: 28px 0 0; }
