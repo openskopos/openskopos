@@ -8,15 +8,20 @@ type, show errors, and complete field names and values. The schema for format
 https://openskopos.org/schema/artifact/0.1.json
 ```
 
-## VS Code
+## The `$schema` field
 
 Every document has a `$schema` field with the URL of its format version.
-VS Code uses this field to find the schema, so a document gets validation and
-completion as soon as it has its `$schema` line.
+Editors that check YAML with
+[yaml-language-server](https://github.com/redhat-developer/yaml-language-server),
+or JSON with the JSON language server from VS Code, use this field to find
+the schema. So a document gets validation and completion as soon as it has
+its `$schema` line.
 
-JSON works with no extension. For YAML, install the
-[YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml)
-from Red Hat.
+VS Code and the editors based on it, such as Cursor and Windsurf, have the
+JSON language server built in, and get yaml-language-server from the
+[YAML extension](https://open-vsx.org/extension/redhat/vscode-yaml) by Red
+Hat. Zed and Helix use both servers by default. Neovim and Emacs can use them
+through their language server support.
 
 ## File names
 
@@ -24,10 +29,11 @@ Give a data file the suffix `.skopos.json` or `.skopos.yaml`, for example
 `intent.skopos.yaml`. A
 [pull request](https://github.com/SchemaStore/schemastore/pull/6625) adds
 these suffixes to the [SchemaStore](https://www.schemastore.org) catalog. Once
-it is merged, editors that use the catalog, such as VS Code and JetBrains
-IDEs, will find the schema for a new file before it has a `$schema` line.
+it is merged, editors that use the catalog will find the schema for a new
+file before it has a `$schema` line. These include JetBrains IDEs and any
+editor that runs yaml-language-server with its default settings.
 
-## Other editors
+## If your editor does not find the schema
 
 If your editor does not find the schema of a YAML file, add this comment as
 the first line of the file:
