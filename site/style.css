@@ -48,6 +48,7 @@ footer {
   border-top: 1px solid var(--line); color: var(--muted); font-size: 14px;
 }
 footer p { margin: 6px 0; }
+footer .credit { margin-top: 16px; text-align: center; }
 
 /* Content */
 main { max-width: 760px; margin: 0 auto; padding: 24px 16px 48px; }
