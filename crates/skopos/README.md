@@ -63,15 +63,37 @@ specification.
 skopos check intent.skopos.json spec.skopos.yaml
 ```
 
-The tool writes one line for each problem:
+The tool writes one line for each problem, and under it a hint that says
+what to do:
 
 ```
 spec.skopos.yaml: /items/2/id: the item ID S1 is also the ID of /items/1 [unique-item-ids]
+  Two items have the ID S1. Give the second one a new ID, such as S4.
+spec.skopos.yaml: /items/5: "modality" is a required property
+  C1 needs a modality: always, never, ask_first, prefer or avoid.
 ```
 
 The line has the file name, the location in the document as a JSON Pointer,
 and the message. If the problem is with a rule of section 9, the line ends
-with the name of the rule. If a document has a problem, the exit code is 1.
+with the name of the rule. If the message says enough, there is no hint line.
+If a document has a problem, the exit code is 1.
+
+Some problems have a fix that needs no choice from a person. For example, a
+counter in `id_counters` that is too low gets the highest number in use, and
+the second of two items with the same ID gets the next free ID. A value such
+as `Accepted` or `ask first` becomes `accepted` or `ask_first`. A missing
+`$schema`, document `status` (`draft`) or item `status` (`proposed`) is
+added. `skopos check --fix` applies these fixes, writes each JSON or YAML
+file again in the canonical layout, and names each fix:
+
+```
+spec.skopos.yaml: fixed: Give the second S1 the ID S4
+spec.skopos.yaml: /items/5: "modality" is a required property
+  C1 needs a modality: always, never, ask_first, prefer or avoid.
+```
+
+The other problems stay, and the exit code is 1 while any are left.
+`--fix` does not change Markdown files.
 
 For a Markdown file, the message starts with the line number in the file:
 
@@ -90,14 +112,25 @@ With `--json`, the tool writes a JSON list with one entry for each file:
       {
         "path": "/items/2/id",
         "rule": "unique-item-ids",
-        "message": "the item ID S1 is also the ID of /items/1"
+        "message": "the item ID S1 is also the ID of /items/1",
+        "hint": "Two items have the ID S1. Give the second one a new ID, such as S4.",
+        "fix": {
+          "label": "Give the second S1 the ID S4",
+          "patch": [
+            { "op": "add", "path": "/items/2/id", "value": "S4" },
+            { "op": "add", "path": "/id_counters/S", "value": 4 }
+          ]
+        }
       }
     ]
   }
 ]
 ```
 
-For a schema problem, `rule` is `null`.
+For a schema problem, `rule` is `null`. `fix` is there only when the problem
+has a certain fix. Its `patch` is a list of JSON Patch operations (RFC 6902).
+With `--fix --json`, each file also has `fixed`: the fixes that the tool
+applied.
 
 ### fmt
 

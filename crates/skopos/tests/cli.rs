@@ -175,6 +175,50 @@ fn convert_to_yaml_and_back_keeps_the_document() {
 }
 
 #[test]
+fn check_fix_applies_certain_fixes_and_keeps_the_rest() {
+    let dir = temp_dir("check-fix");
+    let invalid = conformance().join("invalid");
+    for f in ["duplicate-item-id.json", "constraint-without-modality.json"] {
+        fs::copy(invalid.join(f), dir.join(f)).unwrap();
+    }
+    let dup = dir.join("duplicate-item-id.json");
+    let modality = dir.join("constraint-without-modality.json");
+    let before = fs::read_to_string(&modality).unwrap();
+
+    let out = skopos(&["check", dup.to_str().unwrap(), modality.to_str().unwrap()]);
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("1 problem can be fixed with skopos check --fix."),
+        "{err}"
+    );
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("\n  C1 needs a modality: always, never, ask_first, prefer or avoid.\n"),
+        "{text}"
+    );
+
+    let out = skopos(&[
+        "check",
+        "--fix",
+        dup.to_str().unwrap(),
+        modality.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("duplicate-item-id.json: fixed: Give the second S1 the ID S4\n"),
+        "{text}"
+    );
+    let doc: Value = serde_json::from_str(&fs::read_to_string(&dup).unwrap()).unwrap();
+    assert_eq!(doc["items"][2]["id"], "S4");
+    // A problem that needs a person changes nothing.
+    assert_eq!(fs::read_to_string(&modality).unwrap(), before);
+
+    let out = skopos(&["check", dup.to_str().unwrap()]);
+    assert!(out.status.success());
+}
+
+#[test]
 fn fmt_writes_the_canonical_layout() {
     let dir = temp_dir("fmt");
     let file = dir.join("doc.skopos.json");

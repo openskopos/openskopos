@@ -6,11 +6,13 @@ import { test } from "node:test";
 import init, {
   runCli,
   assignIds,
+  applyFix,
   check,
   diff,
   diffText,
   exportName,
   exportTo,
+  fixAll,
   markdownRead,
   newArtifactId,
   nextVersion,
@@ -55,7 +57,7 @@ test("parse throws a SkoposError with one problem", () => {
 test("problems are plain objects", () => {
   const d = json("invalid/duplicate-item-id.json");
   const [p] = check(d);
-  assert.deepEqual(Object.keys(p).sort(), ["message", "path", "rule"]);
+  assert.deepEqual(Object.keys(p).sort(), ["fix", "hint", "message", "path", "rule"]);
   assert.equal(p.rule, "unique-item-ids");
   assert.equal(Object.getPrototypeOf(p), Object.prototype);
 });
@@ -131,6 +133,26 @@ test("diff and diffText", () => {
   assert.equal(d.same_artifact, true);
   assert.equal(d.from.version + 1, d.to.version);
   assert.equal(typeof diffText(a, b), "string");
+});
+
+test("problems have hints, and fixes that applyFix and fixAll apply", () => {
+  const d = json("invalid/counter-below-highest-id.json");
+  const [p] = check(d);
+  assert.equal(p.rule, "counters-cover-items");
+  assert.equal(p.hint, "The counter for S in id_counters must be 3 or more, because S3 is in use.");
+  assert.equal(p.fix.label, "Set the counter for S to 3");
+  const fixed = applyFix(d, p.fix);
+  assert.deepEqual(check(fixed), []);
+  assert.equal(d.id_counters.S, 2, "the input does not change");
+  const all = fixAll(json("invalid/duplicate-item-id.json"));
+  assert.deepEqual(check(all.doc), []);
+  assert.deepEqual(all.fixed.map((f) => f.label), ["Give the second S1 the ID S4"]);
+  const [q] = check(json("invalid/constraint-without-modality.json"));
+  assert.equal(q.fix, undefined);
+  assert.throws(
+    () => applyFix(d, { label: "x", patch: [{ op: "replace", path: "/nope", value: 1 }] }),
+    (e) => e.name === "SkoposError",
+  );
 });
 
 // A host with files in memory, for runCli.
