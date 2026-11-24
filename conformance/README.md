@@ -21,6 +21,9 @@ conformance/
     generous/<case>/     A hand-written Markdown file and the document that a reader makes from it
     next-version/<case>/ A stored version, an edited Markdown file and what the tool stores
     invalid/<case>/      Markdown files that a reader must reject
+  history/
+    index.json
+    <case>/              Documents in any order and the history that a tool reads from them
   runner/                A check of the cases themselves (Rust)
 ```
 
@@ -56,6 +59,13 @@ the specification tells how to compare documents.
 | `next-version/<case>/` | `stored.json`, `edited.md`, `expected.json` | If you read `edited.md` with the stored version, the result is `expected.json` (specification 10.8). |
 | `invalid/<case>/` | One Markdown file | The reader reports an error. The index gives the file name and the reason. |
 
+### history/
+
+Each case is a folder with documents and `expected.json`. Section 8.3 of the
+specification says how to read a history, and section 13 describes
+`expected.json`. A tool that reads histories can use the cases. A checker
+does not need them.
+
 ## The runner
 
 The runner in `runner/` is a small Rust program. CI uses it on each pull
@@ -70,6 +80,7 @@ request. It does these checks:
   Markdown file of a stored document identifies that document.
 - Each `next-version` case keeps the version number, or makes draft version
   n+1 after a final version n.
+- Each document of the history cases is valid.
 - Each file and folder is in its `index.json`.
 
 The runner does not read or write Markdown. The reference implementation in

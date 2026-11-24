@@ -139,8 +139,14 @@ impl Diff {
         if self.is_empty() {
             return writeln!(out, "no changes");
         }
+        self.write_lines(out, "")
+    }
+
+    /// The lines of [`Self::to_text`] after the first, one for each change,
+    /// each with `indent` before it.
+    pub(crate) fn write_lines(&self, out: &mut String, indent: &str) -> fmt::Result {
         if !self.envelope.is_empty() {
-            writeln!(out, "envelope   {}", self.envelope.join(", "))?;
+            writeln!(out, "{indent}envelope   {}", self.envelope.join(", "))?;
         }
         let width = self
             .added
@@ -153,12 +159,12 @@ impl Diff {
             .unwrap_or(0);
         for item in &self.added {
             let text = crate::one_line(&item.text);
-            writeln!(out, "added      {:width$}  {text}", item.id)?;
+            writeln!(out, "{indent}added      {:width$}  {text}", item.id)?;
         }
         for item in &self.changed {
             write!(
                 out,
-                "changed    {:width$}  {}",
+                "{indent}changed    {:width$}  {}",
                 item.id,
                 item.fields.join(", ")
             )?;
@@ -170,14 +176,14 @@ impl Diff {
         for item in &self.superseded {
             writeln!(
                 out,
-                "superseded {:width$}  by {}",
+                "{indent}superseded {:width$}  by {}",
                 item.id,
                 item.by.join(", ")
             )?;
         }
         for item in &self.dropped {
             let text = crate::one_line(&item.text);
-            writeln!(out, "dropped    {:width$}  {text}", item.id)?;
+            writeln!(out, "{indent}dropped    {:width$}  {text}", item.id)?;
         }
         Ok(())
     }
@@ -196,7 +202,7 @@ fn str_field<'a>(value: &'a Value, key: &str) -> &'a str {
 
 /// The items of a document by ID, in document order. An item with no string
 /// ID is left out. If two items have the same ID, the first one counts.
-fn items_by_id(doc: &Value) -> Vec<(&str, &Map<String, Value>)> {
+pub(crate) fn items_by_id(doc: &Value) -> Vec<(&str, &Map<String, Value>)> {
     let mut seen = BTreeSet::new();
     doc.get("items")
         .and_then(Value::as_array)
@@ -274,7 +280,7 @@ fn same(a: Option<&Value>, b: Option<&Value>) -> bool {
 
 /// True if a ref points to an item of this artifact. A ref with no
 /// `artifact` points into its own document.
-fn local_ref(r: &Value, artifact: &str) -> bool {
+pub(crate) fn local_ref(r: &Value, artifact: &str) -> bool {
     match r.get("artifact").and_then(Value::as_str) {
         None => true,
         Some(a) => a == artifact,

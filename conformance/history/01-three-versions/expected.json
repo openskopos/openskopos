@@ -1,0 +1,83 @@
+{
+  "chains": [
+    {
+      "artifact": "pa_4Hs8Lm2Qx6Vr9Tc3",
+      "versions": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "warnings": 0,
+  "items": {
+    "pa_4Hs8Lm2Qx6Vr9Tc3#G1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#FR1": {
+      "state": "superseded",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          2,
+          "changed"
+        ],
+        [
+          3,
+          "superseded"
+        ]
+      ],
+      "superseded_by": [
+        "pa_4Hs8Lm2Qx6Vr9Tc3@3#FR3"
+      ]
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#Q1": {
+      "state": "rejected",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          2,
+          "changed"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#FR2": {
+      "state": "dropped",
+      "changes": [
+        [
+          2,
+          "added"
+        ],
+        [
+          3,
+          "dropped"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#FR3": {
+      "state": "in_force",
+      "changes": [
+        [
+          3,
+          "added"
+        ]
+      ],
+      "superseded_by": []
+    }
+  }
+}

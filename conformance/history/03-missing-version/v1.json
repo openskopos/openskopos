@@ -1,0 +1,36 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_4Hs8Lm2Qx6Vr9Tc3",
+  "version": 1,
+  "kind": "spec",
+  "title": "Seat limits",
+  "status": "final",
+  "id_counters": {
+    "G": 1,
+    "FR": 1,
+    "Q": 1
+  },
+  "items": [
+    {
+      "id": "G1",
+      "type": "goal",
+      "text": "No user loses access by surprise when the org changes plan.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR1",
+      "type": "requirement",
+      "text": "A plan change that leaves too many seats shows a warning.",
+      "status": "proposed",
+      "priority": "must"
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "Do guests count as seats?",
+      "status": "proposed"
+    }
+  ],
+  "created_at": "2026-11-11T09:00:00Z",
+  "finalized_at": "2026-11-11T17:00:00Z"
+}

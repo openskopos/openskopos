@@ -1,0 +1,16 @@
+{
+  "cases": [
+    {
+      "case": "01-three-versions",
+      "description": "Three final versions of one artifact, given out of order. An item is accepted and changed, then superseded. An item is added and then dropped. A question is rejected and stays in the record."
+    },
+    {
+      "case": "02-hand-over",
+      "description": "A second team starts a new artifact with the first artifact as an input parent. A decision of the new artifact supersedes a decision of the first one, and a requirement is derived from another one."
+    },
+    {
+      "case": "03-missing-version",
+      "description": "Versions 1 and 3 of an artifact, without version 2. The history gives one warning and compares version 3 with version 1."
+    }
+  ]
+}

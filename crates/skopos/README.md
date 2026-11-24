@@ -295,6 +295,76 @@ dropped    N2   Emails to members above the limit.
 With `--json`, the tool writes the differences as JSON. The exit code is 0
 when both documents are valid, even if they differ.
 
+### history
+
+`skopos history` reads versions of one or more artifacts and shows what each
+version decided, then the items that are in force now. Give the files in any
+order. Each file can be JSON, YAML or Markdown, and it must be valid.
+
+```bash
+skopos history specs/*.skopos.json
+```
+
+```
+Seat limits (spec pa_4Hs8Lm2Qx6Vr9Tc3)
+  version 1  final  2026-11-11  3 items
+  version 2  final  2026-11-12  4 items
+    added      FR2  Admins get an email after each plan change.
+    changed    FR1  status, text (status proposed -> accepted)
+    changed    Q1   status (status proposed -> rejected)
+  version 3  final  2026-11-13  3 items
+    added      FR3  A plan change that leaves too many seats is blocked.
+    superseded FR1  by FR3
+    dropped    FR2  Admins get an email after each plan change.
+
+In force now
+  pa_4Hs8Lm2Qx6Vr9Tc3@3
+    G1   No user loses access by surprise when the org changes plan.
+    FR3  A plan change that leaves too many seats is blocked.
+```
+
+The lines under a version are the lines of `skopos diff` between that version
+and the one before it. A missing version is a warning, not an error. When a
+second team starts a new artifact with the first one as an `input` parent,
+the first artifact comes first, and an item of the new artifact that
+supersedes an item of the first one shows under its version. Section 8.3 of
+the [specification](../../spec/0.1/README.md) says how the tool reads a
+history.
+
+With `--since 2`, the tool shows only the versions after version 2. With
+`--json`, it writes the whole history as JSON, with the steps of each item.
+
+### trace
+
+`skopos trace` shows the life of one item: each version that changed it, its
+state now, and the items that replace it, with their rationale, detail and
+evidence.
+
+```bash
+skopos trace pa_4Hs8Lm2Qx6Vr9Tc3#FR1 specs/*.skopos.json
+```
+
+```
+pa_4Hs8Lm2Qx6Vr9Tc3#FR1  requirement
+now: superseded by pa_4Hs8Lm2Qx6Vr9Tc3@3#FR3 (last in pa_4Hs8Lm2Qx6Vr9Tc3@2)
+
+version 1  added       proposed
+    A plan change that leaves too many seats shows a warning.
+version 2  changed     status, text (status proposed -> accepted)
+    A plan change that leaves too many seats shows a warning with the count.
+version 3  superseded  by FR3
+
+pa_4Hs8Lm2Qx6Vr9Tc3@3#FR3 (accepted)
+  A plan change that leaves too many seats is blocked.
+  detail: A warning was not enough: admins ignored it.
+```
+
+The version in the reference string is not needed, because an item ID means
+the same item in every version. An item ID alone, such as `FR2`, works if
+only one artifact has it. If the first version that you give is not
+version 1, its items show as `seen`, because they can be older. The exit code
+is 1 if no file has the item.
+
 ## License
 
 [Apache License 2.0](../../LICENSE)

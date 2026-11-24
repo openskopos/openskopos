@@ -213,6 +213,92 @@ export interface Diff {
   superseded: SupersededItem[];
 }
 
+export interface HistoryVersion {
+  version: number;
+  status: string;
+  title: string;
+  created_at: string;
+  finalized_at: string | null;
+  /** The number of items. */
+  items: number;
+  /** The changes from the version before it in the chain. null for the first version of the chain. */
+  diff: Diff | null;
+}
+
+/** The versions of one artifact, in version order. */
+export interface HistoryChain {
+  artifact: string;
+  kind: string;
+  title: string;
+  versions: HistoryVersion[];
+}
+
+/** An `input` parent that names a version of an artifact. */
+export interface HistoryLink {
+  artifact: string;
+  version: number;
+  input_artifact: string;
+  input_version: number;
+  /** True if that version is one of the documents. */
+  present: boolean;
+}
+
+export interface HistoryWarning { artifact: string | null; message: string; }
+
+export type ItemState = "in_force" | "proposed" | "rejected" | "superseded" | "dropped";
+
+/** One step in the life of an item. */
+export interface HistoryStep {
+  version: number;
+  change: "seen" | "added" | "changed" | "superseded" | "dropped";
+  /** The status after the step. Absent if the item was removed. */
+  status?: string;
+  /** For "changed": the fields that changed. */
+  fields?: string[];
+  status_from?: string;
+  status_to?: string;
+  /** For "superseded": the IDs of the items that replace it. */
+  by?: string[];
+  /** For "seen", "added" and "changed": the whole item after the step. */
+  item?: Item;
+}
+
+/** The life of one item across versions and artifacts. */
+export interface ItemHistory {
+  /** `<artifact id>#<item id>`, the same in every version. */
+  key: string;
+  artifact: string;
+  id: string;
+  type: string;
+  text: string;
+  status: string;
+  /** The reference string in the last version that has the item. */
+  reference: string;
+  first_version: number;
+  last_version: number;
+  state: ItemState;
+  changed: boolean;
+  steps: HistoryStep[];
+  supersedes: string[];
+  superseded_by: string[];
+  derived_from: string[];
+  derived_into: string[];
+}
+
+/** The result of `history`. */
+export interface History {
+  chains: HistoryChain[];
+  links: HistoryLink[];
+  items: ItemHistory[];
+  warnings: HistoryWarning[];
+}
+
+/** Options for `historyText`. */
+export interface HistoryTextOptions {
+  /** Show only the versions after this version number. */
+  since?: number;
+}
+
 /**
  * The file system and terminal for `runCli`. Each method does one simple
  * operation. A method that fails throws, as the `node:fs` functions do.
@@ -656,6 +742,81 @@ pub fn diff_text(
 ) -> Result<String, JsValue> {
     let d = skopos_core::diff::diff(&from_js(&old_doc, "oldDoc")?, &from_js(&new_doc, "newDoc")?);
     Ok(d.to_text())
+}
+
+// ------------------------------------------------------------------ history
+
+fn history_of(docs: &JsValue) -> Result<skopos_core::history::History, JsValue> {
+    let docs = from_js(docs, "docs")?;
+    let docs = docs
+        .as_array()
+        .ok_or_else(|| type_error("docs must be a list of documents"))?;
+    Ok(skopos_core::history::history(docs))
+}
+
+/// The history of documents from one or more artifacts, in any order: the
+/// chain of versions of each artifact, what each version changed, and the
+/// life and state of each item. Does not check the documents: use `check`
+/// first.
+#[wasm_bindgen(unchecked_return_type = "History")]
+pub fn history(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&history_of(&docs)?))
+}
+
+/// `history(docs)` as text for people, as `skopos history` writes it.
+#[wasm_bindgen(js_name = historyText)]
+pub fn history_text(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "HistoryTextOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let options = from_js_opt(&options, "options")?;
+    let since = match options.as_ref().and_then(|o| o.get("since")) {
+        None | Some(Value::Null) => None,
+        Some(n) => Some(
+            n.as_u64()
+                .ok_or_else(|| type_error("options.since must be a whole number"))?,
+        ),
+    };
+    Ok(history_of(&docs)?.to_text(since))
+}
+
+fn traced<T>(
+    docs: &JsValue,
+    reference: &str,
+    f: impl FnOnce(&skopos_core::history::History, &skopos_core::history::ItemHistory) -> T,
+) -> Result<T, JsValue> {
+    let h = history_of(docs)?;
+    match h.find(reference) {
+        Ok(item) => Ok(f(&h, item)),
+        Err(message) => {
+            let e = js_sys::Error::new(&message);
+            e.set_name("SkoposError");
+            Err(e.into())
+        }
+    }
+}
+
+/// The life of one item, from a reference string such as
+/// `pa_2Xc5Rv8Tn1Mb4Kz7#FR2`, or an item ID if only one artifact has it.
+/// Throws a `SkoposError` if no document has the item, or if the ID is in
+/// more than one artifact.
+#[wasm_bindgen(unchecked_return_type = "ItemHistory")]
+pub fn trace(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    reference: &str,
+) -> Result<JsValue, JsValue> {
+    traced(&docs, reference, |_, item| to_js(item))
+}
+
+/// `trace(docs, reference)` as text for people, as `skopos trace` writes it.
+#[wasm_bindgen(js_name = traceText)]
+pub fn trace_text(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    reference: &str,
+) -> Result<String, JsValue> {
+    traced(&docs, reference, |h, item| h.trace_text(item))
 }
 
 // ------------------------------------------------------------------ CLI
