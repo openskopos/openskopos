@@ -1,6 +1,7 @@
 #!/bin/sh
 # Builds openskopos.org into a folder (default: _site). Run it from the root
-# of the repository. It needs pandoc 3.11 or later.
+# of the repository. It needs pandoc 3.11 or later, and Node 20 or later for
+# the tools at /tools/.
 #
 # The schema files are not part of this build. The Deploy site workflow adds
 # each tagged schema file to the folder.
@@ -12,7 +13,18 @@ mkdir -p "$out"
 
 # The static files. The pandoc folder and this script are build files only.
 cp -R site/. "$out/"
-rm -rf "$out/pandoc" "$out/build.sh"
+rm -rf "$out/pandoc" "$out/build.sh" "$out/tools"
+
+# The tools at /tools/ are a Vite app in site/tools. It runs the WebAssembly
+# build of skopos-core from the @openskopos/core package.
+abs_out=$(cd "$out" && pwd)
+(
+  cd site/tools
+  [ -d node_modules ] || npm ci --no-audit --no-fund
+  npx tsc --noEmit
+  npx vite build --logLevel warn --outDir "$abs_out/tools" --emptyOutDir
+)
+echo "site/tools -> /tools/"
 
 # The image for links on social sites.
 cp brand/avatar-512-light.png "$out/og.png"

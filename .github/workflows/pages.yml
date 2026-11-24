@@ -17,6 +17,9 @@ on:
       - "npm/*/README.md"
       - "conformance/README.md"
       - ".github/workflows/pages.yml"
+      - "conformance/valid/**"
+      - "conformance/invalid/**"
+      - "conformance/markdown/**"
     tags: ["schema-*"]
   workflow_dispatch:
 
@@ -48,6 +51,14 @@ jobs:
         env:
           PANDOC_VERSION: "3.11"
           PANDOC_SHA256: 89d4c9d97818c62a97157f0072844e4602c6cee795bf84abd1aee7273abcda99
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: site/tools/package-lock.json
+      - name: Install the packages of the tools
+        run: npm ci --no-audit --no-fund
+        working-directory: site/tools
       - name: Build the site
         run: site/build.sh _site
       - name: Add the published schema files
