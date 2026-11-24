@@ -6,8 +6,7 @@ What happens to seats when an org moves to a plan with fewer seats.
 This version adds the critique from the red team.
 
 17 items: 15 accepted, 1 proposed, 1 rejected.
-Since version 2: 6 added, 5 changed, 1 superseded. Also changed: summary,
-x-generator.
+Since version 2: 6 added, 5 changed, 1 superseded. Also changed: summary.
 
 Goals (1)
   G2   No user loses access by surprise when the org changes plan.
@@ -55,7 +54,7 @@ Constraints (3)
 Assumptions (2)
 ~ A1   Seat counts are [-exact.-] {+exact at the time of the plan change.+}
        [refuted]
-       changed: confirmation, evidence, text
+       changed: confirmation, evidence
        owner: Lee
        evidence:
          - lib/billing/seat.ex:30-44 in acme/billing at 0f1e2d3c4b5a:
@@ -119,14 +118,12 @@ Removed since version 2 (1)
        warning. (superseded by FR4)
 
 reference: pa_2Xc5Rv8Tn1Mb4Kz7@3
-created: 2026-11-08T14:00:00Z
-decider: Ana
-participants: Ana, Lee, Facilitator (AI)
-method: elaboration-mob 2
-session: Seat limits, round 3 <https://example.com/sessions/7781>
-parents:
-  - previous version: pa_2Xc5Rv8Tn1Mb4Kz7@2
-  - input: Billing glossary pa_9Lp4Wd7Ks2Hq6Nb3@1 (glossary)
-  - input: Seat model acme/billing lib/billing/seat.ex
-  - input: Pricing page <https://example.com/pricing>
-x-generator: {"name":"example-tool","version":"0.0.1"}
+created: 2026-11-08
+people: Ana (decider), Lee, Facilitator (AI)
+session: Seat limits, round 3 <https://example.com/sessions/7781> ·
+  elaboration-mob 2
+sources:
+  - Previous version: pa_2Xc5Rv8Tn1Mb4Kz7@2
+  - Input: Billing glossary pa_9Lp4Wd7Ks2Hq6Nb3@1
+  - Input: Seat model acme/billing lib/billing/seat.ex
+  - Input: Pricing page <https://example.com/pricing>
