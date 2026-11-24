@@ -107,14 +107,12 @@ Critiques (1)
        x-tracker: BILL-77
 
 reference: pa_2Xc5Rv8Tn1Mb4Kz7@3
-created: 2026-11-08T14:00:00Z
-decider: Ana
-participants: Ana, Lee, Facilitator (AI)
-method: elaboration-mob 2
-session: Seat limits, round 3 <https://example.com/sessions/7781>
-parents:
-  - previous version: pa_2Xc5Rv8Tn1Mb4Kz7@2
-  - input: Billing glossary pa_9Lp4Wd7Ks2Hq6Nb3@1 (glossary)
-  - input: Seat model acme/billing lib/billing/seat.ex
-  - input: Pricing page <https://example.com/pricing>
-x-generator: {"name":"example-tool","version":"0.0.1"}
+created: 2026-11-08
+people: Ana (decider), Lee, Facilitator (AI)
+session: Seat limits, round 3 <https://example.com/sessions/7781> ·
+  elaboration-mob 2
+sources:
+  - Previous version: pa_2Xc5Rv8Tn1Mb4Kz7@2
+  - Input: Billing glossary pa_9Lp4Wd7Ks2Hq6Nb3@1
+  - Input: Seat model acme/billing lib/billing/seat.ex
+  - Input: Pricing page <https://example.com/pricing>

@@ -312,7 +312,11 @@ impl Term {
         if let Some(Change::Changed {
             fields,
             status_from,
-        }) = &item.change
+            ..
+        }) = &item
+            .change
+            .as_ref()
+            .filter(|c| !matches!(c, Change::Changed { fields, .. } if fields.is_empty()))
         {
             let mut s = format!("changed: {}", fields.join(", "));
             if let Some(from) = status_from {

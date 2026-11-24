@@ -21,8 +21,9 @@ skopos render v3.skopos.yaml --previous v2.skopos.yaml --html -o v3.html
 4. With `--previous`: a line that counts what changed, a mark on each item
    that was added or changed, the removed and new words of each changed text,
    and a list of the items that were superseded or dropped.
-5. Facts about the version: the reference string, dates, participants, method,
-   session and parents.
+5. Facts about the version: the reference string, the date, the people, the
+   session and the sources. `x-` keys are for tools, so the view leaves them
+   out.
 
 A view shows any file, also one that is not valid. Use `skopos check` to find
 problems.
@@ -38,7 +39,11 @@ text, changed words are marked `[-old-]` and `{+new+}`. Long lines wrap at
 
 `skopos render --html` writes one page with no scripts and no files to load.
 The default stylesheet is in the page. It has light and dark colors and rules
-for print. In print, the details of every item move to an appendix at the end.
+for print. Each item that changed since `--previous` has a small dot to the
+left of its ID: green for added, orange for changed, and a red ring for
+superseded or dropped. The stylesheet resets the elements inside `.sk-doc`,
+so the styles of a host page, such as `text-align: center` or a rule for
+`footer`, do not change the view. In print, the details of every item move to an appendix at the end.
 
 | Option | What it does |
 |---|---|
@@ -72,11 +77,12 @@ change them:
 |---|---|
 | `--sk-font`, `--sk-mono` | Text, and IDs and code |
 | `--sk-ink`, `--sk-muted` | Text, and labels and counts |
-| `--sk-bg`, `--sk-surface`, `--sk-line` | Page, panels, and lines between items |
-| `--sk-accent` | The dot, a changed item, and the item that the URL points to |
-| `--sk-ins`, `--sk-ins-bg` | New words and added items |
-| `--sk-del`, `--sk-del-bg` | Removed words and removed items |
-| `--sk-proposed`, `--sk-proposed-bg` | The `proposed` badge |
+| `--sk-bg`, `--sk-surface`, `--sk-line` | Page, the item that the URL points to, and the lines under the header and above the footer |
+| `--sk-accent` | The dot of a changed item, and links on hover |
+| `--sk-ins`, `--sk-ins-bg` | The dot of an added item, and the tint of new words |
+| `--sk-del` | Removed words, and the ring of a removed item |
+| `--sk-proposed` | The `proposed` badge |
+| `--sk-del-bg`, `--sk-proposed-bg` | Not used by the default stylesheet. They stay defined for stylesheets of your own. |
 | `--sk-width` | The width of the text column |
 | `--sk-id-width` | The width of the ID column |
 
@@ -91,6 +97,7 @@ them in scripts.
 | `sk-header`, `sk-eyebrow`, `sk-kind`, `sk-version`, `sk-doc-status` | The top of the document. |
 | `sk-title`, `sk-summary`, `sk-overview` | The title, the summary, and the count of items. |
 | `sk-since`, `sk-envelope`, `sk-note` | With a previous version: what changed. |
+| `sk-key` | In `sk-since`, one count, such as "6 added", with `data-change`. Its dot is the key to the dots of the items. |
 | `sk-section`, `sk-section-title`, `sk-count`, `sk-items` | One section for each item type. `data-type` on the section. |
 | `sk-item` | One item. `id` and `data-id` are the item ID, so `#FR4` links to it. `data-type`, `data-status`, and `data-change` (`added`, `changed`, `superseded` or `dropped`). |
 | `sk-item--accepted`, `sk-item--proposed`, `sk-item--rejected` | The status of the item. |

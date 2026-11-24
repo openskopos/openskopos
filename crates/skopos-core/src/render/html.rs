@@ -203,7 +203,22 @@ fn header(out: &mut String, v: &View) {
     }
     let _ = writeln!(out, "<p class=\"sk-overview\">{}</p>", esc(&v.overview));
     if let Some(since) = &v.since {
-        let _ = write!(out, "<p class=\"sk-since\">{}", esc(&since.line));
+        // The counts name the dots of the items, so they are the key.
+        if since.counts.is_empty() {
+            let _ = write!(out, "<p class=\"sk-since\">{}", esc(&since.line));
+        } else {
+            let _ = write!(out, "<p class=\"sk-since\">Since {}: ", esc(&since.what));
+            for (n, (count, change)) in since.counts.iter().enumerate() {
+                if n > 0 {
+                    out.push_str(", ");
+                }
+                let _ = write!(
+                    out,
+                    "<span class=\"sk-key\" data-change=\"{change}\">{count} {change}</span>"
+                );
+            }
+            out.push('.');
+        }
         if !since.envelope.is_empty() {
             let _ = write!(
                 out,
@@ -275,21 +290,24 @@ fn item_html(out: &mut String, item: &ItemView) {
     if let Some(Change::Changed {
         fields,
         status_from,
+        ..
     }) = &item.change
     {
-        let _ = write!(
-            out,
-            "<p class=\"sk-changed\">Changed: {}",
-            esc(&fields.join(", "))
-        );
-        if let Some(from) = status_from {
+        if !fields.is_empty() {
             let _ = write!(
                 out,
-                " (was <span class=\"sk-was\">{}</span>)",
-                esc(&super::words(from))
+                "<p class=\"sk-changed\">Changed: {}",
+                esc(&fields.join(", "))
             );
+            if let Some(from) = status_from {
+                let _ = write!(
+                    out,
+                    " (was <span class=\"sk-was\">{}</span>)",
+                    esc(&super::words(from))
+                );
+            }
+            out.push_str(".</p>\n");
         }
-        out.push_str(".</p>\n");
     }
     if item.has_details() {
         out.push_str("<details class=\"sk-details\">\n<summary>Details</summary>\n");

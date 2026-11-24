@@ -68,6 +68,10 @@ pub(crate) struct View {
 pub(crate) struct Since {
     /// `Since version 2: 6 added, 5 changed, 1 superseded.`
     pub line: String,
+    /// `version 2` or `the previous version`.
+    pub what: String,
+    /// The counts in `line` that are not 0, such as `(6, "added")`.
+    pub counts: Vec<(usize, &'static str)>,
     /// A note when the two documents are different artifacts.
     pub note: Option<String>,
     /// The envelope fields that changed, such as `summary`.
@@ -118,7 +122,10 @@ impl ItemView {
 pub(crate) enum Change {
     Added,
     Changed {
+        /// The changed fields other than `text`.
         fields: Vec<String>,
+        /// True if the text changed.
+        text: bool,
         status_from: Option<String>,
     },
 }
@@ -513,6 +520,9 @@ impl Builder<'_> {
         out
     }
 
+    /// Facts about the version, at most five rows: reference, created,
+    /// people, session and sources. `x-` keys are for tools, so the view
+    /// leaves them out.
     fn meta(&self, map: &Map<String, Value>) -> Vec<Field> {
         let mut out = Vec::new();
         let mut add = |name: &str, line: Line| {
@@ -529,51 +539,64 @@ impl Builder<'_> {
                 vec![Part::Code(crate::version_label(id, version))],
             );
         }
-        for (key, name) in [("created_at", "created"), ("finalized_at", "finalized")] {
-            if let Some(t) = map.get(key).and_then(Value::as_str) {
-                add(name, vec![Part::Text(t.to_string())]);
+        if let Some(t) = map.get("created_at").and_then(Value::as_str) {
+            let mut s = day(t).to_string();
+            if let Some(f) = map.get("finalized_at").and_then(Value::as_str) {
+                s.push_str(&format!(", finalized {}", day(f)));
             }
+            add("created", vec![Part::Text(s)]);
         }
+        let decider = map.get("decider").and_then(Value::as_str);
+        let mut people: Vec<String> = Vec::new();
         if let Some(d) = map.get("decider") {
-            add("decider", vec![Part::Text(self.person(d))]);
+            people.push(format!("{} (decider)", self.person(d)));
         }
-        let people: Vec<String> = map
+        for p in map
             .get("participants")
             .and_then(Value::as_array)
             .into_iter()
             .flatten()
-            .map(|p| {
-                let name = one_line(str_of(p, "name"));
-                if str_of(p, "kind") == "ai" {
-                    format!("{name} (AI)")
-                } else {
-                    name
-                }
-            })
-            .collect();
+        {
+            if decider.is_some() && p.get("id").and_then(Value::as_str) == decider {
+                continue;
+            }
+            let name = one_line(str_of(p, "name"));
+            people.push(if str_of(p, "kind") == "ai" {
+                format!("{name} (AI)")
+            } else {
+                name
+            });
+        }
         if !people.is_empty() {
-            add("participants", vec![Part::Text(people.join(", "))]);
+            add("people", vec![Part::Text(people.join(", "))]);
+        }
+        let mut session: Line = Vec::new();
+        if let Some(s) = map.get("session") {
+            let title = one_line(
+                s.get("title")
+                    .and_then(Value::as_str)
+                    .unwrap_or(str_of(s, "id")),
+            );
+            session.push(match s.get("url").and_then(Value::as_str) {
+                Some(url) => Part::Link {
+                    text: title,
+                    href: url.to_string(),
+                },
+                None => Part::Text(title),
+            });
         }
         if let Some(m) = map.get("method") {
             let mut s = str_of(m, "id").to_string();
             if let Some(v) = m.get("version").and_then(Value::as_str) {
                 s.push_str(&format!(" {v}"));
             }
-            add("method", vec![Part::Text(s)]);
+            if !session.is_empty() {
+                s.insert_str(0, " \u{b7} ");
+            }
+            session.push(Part::Text(s));
         }
-        if let Some(s) = map.get("session") {
-            let title = s
-                .get("title")
-                .and_then(Value::as_str)
-                .unwrap_or(str_of(s, "id"));
-            let line = match s.get("url").and_then(Value::as_str) {
-                Some(url) => vec![Part::Link {
-                    text: one_line(title),
-                    href: url.to_string(),
-                }],
-                None => vec![Part::Text(one_line(title))],
-            };
-            add("session", line);
+        if !session.is_empty() {
+            add("session", session);
         }
         let parents: Vec<Line> = map
             .get("parents")
@@ -584,17 +607,16 @@ impl Builder<'_> {
             .collect();
         if !parents.is_empty() {
             out.push(Field {
-                name: "parents".into(),
+                name: "sources".into(),
                 values: parents,
                 list: true,
             });
         }
-        out.extend(extensions(map));
         out
     }
 
     fn parent(&self, p: &Value) -> Line {
-        let rel = words(str_of(p, "rel"));
+        let rel = capital(&words(str_of(p, "rel")));
         let mut line = vec![Part::Text(format!("{rel}: "))];
         if let Some(src) = p.get("source") {
             let title = one_line(str_of(src, "title"));
@@ -626,11 +648,16 @@ impl Builder<'_> {
             let id = str_of(p, "artifact");
             let version = p.get("version").and_then(whole_number);
             line.push(Part::Code(crate::version_label(id, version)));
-            if let Some(k) = p.get("kind").and_then(Value::as_str) {
-                line.push(Part::Text(format!(" ({})", words(k))));
-            }
         }
         line
+    }
+}
+
+/// The date of a date and time, such as `2026-11-08`, or the value as it is.
+fn day(t: &str) -> &str {
+    match t.get(..10) {
+        Some(d) if d.as_bytes()[4] == b'-' && d.as_bytes()[7] == b'-' => d,
+        _ => t,
     }
 }
 
@@ -740,13 +767,15 @@ pub(crate) fn view(doc: &Value, previous: Option<&Value>) -> View {
                 .iter()
                 .find(|c| c.id == id)
                 .map(|c| Change::Changed {
-                    fields: c.fields.clone(),
+                    // The changed words of the text show in the text itself.
+                    fields: c.fields.iter().filter(|f| *f != "text").cloned().collect(),
+                    text: c.fields.iter().any(|f| f == "text"),
                     status_from: c.status_from.clone(),
                 })
         });
         let spans = match &change {
             Some(Change::Added) => vec![Span::Ins(text)],
-            Some(Change::Changed { fields, .. }) if fields.iter().any(|f| f == "text") => {
+            Some(Change::Changed { text: true, .. }) => {
                 let old = old_items
                     .get(id.as_str())
                     .map(|o| one_line(str_of(o, "text")))
@@ -814,16 +843,16 @@ pub(crate) fn view(doc: &Value, previous: Option<&Value>) -> View {
 
     let since = d.map(|d| {
         let n_sup = d.superseded.len();
-        let parts: Vec<String> = [
+        let counts: Vec<(usize, &'static str)> = [
             (d.added.len(), "added"),
             (d.changed.len(), "changed"),
             (n_sup, "superseded"),
             (d.dropped.len(), "dropped"),
         ]
-        .iter()
+        .into_iter()
         .filter(|(n, _)| *n > 0)
-        .map(|(n, w)| format!("{n} {w}"))
         .collect();
+        let parts: Vec<String> = counts.iter().map(|(n, w)| format!("{n} {w}")).collect();
         let what = match d.from.version {
             Some(v) => format!("version {v}"),
             None => "the previous version".to_string(),
@@ -837,11 +866,19 @@ pub(crate) fn view(doc: &Value, previous: Option<&Value>) -> View {
         };
         Since {
             line,
+            what,
+            counts,
             note: (!d.same_artifact).then(|| {
                 "The two documents are different artifacts, so the same ID can mean different items."
                     .to_string()
             }),
-            envelope: d.envelope.clone(),
+            // `x-` keys are for tools, not for people.
+            envelope: d
+                .envelope
+                .iter()
+                .filter(|k| !k.starts_with("x-"))
+                .cloned()
+                .collect(),
             removed,
             version: d.from.version,
         }
