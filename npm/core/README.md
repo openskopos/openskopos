@@ -100,6 +100,9 @@ worker.
 | `exportTo(doc, tool, options?)` | Makes the files of OpenSpec, Kiro or Spec Kit. `tool` is `"openspec"`, `"kiro"` or `"speckit"`. The options are `name`, `number` and `existing`. |
 | `exportName(doc, options?)` | Returns the name that `exportTo` uses for the folder. |
 | `diff(oldDoc, newDoc)` | Compares two versions by item ID. `diffText(oldDoc, newDoc)` returns the same result as text. |
+| `renderHtml(doc, options?)` | Renders a document as HTML. The options are `previous` (an earlier version, to mark what changed), `fragment` (only the `<article class="sk-doc">` element), `style` (default `true`) and `css`. Each item element has its ID as `id` and `data-id`. See [docs/render.md](https://github.com/openskopos/openskopos/blob/main/docs/render.md). |
+| `stylesheet()` | Returns the default CSS of `renderHtml`. Every color and font is a `--sk-*` custom property. |
+| `renderTerminal(doc, options?)` | Renders a document as text for a terminal. The options are `previous`, `color` (default `false`) and `width` (default 80). |
 | `newArtifactId()` | Returns a new random artifact ID, for example `pa_7Hk2mQ9xR4tV8wZ1`. |
 | `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.1 as text, and its URL. |
 | `rules()` | Returns the names of the four rules in section 9. |

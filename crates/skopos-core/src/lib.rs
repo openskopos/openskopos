@@ -49,6 +49,7 @@ mod ids;
 pub mod markdown;
 pub mod model;
 mod order;
+pub mod render;
 pub mod rules;
 mod schema;
 mod text;

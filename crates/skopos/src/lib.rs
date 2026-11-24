@@ -20,6 +20,7 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use skopos_core::export::{self, Options, Tool};
 use skopos_core::markdown::Fill;
+use skopos_core::render::{self, HtmlOptions, TerminalOptions};
 use skopos_core::{assign_ids, check, diff, markdown, parse, write, Format, Problem, Value};
 
 /// The file system and the terminal, as the commands see them.
@@ -185,6 +186,45 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Show a document for people: as text in the terminal, or as HTML.
+    ///
+    /// The view has the title and summary, one line for each item with its
+    /// ID, and the details of each item. With --previous, it also marks the
+    /// items that were added and changed, shows the changed words, and lists
+    /// the items that were removed. See docs/render.md.
+    Render {
+        /// A JSON, YAML or Markdown file
+        file: PathBuf,
+        /// Write HTML: one self-contained page with the default stylesheet
+        #[arg(long)]
+        html: bool,
+        /// HTML: leave out the default stylesheet
+        #[arg(long, requires = "html")]
+        no_style: bool,
+        /// HTML: add the CSS of this file after the default stylesheet
+        #[arg(long, value_name = "FILE", requires = "html")]
+        css: Option<PathBuf>,
+        /// HTML: write only the document element, to put in a page of your
+        /// own, with no page and no stylesheet
+        #[arg(long, requires = "html", conflicts_with_all = ["no_style", "css"])]
+        fragment: bool,
+        /// An earlier version of the document to compare with
+        #[arg(long, value_name = "FILE")]
+        previous: Option<PathBuf>,
+        /// Text: the width of a line
+        #[arg(long, default_value_t = 80, conflicts_with = "html")]
+        width: usize,
+        /// The file to write. Without it, the view goes to standard output.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+}
+
+/// The HTML options of `skopos render`.
+struct HtmlArgs {
+    no_style: bool,
+    css: Option<PathBuf>,
+    fragment: bool,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -290,6 +330,26 @@ where
             dry_run,
         ),
         Command::Diff { old, new, json } => cmd.diff(&old, &new, json),
+        Command::Render {
+            file,
+            html,
+            no_style,
+            css,
+            fragment,
+            previous,
+            width,
+            output,
+        } => cmd.render(
+            &file,
+            previous.as_deref(),
+            html.then_some(HtmlArgs {
+                no_style,
+                css,
+                fragment,
+            }),
+            width,
+            output.as_deref(),
+        ),
     };
     if ok {
         0
@@ -915,6 +975,61 @@ impl Commands<'_> {
             self.out(&text)
         } else {
             self.out(&d.to_text())
+        }
+    }
+
+    fn render(
+        &mut self,
+        file: &Path,
+        previous: Option<&Path>,
+        html: Option<HtmlArgs>,
+        width: usize,
+        output: Option<&Path>,
+    ) -> bool {
+        let Some(doc) = self.read_or_report(file) else {
+            return false;
+        };
+        let previous = match previous {
+            Some(path) => match self.read_or_report(path) {
+                Some(p) => Some(p),
+                None => return false,
+            },
+            None => None,
+        };
+        let text = match html {
+            Some(h) => {
+                let css = match &h.css {
+                    Some(path) => match self.read_text(path) {
+                        Ok(t) => Some(t),
+                        Err(p) => {
+                            self.report(path, &p);
+                            return false;
+                        }
+                    },
+                    None => None,
+                };
+                render::html(
+                    &doc,
+                    &HtmlOptions {
+                        previous: previous.as_ref(),
+                        fragment: h.fragment,
+                        style: !h.no_style,
+                        css: css.as_deref(),
+                    },
+                )
+            }
+            None => render::terminal(
+                &doc,
+                &TerminalOptions {
+                    previous: previous.as_ref(),
+                    color: output.is_none() && self.host.color(Stream::Stdout),
+                    width,
+                },
+            ),
+        };
+        match output {
+            Some(path) => self.write_file(path, &text),
+            None => self.out(&text),
         }
     }
 }

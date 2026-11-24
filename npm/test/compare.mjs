@@ -155,6 +155,14 @@ const cases = [
   ["diff", valid[0], valid[1]],
   ["diff", valid[0], invalid[0]],
   ["diff", "missing.json", valid[0]],
+
+  // render
+  ...valid.flatMap((f) => [["render", f], ["render", f, "--html"]]),
+  ["render", valid[1], "--previous", valid[0], "--width", "60"],
+  ["render", valid[0], "--html", "--fragment"],
+  ["render", valid[0], "--html", "--no-style", "-o", "page.html"],
+  ["render", invalid[0]],
+  ["render", valid[0], "--fragment"],
 ];
 
 // Commands that run twice in the same folder: the second export finds the

@@ -19,6 +19,8 @@ does not use the network. It builds for `wasm32-unknown-unknown`.
 | `assign_ids(&mut Value) -> Result<IdReport, Vec<Problem>>` | Adds an ID to each item that has no ID, and updates `id_counters` (specification section 7). |
 | `parse_item_id(&str)` | Reads an item ID, for example `CR12`, and returns its type and number. |
 | `diff::diff(&Value, &Value) -> Diff` | Compares two versions by item ID. The result has the items that were added, changed, dropped and superseded. `Diff::to_text` returns one line for each item. |
+| `render::html(&Value, &HtmlOptions) -> String` | Renders a document as semantic HTML with `sk-` class names: a full page with the default stylesheet `render::STYLESHEET`, or only the document element. With `previous`, it marks what changed since an earlier version. See [docs/render.md](../../docs/render.md). |
+| `render::terminal(&Value, &TerminalOptions) -> String` | Renders a document as text for a terminal, with or without colors. |
 | `export::export(&Value, Tool, &Options) -> Export` | Makes the files of OpenSpec, Kiro or Spec Kit from a document. The result has the files, and the items that the function did not export. See [docs/exporters.md](../../docs/exporters.md). |
 
 A `Problem` has three fields:
