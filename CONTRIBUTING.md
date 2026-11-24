@@ -53,45 +53,52 @@ builds the crate for this target on each pull request.
 
 ## Versions
 
-The format and the tools share one version number, so you never need a table
-to know which tools go with which format.
+OpenSkopos has one version number for everything, so you never need a table
+to know which parts go together.
 
-- The format has a two-part version, such as `0.1`. The specification is in
-  `spec/0.1/`, and the schema is at `https://openskopos.org/schema/artifact/0.1.json`.
-- Every package has the same three-part version: the crates `skopos-core`,
-  `skopos` and `skopos-wasm`, and the npm packages `@openskopos/core` and
-  `@openskopos/cli`. Its first two numbers are the format version that the
-  tools read and write. `skopos` 0.1.3 and `@openskopos/core` 0.1.3 both work
-  with format 0.1.
+- One x.y version names the format, the specification in `spec/x.y/`, the
+  schema at `https://openskopos.org/schema/artifact/x.y.json`, and the
+  release of the tools: the crates `skopos-core`, `skopos` and `skopos-wasm`,
+  the npm packages `@openskopos/core` and `@openskopos/cli`, and the `skopos`
+  binaries. For example, release 0.2.0 has specification 0.2, schema 0.2,
+  `skopos` 0.2.0 and `@openskopos/core` 0.2.0.
+- Every x.y version is a tagged release. A new x.y version ships the
+  specification, the schema and all packages together, with the tags
+  `vx.y.0` and `schema-x.y` on the same commit.
 - A bug fix or an addition that breaks nothing, such as a new command, a new
-  exporter or a new library function, increases the last number: 0.1.0, then
-  0.1.1.
-- A new format version moves every package to it. Format 0.2 ships as
-  packages 0.2.0.
-- Within one format version, the library APIs can only grow. A change that
-  breaks code that uses `skopos-core` or `@openskopos/core` waits for the
-  next format version.
-- After 1.0, the same rules apply: format 1.1 ships as packages 1.1.0, and
-  format 2.0 as packages 2.0.0.
+  exporter or a new library function, can ship as a fix release: 0.2.0, then
+  0.2.1. A fix release changes all packages together and does not change the
+  format. The changelog, the site and the documentation name the x.y version
+  only; the full version is only for tags, package files and downloads.
+- A change to the format, or a change that breaks code that uses
+  `skopos-core` or `@openskopos/core`, needs the next x.y version.
+- After 1.0, the same rules apply: 1.1.0 has format 1.1, and 2.0.0 has
+  format 2.0.
 
-CI runs `node scripts/check-versions.mjs`, which fails if the packages have
-different versions or if their version does not match the format version.
+CI runs `node scripts/check-versions.mjs`. It fails if the packages have
+different versions, if their x.y is not the format that `skopos-core` reads
+and writes, or if the specification, the schema, the changelog of the format
+or [RELEASES.md](RELEASES.md) has no section for that x.y version.
 
 ## Make a release
 
 1. Change the version of all crates and both `package.json` files, also the
-   dependency of `@openskopos/cli` on `@openskopos/core`. Run
-   `node scripts/check-versions.mjs`.
-2. Add a section for the version to [RELEASES.md](RELEASES.md). The GitHub
-   release uses it as its notes.
-3. Merge the change, then push the tag, for example `v0.1.1`. The Release
+   dependency of `@openskopos/cli` on `@openskopos/core`. Run `cargo update
+   --workspace` and `node scripts/check-versions.mjs`.
+2. Add the changes to the section `## x.y` of [RELEASES.md](RELEASES.md),
+   under `### Added`, `### Changed` or `### Removed`. A new x.y version gets a
+   new section. The Release notes workflow puts the section in the GitHub
+   release, and the site shows it at /changelog/.
+3. Merge the change, then push the tag, for example `v0.2.1`. The Release
    workflow builds the binaries, makes the GitHub release, updates the
-   Homebrew formula, publishes the crates and stages the npm packages.
+   Homebrew formula, publishes the crates and stages the npm packages. For a
+   new x.y version, also push the tag `schema-x.y`, for example `schema-0.2`,
+   on the same commit. It publishes the schema.
 4. Approve the staged npm packages on npmjs.com, `@openskopos/core` first and
    then `@openskopos/cli`.
-
-For a new format version, also push the tag `schema-<version>`, for example
-`schema-0.2`, to publish the schema.
+5. Change the version of `@openskopos/core` in `site/tools/package.json` to
+   the new version, and run `npm install` in `site/tools`. The tools on the
+   site then use the release.
 
 ## Writing style
 

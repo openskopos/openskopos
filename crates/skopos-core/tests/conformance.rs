@@ -6,6 +6,8 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+use skopos_core::history::history;
+use skopos_core::merge::{self, merge};
 use skopos_core::{check, check_rules, check_schema, model::Document, parse, rules, write, Format};
 
 fn conformance() -> PathBuf {
@@ -31,6 +33,15 @@ fn cases(dir: &str) -> Vec<Value> {
         .clone()
 }
 
+/// The `expected.json` of a history case, which is not a document.
+fn is_history_expectation(path: &Path) -> bool {
+    path.ends_with("expected.json")
+        && path
+            .parent()
+            .and_then(Path::parent)
+            .is_some_and(|p| p.ends_with("history"))
+}
+
 /// Every JSON or YAML document in the conformance folder.
 fn all_documents() -> Vec<PathBuf> {
     fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -44,6 +55,7 @@ fn all_documents() -> Vec<PathBuf> {
                 path.extension().and_then(|e| e.to_str()),
                 Some("json" | "yaml" | "yml")
             ) && !path.ends_with("index.json")
+                && !is_history_expectation(&path)
             {
                 out.push(path);
             }
@@ -172,11 +184,11 @@ fn typed_model_keeps_every_valid_document() {
 
 #[test]
 fn embedded_schema_is_the_published_file() {
-    let file = fs::read_to_string(conformance().join("../schema/artifact/0.1.json")).unwrap();
+    let file = fs::read_to_string(conformance().join("../schema/artifact/0.2.json")).unwrap();
     assert_eq!(
         skopos_core::SCHEMA,
         file,
-        "copy schema/artifact/0.1.json to crates/skopos-core/schema/0.1.json"
+        "copy schema/artifact/0.2.json to crates/skopos-core/schema/0.2.json"
     );
     let schema: Value = serde_json::from_str(&file).unwrap();
     assert_eq!(schema["$id"], skopos_core::SCHEMA_URL);
@@ -209,4 +221,130 @@ fn parents_message_follows_the_schema_branch() {
         messages,
         ["version 2 must have exactly one previous_version parent"]
     );
+}
+
+#[test]
+fn history_cases_give_the_expected_history() {
+    for case in cases("history") {
+        let name = case["case"].as_str().unwrap();
+        let dir = conformance().join("history").join(name);
+        let mut docs = vec![];
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if !path.ends_with("expected.json") {
+                docs.push(read(&path));
+            }
+        }
+        let expected = read(&dir.join("expected.json"));
+        // The order of the files must not matter.
+        let h = history(&docs);
+        docs.reverse();
+        assert_eq!(
+            h,
+            history(&docs),
+            "{name}: the order of the files changes the history"
+        );
+
+        let chains: Vec<Value> = h
+            .chains
+            .iter()
+            .map(|c| {
+                let versions: Vec<u64> = c.versions.iter().map(|v| v.version).collect();
+                serde_json::json!({"artifact": c.artifact, "versions": versions})
+            })
+            .collect();
+        assert_eq!(Value::from(chains), expected["chains"], "{name}: chains");
+        assert_eq!(
+            h.warnings.len() as u64,
+            expected["warnings"].as_u64().unwrap(),
+            "{name}: warnings {:?}",
+            h.warnings
+        );
+        let items = expected["items"].as_object().unwrap();
+        let keys: BTreeSet<&str> = h.items.iter().map(|i| i.key.as_str()).collect();
+        let want: BTreeSet<&str> = items.keys().map(String::as_str).collect();
+        assert_eq!(keys, want, "{name}: items");
+        for (key, want) in items {
+            let item = serde_json::to_value(h.item(key).unwrap()).unwrap();
+            let changes: Vec<Value> = item["steps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| serde_json::json!([s["version"], s["change"]]))
+                .collect();
+            assert_eq!(item["state"], want["state"], "{name}: {key} state");
+            assert_eq!(
+                Value::from(changes),
+                want["changes"],
+                "{name}: {key} changes"
+            );
+            for list in [
+                "superseded_by",
+                "supersedes",
+                "derived_from",
+                "derived_into",
+            ] {
+                if let Some(w) = want.get(list) {
+                    assert_eq!(&item[list], w, "{name}: {key} {list}");
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn merge_cases_give_the_expected_document() {
+    for case in cases("merge") {
+        let name = case["case"].as_str().unwrap();
+        let dir = conformance().join("merge").join(name);
+        let base = dir.join("base.json");
+        let base = base.exists().then(|| read(&base));
+        let options = merge::Options {
+            base: base.as_ref(),
+            ..Default::default()
+        };
+        let m = merge(
+            &read(&dir.join("main.json")),
+            &read(&dir.join("other.json")),
+            &options,
+        )
+        .unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(check(&m.doc).is_empty(), "{name}: {:?}", check(&m.doc));
+        let mut expected = read(&dir.join("expected.json"));
+        let mut doc = m.doc.clone();
+        // The comparison ignores created_at.
+        expected.as_object_mut().unwrap().remove("created_at");
+        doc.as_object_mut().unwrap().remove("created_at");
+        assert_eq!(doc, expected, "{name}: document");
+        // The index gives the kind, the IDs and the fields of each conflict.
+        let conflicts: Vec<Value> = m
+            .conflicts
+            .iter()
+            .map(|c| {
+                serde_json::json!({"kind": c.kind, "main": c.main, "other": c.other, "fields": c.fields})
+            })
+            .collect();
+        assert_eq!(
+            Value::from(conflicts),
+            case["conflicts"],
+            "{name}: conflicts"
+        );
+        let new: Vec<Value> = m
+            .renamed
+            .iter()
+            .map(|r| serde_json::json!([r.from, r.to]))
+            .collect();
+        assert_eq!(Value::from(new), case["new"], "{name}: new IDs");
+        // The open conflicts of the result are the pairs of the merge.
+        let open: Vec<(String, String)> = merge::conflicts(&m.doc)
+            .into_iter()
+            .map(|c| (c.main, c.other))
+            .collect();
+        let pairs: Vec<(String, String)> = m
+            .conflicts
+            .iter()
+            .filter_map(|c| Some((c.main.clone()?, c.other.clone()?)))
+            .collect();
+        assert_eq!(open, pairs, "{name}: open conflicts");
+    }
 }

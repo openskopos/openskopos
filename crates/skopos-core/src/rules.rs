@@ -4,6 +4,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use serde_json::Value;
 
+use crate::fix::{counter_op, new_id_fix, Fix, Op};
+use crate::model::ItemType;
 use crate::{parse_item_id, pointer, whole_number, Problem};
 
 /// No two items in a version have the same ID.
@@ -40,11 +42,34 @@ pub fn check_rules(doc: &Value) -> Vec<Problem> {
             continue;
         };
         if let Some(j) = first.get(id) {
-            problems.push(Problem::rule(
-                pointer(&pointer("/items", i), "id"),
-                UNIQUE_ITEM_IDS,
-                format!("the item ID {id} is also the ID of /items/{j}"),
-            ));
+            // The prefix of the item's type, or else of the ID.
+            let prefix = item
+                .get("type")
+                .and_then(Value::as_str)
+                .and_then(|t| t.parse::<ItemType>().ok())
+                .or_else(|| parse_item_id(id).map(|(t, _)| t))
+                .map(ItemType::prefix);
+            let fix = prefix.map(|p| {
+                new_id_fix(doc, i, p, |new| {
+                    format!("Give the second {id} the ID {new}")
+                })
+            });
+            let hint = match &fix {
+                Some(f) => format!(
+                    "Two items have the ID {id}. Give the second one a new ID, such as {}.",
+                    f.label.rsplit(' ').next().unwrap_or_default()
+                ),
+                None => format!("Two items have the ID {id}. Give the second one a new ID."),
+            };
+            problems.push(
+                Problem::rule(
+                    pointer(&pointer("/items", i), "id"),
+                    UNIQUE_ITEM_IDS,
+                    format!("the item ID {id} is also the ID of /items/{j}"),
+                )
+                .with_hint(hint)
+                .with_fix(fix),
+            );
         } else {
             first.insert(id, i);
         }
@@ -66,8 +91,20 @@ pub fn check_rules(doc: &Value) -> Vec<Problem> {
         }
     }
     let counters = doc.get("id_counters").and_then(Value::as_object);
+    // With no id_counters, one fix adds a counter for every prefix.
+    let add_all = Fix {
+        label: "Add id_counters for the IDs in use".to_string(),
+        patch: vec![Op::add(
+            "/id_counters",
+            highest
+                .iter()
+                .map(|(p, (n, _))| (p.to_string(), Value::from(*n)))
+                .collect::<serde_json::Map<_, _>>()
+                .into(),
+        )],
+    };
     if doc.get("id_counters").is_none() || counters.is_some() {
-        for (prefix, (n, i)) in highest {
+        for (prefix, (n, i)) in highest.clone() {
             let counter = counters.and_then(|c| c.get(prefix));
             let value = match counter {
                 None => 0,
@@ -83,13 +120,27 @@ pub fn check_rules(doc: &Value) -> Vec<Problem> {
                 } else {
                     "/id_counters".to_string()
                 };
-                problems.push(Problem::rule(
-                    path,
-                    COUNTERS_COVER_ITEMS,
-                    format!(
-                        "the counter for {prefix} is {value}, but /items/{i} has the ID {prefix}{n}; the counter must be {n} or more"
-                    ),
-                ));
+                let fix = if counters.is_none() {
+                    Some(add_all.clone())
+                } else {
+                    counter_op(doc, prefix, n).map(|op| Fix {
+                        label: format!("Set the counter for {prefix} to {n}"),
+                        patch: vec![op],
+                    })
+                };
+                problems.push(
+                    Problem::rule(
+                        path,
+                        COUNTERS_COVER_ITEMS,
+                        format!(
+                            "the counter for {prefix} is {value}, but /items/{i} has the ID {prefix}{n}; the counter must be {n} or more"
+                        ),
+                    )
+                    .with_hint(format!(
+                        "The counter for {prefix} in id_counters must be {n} or more, because {prefix}{n} is in use."
+                    ))
+                    .with_fix(fix),
+                );
             }
         }
     }
@@ -106,11 +157,16 @@ pub fn check_rules(doc: &Value) -> Vec<Problem> {
             doc.get("id").and_then(Value::as_str),
         ) {
             if artifact != id {
-                problems.push(Problem::rule(
-                    pointer(&at, "artifact"),
-                    PREVIOUS_VERSION_SAME_ARTIFACT,
-                    format!("the previous version is of the artifact {artifact}, but this document is {id}"),
-                ));
+                problems.push(
+                    Problem::rule(
+                        pointer(&at, "artifact"),
+                        PREVIOUS_VERSION_SAME_ARTIFACT,
+                        format!("the previous version is of the artifact {artifact}, but this document is {id}"),
+                    )
+                    .with_hint(format!(
+                        "The previous_version parent must be a version of this artifact, {id}. To build on another artifact, make it an input parent."
+                    )),
+                );
             }
         }
         // Version 1 has no previous version. The schema reports that.
@@ -121,14 +177,20 @@ pub fn check_rules(doc: &Value) -> Vec<Problem> {
                 .filter(|v| *v >= 2),
         ) {
             if parent_version != version - 1 {
-                problems.push(Problem::rule(
-                    pointer(&at, "version"),
-                    PREVIOUS_VERSION_ONE_LESS,
-                    format!(
-                        "the previous version is {parent_version}, but this document is version {version}; the previous version must be {}",
+                problems.push(
+                    Problem::rule(
+                        pointer(&at, "version"),
+                        PREVIOUS_VERSION_ONE_LESS,
+                        format!(
+                            "the previous version is {parent_version}, but this document is version {version}; the previous version must be {}",
+                            version - 1
+                        ),
+                    )
+                    .with_hint(format!(
+                        "Version {version} must follow version {}. Change the version of the previous_version parent, or the version of the document.",
                         version - 1
-                    ),
-                ));
+                    )),
+                );
             }
         }
     }

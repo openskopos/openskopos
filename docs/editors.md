@@ -2,10 +2,10 @@
 
 Your editor can check an OpenSkopos document against the JSON Schema as you
 type, show errors, and complete field names and values. The schema for format
-0.1 is at this URL:
+0.2 is at this URL:
 
 ```
-https://openskopos.org/schema/artifact/0.1.json
+https://openskopos.org/schema/artifact/0.2.json
 ```
 
 ## The `$schema` field
@@ -38,7 +38,7 @@ If your editor does not find the schema of a YAML file, add this comment as
 the first line of the file:
 
 ```yaml
-# yaml-language-server: $schema=https://openskopos.org/schema/artifact/0.1.json
+# yaml-language-server: $schema=https://openskopos.org/schema/artifact/0.2.json
 ```
 
 ## Rules that the schema cannot check
@@ -50,4 +50,4 @@ ID in a version must be unique. To check every rule, run `skopos check`:
 skopos check intent.skopos.yaml
 ```
 
-Section 9 of the [specification](../spec/0.1/README.md) lists these rules.
+Section 9 of the [specification](../spec/0.2/README.md) lists these rules.

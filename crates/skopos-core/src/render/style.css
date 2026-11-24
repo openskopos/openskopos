@@ -1,0 +1,249 @@
+/* OpenSkopos document view. Every color and font is a custom property.
+   The defaults use :where(), so any rule that sets a property wins. */
+:where(:root) {
+  color-scheme: light dark;
+  --sk-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sk-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sk-ink: #242433;
+  --sk-muted: #6b6b7d;
+  --sk-bg: #ffffff;
+  --sk-surface: #f6f5f1;
+  --sk-line: #e3e1da;
+  --sk-accent: #e8512f;
+  --sk-del: #b42318;
+  --sk-del-bg: #fde8e5;
+  --sk-ins: #116329;
+  --sk-ins-bg: #e3f4e7;
+  --sk-proposed: #8a5a00;
+  --sk-proposed-bg: #fff3d6;
+  --sk-width: 46rem;
+  --sk-id-width: 3.25rem;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root) {
+    --sk-ink: #fafafa;
+    --sk-muted: #a1a1aa;
+    --sk-bg: #18181b;
+    --sk-surface: #232327;
+    --sk-line: #34343a;
+    --sk-accent: #ff6848;
+    --sk-del: #ff8a80;
+    --sk-del-bg: #3d1f1c;
+    --sk-ins: #7ee2a0;
+    --sk-ins-bg: #173322;
+    --sk-proposed: #f5c26b;
+    --sk-proposed-bg: #3a2d12;
+  }
+}
+
+.sk-page {
+  margin: 0;
+  background: var(--sk-bg);
+}
+.sk-doc {
+  box-sizing: border-box;
+  max-width: var(--sk-width);
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+  color: var(--sk-ink);
+  background: var(--sk-bg);
+  font: 1rem/1.6 var(--sk-font);
+  /* The view sets its own text layout, so a host page does not leak in. */
+  text-align: start;
+  text-indent: 0;
+  text-transform: none;
+  letter-spacing: normal;
+  word-spacing: normal;
+  white-space: normal;
+}
+.sk-doc *, .sk-doc *::before, .sk-doc *::after { box-sizing: inherit; }
+/* A reset against the element rules of a host page, such as `footer` or
+   `h2`. It has the weight of one class; the rules below come later. */
+.sk-doc :where(header, footer, section, h1, h2, h3, p, ol, ul, li, dl, dt, dd, details, summary) {
+  max-width: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  float: none;
+  background: none;
+  color: inherit;
+  font-size: inherit;
+  text-align: inherit;
+  list-style: none;
+}
+.sk-doc :where(:is(header, footer, section, h1, h2, h3, p, dl, dt, dd, ol, ul):not([hidden])) { display: block; }
+.sk-doc [hidden] { display: none; }
+.sk-doc a { color: inherit; text-decoration-color: var(--sk-line); text-underline-offset: 0.2em; }
+.sk-doc a:hover { text-decoration-color: var(--sk-accent); }
+.sk-doc code {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font-family: var(--sk-mono);
+  font-size: 0.875em;
+}
+
+/* Header */
+.sk-header { padding-bottom: 2rem; border-bottom: 1px solid var(--sk-line); }
+.sk-eyebrow { margin-bottom: 0.75rem; color: var(--sk-muted); font-size: 0.875rem; }
+.sk-eyebrow > * + *::before { content: "\00b7"; margin: 0 0.5em; color: var(--sk-line); }
+.sk-doc .sk-title {
+  margin-bottom: 0.75rem;
+  font-size: 2rem;
+  line-height: 1.2;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+}
+.sk-summary { max-width: 38rem; font-size: 1.125rem; }
+.sk-summary p { margin-bottom: 0.5rem; }
+.sk-doc .sk-overview { margin-top: 1rem; color: var(--sk-muted); font-size: 0.875rem; }
+.sk-doc .sk-since, .sk-doc .sk-note { margin-top: 0.25rem; font-size: 0.875rem; }
+.sk-note, .sk-envelope { color: var(--sk-muted); }
+
+/* The dot of an item that changed, and the same dot as a key in the
+   since line. */
+.sk-item[data-change]::before, .sk-key::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--sk-accent);
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+.sk-key { white-space: nowrap; }
+.sk-key::before { display: inline-block; margin-right: 0.4em; vertical-align: 0.12em; }
+:is(.sk-item, .sk-key)[data-change="added"]::before { background: var(--sk-ins); }
+/* A removed item has a ring, so it differs from a changed item by shape
+   as well as color. */
+:is(.sk-item, .sk-key):is([data-change="dropped"], [data-change="superseded"])::before {
+  background: none;
+  box-shadow: inset 0 0 0 1.5px var(--sk-del);
+}
+
+/* Sections and items */
+.sk-doc .sk-section { margin-top: 2.5rem; }
+.sk-doc .sk-section-title {
+  margin-bottom: 0.5rem;
+  font-size: 1rem;
+  line-height: 1.4;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--sk-ink);
+}
+.sk-count { margin-left: 0.4em; font-weight: 400; color: var(--sk-muted); font-variant-numeric: tabular-nums; }
+.sk-doc .sk-item {
+  position: relative;
+  margin: 0 -0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.25rem;
+  scroll-margin-top: 1rem;
+}
+.sk-doc .sk-item:target { background: var(--sk-surface); }
+.sk-item[data-change]::before {
+  position: absolute;
+  left: -0.125rem;
+  top: calc(0.5rem + 0.8em - 3px);
+}
+/* A hanging indent: the ID floats in the margin, so wrapped text and the
+   details line up after it. The space after the ID starts the line box and
+   is dropped. */
+.sk-line { padding-left: var(--sk-id-width); }
+.sk-item > :not(.sk-line) { margin-left: var(--sk-id-width); }
+.sk-doc .sk-id {
+  float: left;
+  width: var(--sk-id-width);
+  margin-left: calc(-1 * var(--sk-id-width));
+  font-family: var(--sk-mono);
+  font-size: 0.8125em;
+  line-height: calc(1.6 / 0.8125);
+  color: var(--sk-muted);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.sk-doc a.sk-id:hover { color: var(--sk-accent); }
+
+/* Short values, as plain small text after the item text. */
+.sk-badges { margin-left: 0.15em; }
+.sk-badge { font-size: 0.8125rem; color: var(--sk-muted); }
+.sk-badge + .sk-badge::before { content: "\00b7"; margin: 0 0.35em; color: var(--sk-line); }
+.sk-badge[data-value="proposed"] { color: var(--sk-proposed); }
+.sk-badge[data-value="rejected"], .sk-badge[data-value="refuted"] { color: var(--sk-del); }
+.sk-badge[data-field="blocking"], .sk-badge[data-value="blocker"], .sk-badge[data-value="must"] {
+  color: var(--sk-ink);
+  font-weight: 500;
+}
+.sk-item--rejected > .sk-line .sk-text { color: var(--sk-muted); }
+.sk-item--superseded > .sk-line .sk-text { color: var(--sk-muted); text-decoration: line-through; text-decoration-color: var(--sk-muted); }
+.sk-by, .sk-doc .sk-changed { color: var(--sk-muted); font-size: 0.8125rem; }
+.sk-ref { font-family: var(--sk-mono); font-size: 0.875em; }
+
+/* Changed words. An added item has its dot, so its text needs no tint. */
+.sk-doc ins { color: inherit; background: var(--sk-ins-bg); text-decoration: none; }
+.sk-doc del { color: var(--sk-del); background: none; text-decoration: line-through; }
+.sk-doc .sk-item--added > .sk-line ins { background: none; }
+.sk-doc .sk-removed del { color: var(--sk-muted); }
+
+/* Details */
+.sk-doc .sk-details { margin-top: 0.125rem; }
+.sk-doc .sk-details > summary {
+  display: inline-block;
+  list-style: none;
+  font-size: 0.8125rem;
+  color: var(--sk-muted);
+  cursor: pointer;
+}
+.sk-details > summary::-webkit-details-marker { display: none; }
+.sk-details > summary::after { content: "+"; margin-left: 0.3em; }
+.sk-details[open] > summary::after { content: "\2212"; }
+.sk-details > summary:hover { color: var(--sk-ink); }
+.sk-details > summary:focus-visible { outline: 2px solid var(--sk-accent); outline-offset: 2px; }
+.sk-doc .sk-details[open] > summary { margin-bottom: 0.5rem; }
+.sk-fields, .sk-meta { display: grid; gap: 0.125rem 1rem; }
+.sk-fields { grid-template-columns: 7rem minmax(0, 1fr); font-size: 0.875rem; }
+.sk-fields dt, .sk-meta dt { color: var(--sk-muted); }
+.sk-fields dd, .sk-meta dd { min-width: 0; overflow-wrap: anywhere; }
+.sk-doc .sk-detail { margin-top: 0.5rem; font-size: 0.875rem; }
+.sk-doc .sk-detail p + p { margin-top: 0.5rem; }
+
+/* Footer: facts about the version, left aligned, with a label column. */
+.sk-doc .sk-footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--sk-line); }
+.sk-meta {
+  grid-template-columns: 5.5rem minmax(0, 1fr);
+  gap: 0.25rem 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+.sk-meta dd { color: var(--sk-ink); }
+.sk-meta dd > code:only-child { user-select: all; }
+.sk-doc :is(.sk-meta, .sk-fields) li + li { margin-top: 0.125rem; }
+
+@media (max-width: 32rem) {
+  .sk-doc { padding-top: 1.5rem; }
+  .sk-doc .sk-title { font-size: 1.5rem; }
+  :where(:root) { --sk-id-width: 2.75rem; }
+  .sk-fields { grid-template-columns: 1fr; gap: 0; }
+  .sk-fields dd { margin-bottom: 0.4rem; }
+}
+
+@media print {
+  :where(:root) {
+    --sk-ink: #000;
+    --sk-muted: #555;
+    --sk-bg: #fff;
+    --sk-surface: #fff;
+    --sk-line: #ccc;
+  }
+  .sk-doc { max-width: none; padding: 0; font-size: 10.5pt; }
+  .sk-doc .sk-details { display: none; }
+  .sk-doc .sk-appendix[hidden] { display: block; }
+  .sk-appendix { break-before: page; }
+  .sk-appendix-item { break-inside: avoid; margin-bottom: 0.75rem; }
+  .sk-appendix-item h3 { margin: 0 0 0.25rem; font-size: 1em; }
+  .sk-item { break-inside: avoid; }
+  .sk-section-title { break-after: avoid; }
+  .sk-doc a { text-decoration: none; }
+}

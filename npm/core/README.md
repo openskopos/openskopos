@@ -88,6 +88,8 @@ worker.
 | Function | What it does |
 |---|---|
 | `check(doc)` | Finds all problems in a document. The schema problems are first, then the problems with the rules in section 9. If the list is empty, the document is valid. |
+| `applyFix(doc, fix)` | Applies the `fix` of a problem and returns the new document. A problem has `path`, `rule`, `message`, `hint` (one plain sentence that says what to do) and, when the fix needs no choice, `fix` (`{ label, patch }`, with JSON Patch operations). |
+| `fixAll(doc)` | Applies every certain fix, checks again after each one, and returns `{ doc, fixed }`. |
 | `checkSchema(doc)`, `checkRules(doc)` | Run only the schema checks, or only the section 9 rules. |
 | `parse(text, format)` | Reads JSON or YAML text. `format` is `"json"` or `"yaml"`. The function does not check the document. |
 | `write(doc, format)` | Writes a document as JSON or YAML with the canonical layout. `toJson(doc)` and `toYaml(doc)` do the same for one format. |
@@ -100,14 +102,22 @@ worker.
 | `exportTo(doc, tool, options?)` | Makes the files of OpenSpec, Kiro or Spec Kit. `tool` is `"openspec"`, `"kiro"` or `"speckit"`. The options are `name`, `number` and `existing`. |
 | `exportName(doc, options?)` | Returns the name that `exportTo` uses for the folder. |
 | `diff(oldDoc, newDoc)` | Compares two versions by item ID. `diffText(oldDoc, newDoc)` returns the same result as text. |
+| `history(docs)` | Reads documents from one or more artifacts, in any order, as one history. Returns `{ chains, links, items, warnings }`. Each item has a `key` (`<artifact id>#<item id>`), its `reference` string, its `state` now and its `steps` across the versions. `historyText(docs, { since? })` returns it as text. |
+| `trace(docs, reference)` | Returns the history of one item, from a reference string such as `pa_2Xc5Rv8Tn1Mb4Kz7#FR2`. `traceText(docs, reference)` returns it as text, with the items that replace it and why. |
+| `merge(main, other, options?)` | Merges two documents into the next version of main. The options are `base`, `pairs` (a list of `[mainId, otherId]`) and `now`. Returns `{ doc, pairs, conflicts, renamed, envelope }`. Without `base` or `pairs`, items of the same type with similar text pair, and `pairs` returns them for people to confirm. `mergeText(main, other, options?)` returns the summary as text. |
+| `conflicts(doc)` | Lists the open conflicts of a merged document: `{ main, other, fields }`. `resolve(doc, id)` accepts the item and rejects the other item of its pair, and returns `{ doc, accepted, rejected }`. |
+| `wordDiff(old, new)` | Compares two texts word by word. Returns a list of `{ op, text }`, where `op` is `"same"`, `"del"` or `"ins"`. Each changed item of `diff` has the same list for its text as `text_spans`, and for its other text fields in `field_spans`. Each conflict of `merge` has `text_spans` from main's text to the other's text, and `base_text` in a merge with a base. |
+| `renderHtml(doc, options?)` | Renders a document as HTML. The options are `previous` (an earlier version, to mark what changed), `fragment` (only the `<article class="sk-doc">` element), `style` (default `true`) and `css`. Each item element has its ID as `id` and `data-id`. See [docs/render.md](https://github.com/openskopos/openskopos/blob/main/docs/render.md). |
+| `stylesheet()` | Returns the default CSS of `renderHtml`. Every color and font is a `--sk-*` custom property. |
+| `renderTerminal(doc, options?)` | Renders a document as text for a terminal. The options are `previous`, `color` (default `false`) and `width` (default 80). |
 | `newArtifactId()` | Returns a new random artifact ID, for example `pa_7Hk2mQ9xR4tV8wZ1`. |
-| `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.1 as text, and its URL. |
+| `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.2 as text, and its URL. |
 | `rules()` | Returns the names of the four rules in section 9. |
 | `version()` | Returns the version of the package. |
 | `runCli(args, host)` | Operates the `skopos` command line tool. The package `@openskopos/cli` uses this function. |
 
 The TypeScript types are in the package. For the format, see the
-[specification](https://github.com/openskopos/openskopos/blob/main/spec/0.1/README.md).
+[specification](https://github.com/openskopos/openskopos/blob/main/spec/0.2/README.md).
 
 ## License
 

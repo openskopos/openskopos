@@ -1,6 +1,6 @@
 {
   "name": "@openskopos/cli",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "The skopos command line tool for OpenSkopos documents, for Node on every platform.",
   "keywords": [
     "openskopos",
@@ -23,7 +23,7 @@
     "bin/skopos.js"
   ],
   "dependencies": {
-    "@openskopos/core": "0.1.0"
+    "@openskopos/core": "0.2.0"
   },
   "engines": {
     "node": ">=20"

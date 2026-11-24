@@ -9,6 +9,10 @@ $if(description)$
 <meta property="og:description" content="$description$">
 $endif$
 <link rel="canonical" href="https://openskopos.org/$folder$/">
+<link rel="alternate" type="text/markdown" href="/$folder$/index.md">
+$if(breadcrumbs)$
+<script type="application/ld+json">$breadcrumbs$</script>
+$endif$
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="OpenSkopos">
 <meta property="og:title" content="$pagetitle$ · OpenSkopos">
@@ -17,6 +21,9 @@ $endif$
 <meta name="twitter:card" content="summary">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="/style.css">
+$if(versions)$
+<script src="/install.js" data-versions="$versions$" defer></script>
+$endif$
 <script defer data-website-id="dfid_1r4Qm5UNUqHW9qbB0ZomE" data-domain="openskopos.org" src="https://datafa.st/js/script.cookieless.js"></script>
 </head>
 <body>
@@ -27,7 +34,8 @@ $endif$
     <span><span class="open">Open</span><span class="skopos">Skopos</span></span>
   </a>
   <nav>
-    <a href="/spec/0.1/">Specification</a>
+    <a href="/tools/">Tools</a>
+    <a href="/spec/0.2/">Specification</a>
     <a href="/docs/">Docs</a>
     <a href="/docs/install/">Install</a>
     <a href="https://github.com/openskopos/openskopos">GitHub</a>

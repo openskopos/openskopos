@@ -1,0 +1,70 @@
+{
+  "chains": [
+    {
+      "artifact": "pa_4Hs8Lm2Qx6Vr9Tc3",
+      "versions": [
+        1
+      ]
+    },
+    {
+      "artifact": "pa_7Wn3Kd5Pz1Gy8Fb2",
+      "versions": [
+        1
+      ]
+    }
+  ],
+  "warnings": 0,
+  "items": {
+    "pa_4Hs8Lm2Qx6Vr9Tc3#D1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": [],
+      "derived_into": [
+        "pa_7Wn3Kd5Pz1Gy8Fb2@1#FR1"
+      ]
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#D2": {
+      "state": "superseded",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": [
+        "pa_7Wn3Kd5Pz1Gy8Fb2@1#D1"
+      ]
+    },
+    "pa_7Wn3Kd5Pz1Gy8Fb2#D1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": [],
+      "supersedes": [
+        "pa_4Hs8Lm2Qx6Vr9Tc3@1#D2"
+      ]
+    },
+    "pa_7Wn3Kd5Pz1Gy8Fb2#FR1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": [],
+      "derived_from": [
+        "pa_4Hs8Lm2Qx6Vr9Tc3@1#D1"
+      ]
+    }
+  }
+}

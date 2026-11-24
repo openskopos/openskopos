@@ -1,4 +1,21 @@
 /* The styles of openskopos.org. Colors and fonts are from brand/BRAND.md. */
+
+/* Inter and JetBrains Mono, Latin only, under the SIL Open Font License
+   (fonts/LICENSE-*.txt). Variable fonts: one file has every weight. */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/fonts/inter.woff2) format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url(/fonts/jetbrains-mono.woff2) format("woff2");
+}
 :root {
   --bg: #FFF7EA;
   --ink: #242433;
@@ -89,3 +106,10 @@ footer.home { max-width: 640px; }
 .links { list-style: none; padding: 0; margin: 28px 0 0; display: flex; flex-wrap: wrap; gap: 10px 22px; font-size: 17px; }
 .home h2 { font-size: 19px; border-top: 0; padding-top: 0; margin-top: 40px; }
 .muted { color: var(--muted); font-size: 16px; }
+
+/* The version picker of the install page (site/install.js) */
+.picker { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 18px; margin: 20px 0 0; font-size: 15px; }
+.picker select {
+  font: inherit; color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 4px; padding: 3px 6px; margin-left: 6px;
+}

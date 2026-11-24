@@ -175,12 +175,56 @@ fn convert_to_yaml_and_back_keeps_the_document() {
 }
 
 #[test]
+fn check_fix_applies_certain_fixes_and_keeps_the_rest() {
+    let dir = temp_dir("check-fix");
+    let invalid = conformance().join("invalid");
+    for f in ["duplicate-item-id.json", "constraint-without-modality.json"] {
+        fs::copy(invalid.join(f), dir.join(f)).unwrap();
+    }
+    let dup = dir.join("duplicate-item-id.json");
+    let modality = dir.join("constraint-without-modality.json");
+    let before = fs::read_to_string(&modality).unwrap();
+
+    let out = skopos(&["check", dup.to_str().unwrap(), modality.to_str().unwrap()]);
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("1 problem can be fixed with skopos check --fix."),
+        "{err}"
+    );
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("\n  C1 needs a modality: always, never, ask_first, prefer or avoid.\n"),
+        "{text}"
+    );
+
+    let out = skopos(&[
+        "check",
+        "--fix",
+        dup.to_str().unwrap(),
+        modality.to_str().unwrap(),
+    ]);
+    assert_eq!(out.status.code(), Some(1));
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        text.contains("duplicate-item-id.json: fixed: Give the second S1 the ID S4\n"),
+        "{text}"
+    );
+    let doc: Value = serde_json::from_str(&fs::read_to_string(&dup).unwrap()).unwrap();
+    assert_eq!(doc["items"][2]["id"], "S4");
+    // A problem that needs a person changes nothing.
+    assert_eq!(fs::read_to_string(&modality).unwrap(), before);
+
+    let out = skopos(&["check", dup.to_str().unwrap()]);
+    assert!(out.status.success());
+}
+
+#[test]
 fn fmt_writes_the_canonical_layout() {
     let dir = temp_dir("fmt");
     let file = dir.join("doc.skopos.json");
     fs::write(
         &file,
-        r#"{"items":[],"title":"Short","kind":"intent","version":1,"id":"pa_7Hk2mQ9xR4tV8wZ1","status":"draft","created_at":"2026-11-05T09:00:00Z","$schema":"https://openskopos.org/schema/artifact/0.1.json"}"#,
+        r#"{"items":[],"title":"Short","kind":"intent","version":1,"id":"pa_7Hk2mQ9xR4tV8wZ1","status":"draft","created_at":"2026-11-05T09:00:00Z","$schema":"https://openskopos.org/schema/artifact/0.2.json"}"#,
     )
     .unwrap();
     let path = file.to_str().unwrap();
@@ -192,7 +236,7 @@ fn fmt_writes_the_canonical_layout() {
     let text = fs::read_to_string(&file).unwrap();
     assert!(
         text.starts_with(
-            "{\n  \"$schema\": \"https://openskopos.org/schema/artifact/0.1.json\",\n  \"id\": "
+            "{\n  \"$schema\": \"https://openskopos.org/schema/artifact/0.2.json\",\n  \"id\": "
         ),
         "{text}"
     );
@@ -209,7 +253,7 @@ fn ids_gives_new_items_ids_from_the_counters() {
     let file = dir.join("intent.skopos.yaml");
     fs::write(
         &file,
-        "$schema: https://openskopos.org/schema/artifact/0.1.json\n\
+        "$schema: https://openskopos.org/schema/artifact/0.2.json\n\
          id: pa_7Hk2mQ9xR4tV8wZ1\nversion: 1\nkind: intent\ntitle: Downgrades\nstatus: draft\n\
          id_counters:\n  G: 3\n\
          items:\n\
@@ -574,6 +618,175 @@ fn diff_names_items_by_id() {
     assert_eq!(json["superseded"][0]["id"], "FR2");
     assert_eq!(json["added"][0]["id"], "FR4");
     assert_eq!(json["changed"][0]["id"], "S2");
+}
+
+#[test]
+fn render_shows_text_and_html() {
+    let old = fixture("spec-v2.json");
+    let new = valid("spec-all-types-v3.json");
+    let out = skopos(&["render", &new, "--previous", &old, "--width", "60"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    // Not a terminal: no colors.
+    assert!(!text.contains('\x1b'), "{text}");
+    assert!(
+        text.contains("Since version 2: 6 added, 5 changed, 1 superseded."),
+        "{text}"
+    );
+    assert!(text.lines().all(|l| l.chars().count() <= 60), "{text}");
+
+    let dir = temp_dir("render");
+    let css = dir.join("brand.css");
+    fs::write(&css, ":root { --sk-accent: #e8512f; }").unwrap();
+    let page = dir.join("spec.html");
+    let out = skopos(&[
+        "render",
+        &new,
+        "--html",
+        "--css",
+        css.to_str().unwrap(),
+        "-o",
+        page.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let html = fs::read_to_string(&page).unwrap();
+    assert!(html.starts_with("<!doctype html>"));
+    assert!(html.contains("--sk-ink"));
+    assert!(html.contains(":root { --sk-accent: #e8512f; }"));
+    assert!(html.contains("id=\"FR4\""));
+
+    let out = skopos(&["render", &new, "--html", "--fragment"]);
+    let frag = String::from_utf8(out.stdout).unwrap();
+    assert!(frag.starts_with("<article class=\"sk-doc\""), "{frag}");
+
+    // --no-style needs --html.
+    assert_eq!(
+        skopos(&["render", &new, "--no-style"]).status.code(),
+        Some(2)
+    );
+}
+
+#[test]
+fn history_and_trace_read_versions_in_any_order_and_format() {
+    let case = conformance().join("history/01-three-versions");
+    let dir = temp_dir("history");
+    let md = dir.join("v2.md").display().to_string();
+    let v2 = case.join("v2.json").display().to_string();
+    assert!(skopos(&["convert", &v2, "--to", "markdown", "-o", &md])
+        .status
+        .success());
+    let v1 = case.join("v1.json").display().to_string();
+    let v3 = case.join("v3.json").display().to_string();
+
+    let out = skopos(&["history", &v3, &md, &v1]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("  version 3  final  2026-11-13  3 items\n    added      FR3"),
+        "{text}"
+    );
+    assert!(text.contains("    superseded FR1  by FR3\n"), "{text}");
+    assert!(
+        text.contains("In force now\n  pa_4Hs8Lm2Qx6Vr9Tc3@3\n    G1 "),
+        "{text}"
+    );
+
+    let text =
+        String::from_utf8(skopos(&["history", "--since", "2", &v1, &md, &v3]).stdout).unwrap();
+    assert!(!text.contains("version 2"), "{text}");
+    assert!(text.contains("version 3"), "{text}");
+
+    let json = stdout_json(&skopos(&["history", "--json", &v1, &md, &v3]));
+    assert_eq!(json["chains"][0]["versions"].as_array().unwrap().len(), 3);
+    let fr1 = json["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "FR1")
+        .unwrap();
+    assert_eq!(fr1["state"], "superseded");
+
+    let out = skopos(&["trace", "pa_4Hs8Lm2Qx6Vr9Tc3@1#FR1", &v1, &md, &v3]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("now: superseded by pa_4Hs8Lm2Qx6Vr9Tc3@3#FR3"),
+        "{text}"
+    );
+    assert!(text.contains("detail: A warning was not enough"), "{text}");
+
+    let out = skopos(&["trace", "FR9", &v1, &v3]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("no document has the item FR9"));
+}
+
+#[test]
+fn merge_conflicts_and_resolve() {
+    let case = conformance().join("merge/02-edit-edit");
+    let path = |f: &str| case.join(f).display().to_string();
+    let dir = temp_dir("merge");
+    let out_file = dir.join("merged.skopos.yaml").display().to_string();
+
+    let out = skopos(&[
+        "merge",
+        &path("main.json"),
+        &path("other.json"),
+        "--base",
+        &path("base.json"),
+        "-o",
+        &out_file,
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("1 conflict:\n  FR1 or FR3: text\n"));
+    let text = fs::read_to_string(&out_file).unwrap();
+    assert!(
+        text.starts_with("$schema: "),
+        "the -o file decides the format: {text}"
+    );
+    assert!(skopos(&["check", &out_file]).status.success());
+
+    let out = skopos(&["conflicts", &out_file]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "FR1 or FR3: text\n");
+
+    assert_eq!(skopos(&["resolve", &out_file, "G1"]).status.code(), Some(1));
+    let out = skopos(&["resolve", &out_file, "FR1"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(skopos(&["conflicts", &out_file]).status.success());
+    assert!(skopos(&["check", &out_file]).status.success());
+
+    let drafts = conformance().join("merge/05-two-drafts");
+    let (a, b) = (
+        drafts.join("main.json").display().to_string(),
+        drafts.join("other.json").display().to_string(),
+    );
+    let json = stdout_json(&skopos(&["merge", "--json", &a, &b]));
+    assert_eq!(json["pairs"][1]["similarity"], 96);
+    let json = stdout_json(&skopos(&["merge", "--json", "--pair", "G1=G1", &a, &b]));
+    assert_eq!(json["conflicts"], serde_json::json!([]));
+    assert_eq!(
+        skopos(&["merge", "--pair", "G1", &a, &b]).status.code(),
+        Some(1)
+    );
 }
 
 #[test]

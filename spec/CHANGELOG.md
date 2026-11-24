@@ -4,6 +4,20 @@ This file lists the changes to the OpenSkopos format, by format version. While
 the format is at 0.x, each 0.y version can have breaking changes. Each entry
 lists every breaking change, so that tools can migrate documents.
 
+## 0.2 (2026-11-24)
+
+No breaking change. A document of format 0.1 is a valid document of format
+0.2 when its `$schema` is the URL of 0.2.
+
+- Section 8.3 (informative): how a tool reads several documents as one
+  history, and the state of each item: in force, proposed, rejected,
+  superseded or dropped.
+- Section 8.4 (informative): how a tool merges two documents of the same
+  work into the next version of one of them. A conflict stays in the format,
+  as two `proposed` items with a `contradicts` ref.
+- Conformance cases for histories in `conformance/history/` and for merges in
+  `conformance/merge/`.
+
 ## 0.1 (2026-11-11)
 
 The first version of the format.

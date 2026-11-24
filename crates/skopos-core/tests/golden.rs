@@ -206,7 +206,7 @@ fn diff_of_two_versions() {
 /// tool: headings in `detail` and `summary`, and brackets in a question.
 fn tricky() -> Value {
     serde_json::json!({
-        "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+        "$schema": "https://openskopos.org/schema/artifact/0.2.json",
         "id": "pa_7Hk2mQ9xR4tV8wZ1", "version": 1, "kind": "spec",
         "title": "Tricky text", "status": "draft",
         "summary": "# Overview\n\n## Background\nWhy we do it.",

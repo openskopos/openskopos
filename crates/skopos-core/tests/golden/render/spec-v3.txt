@@ -1,0 +1,118 @@
+Σ• Spec · version 3 · draft
+Spec: seat limits on plan changes
+
+What happens to seats when an org moves to a plan with fewer seats.
+
+This version adds the critique from the red team.
+
+17 items: 15 accepted, 1 proposed, 1 rejected.
+
+Goals (1)
+  G2   No user loses access by surprise when the org changes plan.
+       for: Members of orgs that downgrade
+
+Success signals (1)
+  S2   No support ticket about lost access after a plan change. [proposed]
+       verification: Support tags tickets with plan-change for one month.
+       verifies: G2
+
+Requirements (2)
+  FR4  A plan change that leaves more seats in use than the new limit is
+       blocked. [must]
+       examples:
+         - 12 seats in use, new limit 10. The change is blocked.
+         - edge: 10 seats in use, new limit 10. The change goes ahead.
+       supersedes: FR2
+       derived from: G2
+  FR3  The seat count never goes below zero. [should]
+       An invariant. A property-based test fits it.
+
+Stories (1)
+  ST1  As an org admin, I want to see which seats block a plan change, so that I
+       can free them.
+       acceptance criteria:
+         - The page lists the members above the limit.
+       examples:
+         - forbidden: A member who is not an admin sees the list.
+       refines: FR4
+
+Constraints (3)
+  C1   Always run the billing contract tests before a merge. [always]
+       enforced by: CI job billing-contract
+  C3   Prefer the existing Seat module over new tables. [prefer]
+       rationale: One owner for seat data.
+       scope:
+         - lib/billing/
+  C4   Avoid new background jobs for this work. [avoid]
+       scope:
+         - this work only
+       mitigates: R1
+
+Assumptions (2)
+  A1   Seat counts are exact at the time of the plan change. [refuted]
+       owner: Lee
+       evidence:
+         - lib/billing/seat.ex:30-44 in acme/billing at 0f1e2d3c4b5a:
+           Task.start(fn -> recount(org) end)
+  A2   Seat counts are at most one minute late.
+       owner: Lee
+       confirm by: 2026-12-01
+       contradicts: A1
+
+Non-goals (1)
+  N1   Automatic removal of members above the limit. [deferred]
+       reason: An admin chooses who leaves.
+
+Risks (1)
+  R1   A late seat count lets a blocked change through.
+       likelihood: low
+       impact: high
+       mitigation: Recount seats inside the plan change.
+       owner: Ana
+       threatens: FR4
+
+Open questions (2)
+  Q2   Do guest users count as seats? [blocking]
+       owner: Ana
+       answer: No, guests are free.
+       relates to: pa_9Lp4Wd7Ks2Hq6Nb3@1#T1
+  Q1   Should we email the admin? [rejected]
+
+Decisions (1)
+  D1   Recount seats inside the plan change.
+       rationale: The background count can be late.
+       decided by: Ana
+       resolves: CR1
+       depends on: A1
+
+Terms (1)
+  T1   Seat limit
+       definition: The highest number of seats that a plan allows.
+       code names:
+         - Plan.max_seats
+
+Critiques (1)
+  CR1  Version 2 trusts a seat count that a background job writes.
+       [major severity]
+       category: incorrect
+       target: pa_2Xc5Rv8Tn1Mb4Kz7@2#A1
+       resolution: fix code: The spec is right, the recount is wrong. (decided
+         by Ana)
+       evidence:
+         - “Seat counts are exact.” from pa_2Xc5Rv8Tn1Mb4Kz7@2#A1
+         - Lee: “We saw a five minute lag last week.”
+         - Incident 42 <https://example.com/incidents/42>
+       proposed by: Facilitator
+       votes: 2 yes, 0 no, 2 eligible
+       x-tracker: BILL-77
+
+reference: pa_2Xc5Rv8Tn1Mb4Kz7@3
+created: 2026-11-08
+people: Ana (decider), Lee, Facilitator (AI)
+session: Seat limits, round 3 <https://example.com/sessions/7781> ·
+  elaboration-mob 2
+sources:
+  - Previous version: pa_2Xc5Rv8Tn1Mb4Kz7@2
+  - Input: Billing glossary pa_9Lp4Wd7Ks2Hq6Nb3@1
+  - Input: Seat model acme/billing lib/billing/seat.ex
+  - Input: Pricing page <https://example.com/pricing>

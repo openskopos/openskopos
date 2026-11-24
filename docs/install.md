@@ -5,6 +5,10 @@ formats and converts documents. It adds IDs to new items, compares versions,
 and exports documents to other tools. Each release has binaries for macOS,
 Linux and Windows.
 
+The commands on this page install the latest release. The
+[changelog](../RELEASES.md) lists what each release added, changed and
+removed.
+
 ## Homebrew
 
 With [Homebrew](https://brew.sh) on macOS or Linux, run:

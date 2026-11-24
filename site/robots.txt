@@ -1,0 +1,6 @@
+# Every crawler is welcome, also the crawlers of search engines and of AI
+# models. The whole site is under the Apache License 2.0.
+User-agent: *
+Allow: /
+
+Sitemap: https://openskopos.org/sitemap.xml

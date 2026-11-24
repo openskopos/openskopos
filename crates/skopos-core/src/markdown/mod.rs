@@ -45,6 +45,7 @@ pub use read::read_with;
 #[cfg(not(all(target_arch = "wasm32", target_os = "unknown")))]
 pub use version::next_version;
 pub use version::{next_version_at, same_content};
+pub(crate) use write::ref_string;
 pub use write::write;
 
 /// A case where the reader skips or changes something and continues (10.6).

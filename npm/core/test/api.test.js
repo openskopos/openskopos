@@ -6,21 +6,35 @@ import { test } from "node:test";
 import init, {
   runCli,
   assignIds,
+  applyFix,
   check,
   diff,
   diffText,
   exportName,
   exportTo,
+  fixAll,
+  history,
+  historyText,
   markdownRead,
+  merge,
+  mergeText,
+  conflicts,
+  resolve,
   newArtifactId,
   nextVersion,
   parse,
   parseItemId,
+  renderHtml,
+  renderTerminal,
   sameContent,
   schema,
   schemaUrl,
+  stylesheet,
   toJson,
   toYaml,
+  wordDiff,
+  trace,
+  traceText,
   version,
   write,
 } from "@openskopos/core";
@@ -41,7 +55,7 @@ test("the version is the version of the package", () => {
 test("the schema is the published schema", () => {
   const s = JSON.parse(schema());
   assert.equal(s.$id, schemaUrl());
-  assert.equal(schemaUrl(), "https://openskopos.org/schema/artifact/0.1.json");
+  assert.equal(schemaUrl(), "https://openskopos.org/schema/artifact/0.2.json");
 });
 
 test("parse throws a SkoposError with one problem", () => {
@@ -55,7 +69,7 @@ test("parse throws a SkoposError with one problem", () => {
 test("problems are plain objects", () => {
   const d = json("invalid/duplicate-item-id.json");
   const [p] = check(d);
-  assert.deepEqual(Object.keys(p).sort(), ["message", "path", "rule"]);
+  assert.deepEqual(Object.keys(p).sort(), ["fix", "hint", "message", "path", "rule"]);
   assert.equal(p.rule, "unique-item-ids");
   assert.equal(Object.getPrototypeOf(p), Object.prototype);
 });
@@ -131,6 +145,117 @@ test("diff and diffText", () => {
   assert.equal(d.same_artifact, true);
   assert.equal(d.from.version + 1, d.to.version);
   assert.equal(typeof diffText(a, b), "string");
+});
+
+test("wordDiff, and word changes in diff and merge", () => {
+  assert.deepEqual(wordDiff("Count every hour.", "Count at once."), [
+    { op: "same", text: "Count" },
+    { op: "del", text: "every hour." },
+    { op: "ins", text: "at once." },
+  ]);
+  const a = json("valid/spec-all-types-v3.json");
+  const b = structuredClone(a);
+  b.items[0].text = `${a.items[0].text} Now.`;
+  const changed = diff(a, b).changed[0];
+  assert.deepEqual(changed.text_spans.at(-1), { op: "ins", text: "Now." });
+
+  const dir = "merge/02-edit-edit/";
+  const [main, other, base] = ["main", "other", "base"].map((f) => json(`${dir}${f}.json`));
+  const c = merge(main, other, { base }).conflicts[0];
+  assert.equal(c.base_text, base.items.find((i) => i.id === "FR1").text);
+  assert.ok(c.text_spans.some((s) => s.op === "del"));
+});
+
+test("history, historyText, trace and traceText", () => {
+  const dir = "history/02-hand-over/";
+  const docs = [json(`${dir}second-team.json`), json(`${dir}first-team.json`)];
+  const h = history(docs);
+  assert.deepEqual(
+    h.chains.map((c) => c.artifact),
+    ["pa_4Hs8Lm2Qx6Vr9Tc3", "pa_7Wn3Kd5Pz1Gy8Fb2"],
+  );
+  const d2 = h.items.find((i) => i.key === "pa_4Hs8Lm2Qx6Vr9Tc3#D2");
+  assert.equal(d2.state, "superseded");
+  assert.deepEqual(d2.superseded_by, ["pa_7Wn3Kd5Pz1Gy8Fb2@1#D1"]);
+  assert.equal(d2.steps[0].change, "added");
+  assert.match(historyText(docs, { since: 0 }), /superseded pa_4Hs8Lm2Qx6Vr9Tc3@1#D2  by D1/);
+  assert.equal(trace(docs, "pa_4Hs8Lm2Qx6Vr9Tc3#D2").key, d2.key);
+  assert.match(traceText(docs, "pa_4Hs8Lm2Qx6Vr9Tc3#D2"), /rationale: The nightly count/);
+  assert.throws(() => trace(docs, "D1"), { name: "SkoposError", message: /more than one artifact/ });
+  assert.throws(() => history({}), TypeError);
+});
+
+test("merge, mergeText, conflicts and resolve", () => {
+  const dir = "merge/02-edit-edit/";
+  const [main, other, base] = ["main", "other", "base"].map((f) => json(`${dir}${f}.json`));
+  const m = merge(main, other, { base, now: "2026-11-24T12:00:00Z" });
+  assert.equal(m.doc.version, main.version + 1);
+  assert.equal(m.doc.created_at, "2026-11-24T12:00:00Z");
+  const [c] = m.conflicts;
+  assert.equal(m.conflicts.length, 1);
+  assert.deepEqual([c.kind, c.main, c.other, c.fields], ["changed", "FR1", "FR3", ["text"]]);
+  assert.deepEqual(check(m.doc), []);
+  assert.match(mergeText(main, other, { base }), /FR1 or FR3: text/);
+  assert.deepEqual(conflicts(m.doc), [{ main: "FR1", other: "FR3", fields: ["text"] }]);
+  const r = resolve(m.doc, "FR3");
+  assert.equal(r.rejected, "FR1");
+  assert.deepEqual(conflicts(r.doc), []);
+  assert.equal(conflicts(m.doc).length, 1, "resolve does not change its input");
+  assert.throws(() => resolve(m.doc, "G1"), { name: "SkoposError" });
+
+  const drafts = "merge/05-two-drafts/";
+  const a = json(`${drafts}main.json`);
+  const b = json(`${drafts}other.json`);
+  const proposed = merge(a, b);
+  assert.deepEqual(
+    proposed.pairs.map((p) => [p.main, p.other, p.by]),
+    [["G1", "G1", "text"], ["FR1", "FR2", "text"]],
+  );
+  const split = merge(a, b, { pairs: [["G1", "G1"]] });
+  assert.deepEqual(split.conflicts, []);
+  assert.throws(() => merge(a, b, { pairs: [["G1", "G9"]] }), { name: "SkoposError" });
+});
+
+test("renderHtml, renderTerminal and stylesheet", () => {
+  const dir = "markdown/next-version/01-edit-final-version/";
+  const a = json(`${dir}stored.json`);
+  const b = json(`${dir}expected.json`);
+  const page = renderHtml(b);
+  assert.ok(page.startsWith("<!doctype html>"));
+  assert.ok(page.includes(stylesheet()));
+  const frag = renderHtml(b, { fragment: true, previous: a });
+  assert.ok(frag.startsWith('<article class="sk-doc"'));
+  assert.ok(!frag.includes("<style"));
+  assert.match(frag, /class="sk-since"/);
+  for (const item of b.items) assert.ok(frag.includes(` id="${item.id}" data-id="${item.id}"`));
+  assert.ok(!renderHtml(b, { style: false }).includes("--sk-ink"));
+  assert.ok(renderHtml(b, { style: false, css: ".x{}" }).includes(".x{}"));
+  assert.throws(() => renderHtml(b, { fragment: "yes" }), TypeError);
+  assert.match(stylesheet(), /--sk-accent:/);
+  const text = renderTerminal(b, { previous: a, width: 50 });
+  assert.ok(!text.includes("\x1b"));
+  assert.ok(text.split("\n").every((l) => [...l].length <= 50));
+  assert.ok(renderTerminal(b, { color: true }).includes("\x1b["));
+});
+
+test("problems have hints, and fixes that applyFix and fixAll apply", () => {
+  const d = json("invalid/counter-below-highest-id.json");
+  const [p] = check(d);
+  assert.equal(p.rule, "counters-cover-items");
+  assert.equal(p.hint, "The counter for S in id_counters must be 3 or more, because S3 is in use.");
+  assert.equal(p.fix.label, "Set the counter for S to 3");
+  const fixed = applyFix(d, p.fix);
+  assert.deepEqual(check(fixed), []);
+  assert.equal(d.id_counters.S, 2, "the input does not change");
+  const all = fixAll(json("invalid/duplicate-item-id.json"));
+  assert.deepEqual(check(all.doc), []);
+  assert.deepEqual(all.fixed.map((f) => f.label), ["Give the second S1 the ID S4"]);
+  const [q] = check(json("invalid/constraint-without-modality.json"));
+  assert.equal(q.fix, undefined);
+  assert.throws(
+    () => applyFix(d, { label: "x", patch: [{ op: "replace", path: "/nope", value: 1 }] }),
+    (e) => e.name === "SkoposError",
+  );
 });
 
 // A host with files in memory, for runCli.

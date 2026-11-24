@@ -1,0 +1,378 @@
+<article class="sk-doc" data-artifact="pa_2Xc5Rv8Tn1Mb4Kz7" data-kind="spec" data-status="draft" data-version="3">
+<header class="sk-header">
+<p class="sk-eyebrow"><span class="sk-kind">Spec</span> <span class="sk-version">version 3</span> <span class="sk-doc-status" data-status="draft">draft</span></p>
+<h1 class="sk-title">Spec: seat limits on plan changes</h1>
+<div class="sk-summary">
+<p>What happens to seats when an org moves to a plan with fewer seats.</p>
+<p>This version adds the critique from the red team.</p>
+</div>
+<p class="sk-overview">17 items: 15 accepted, 1 proposed, 1 rejected.</p>
+</header>
+<section class="sk-section" data-type="goal">
+<h2 class="sk-section-title">Goals <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="G2" data-id="G2" data-type="goal" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#G2">G2</a> <span class="sk-text">No user loses access by surprise when the org changes plan.</span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>for</dt><dd>Members of orgs that downgrade</dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="success_signal">
+<h2 class="sk-section-title">Success signals <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--proposed" id="S2" data-id="S2" data-type="success_signal" data-status="proposed">
+<p class="sk-line"><a class="sk-id" href="#S2">S2</a> <span class="sk-text">No support ticket about lost access after a plan change.</span> <span class="sk-badges"><span class="sk-badge" data-field="status" data-value="proposed">proposed</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>verification</dt><dd>Support tags tickets with plan-change for one month.</dd>
+<dt>verifies</dt><dd><a class="sk-ref" href="#G2">G2</a></dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="requirement">
+<h2 class="sk-section-title">Requirements <span class="sk-count">2</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="FR4" data-id="FR4" data-type="requirement" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#FR4">FR4</a> <span class="sk-text">A plan change that leaves more seats in use than the new limit is blocked.</span> <span class="sk-badges"><span class="sk-badge" data-field="priority" data-value="must">must</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>examples</dt><dd><ul><li>12 seats in use, new limit 10. The change is blocked.</li><li>edge: 10 seats in use, new limit 10. The change goes ahead.</li></ul></dd>
+<dt>supersedes</dt><dd><span class="sk-ref">FR2</span></dd>
+<dt>derived from</dt><dd><a class="sk-ref" href="#G2">G2</a></dd>
+</dl>
+</details>
+</li>
+<li class="sk-item sk-item--accepted" id="FR3" data-id="FR3" data-type="requirement" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#FR3">FR3</a> <span class="sk-text">The seat count never goes below zero.</span> <span class="sk-badges"><span class="sk-badge" data-field="priority" data-value="should">should</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<div class="sk-detail">
+<p>An invariant. A property-based test fits it.</p>
+</div>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="story">
+<h2 class="sk-section-title">Stories <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="ST1" data-id="ST1" data-type="story" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#ST1">ST1</a> <span class="sk-text">As an org admin, I want to see which seats block a plan change, so that I can free them.</span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>acceptance criteria</dt><dd><ul><li>The page lists the members above the limit.</li></ul></dd>
+<dt>examples</dt><dd><ul><li>forbidden: A member who is not an admin sees the list.</li></ul></dd>
+<dt>refines</dt><dd><a class="sk-ref" href="#FR4">FR4</a></dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="constraint">
+<h2 class="sk-section-title">Constraints <span class="sk-count">3</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="C1" data-id="C1" data-type="constraint" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#C1">C1</a> <span class="sk-text">Always run the billing contract tests before a merge.</span> <span class="sk-badges"><span class="sk-badge" data-field="modality" data-value="always">always</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>enforced by</dt><dd>CI job billing-contract</dd>
+</dl>
+</details>
+</li>
+<li class="sk-item sk-item--accepted" id="C3" data-id="C3" data-type="constraint" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#C3">C3</a> <span class="sk-text">Prefer the existing Seat module over new tables.</span> <span class="sk-badges"><span class="sk-badge" data-field="modality" data-value="prefer">prefer</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>rationale</dt><dd>One owner for seat data.</dd>
+<dt>scope</dt><dd><ul><li>lib/billing/</li></ul></dd>
+</dl>
+</details>
+</li>
+<li class="sk-item sk-item--accepted" id="C4" data-id="C4" data-type="constraint" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#C4">C4</a> <span class="sk-text">Avoid new background jobs for this work.</span> <span class="sk-badges"><span class="sk-badge" data-field="modality" data-value="avoid">avoid</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>scope</dt><dd><ul><li>this work only</li></ul></dd>
+<dt>mitigates</dt><dd><a class="sk-ref" href="#R1">R1</a></dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="assumption">
+<h2 class="sk-section-title">Assumptions <span class="sk-count">2</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="A1" data-id="A1" data-type="assumption" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#A1">A1</a> <span class="sk-text">Seat counts are exact at the time of the plan change.</span> <span class="sk-badges"><span class="sk-badge" data-field="confirmation" data-value="refuted">refuted</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>owner</dt><dd>Lee</dd>
+<dt>evidence</dt><dd><ul><li><code>lib/billing/seat.ex:30-44</code> in acme/billing at <code>0f1e2d3c4b5a</code>: <code>Task.start(fn -&gt; recount(org) end)</code></li></ul></dd>
+</dl>
+</details>
+</li>
+<li class="sk-item sk-item--accepted" id="A2" data-id="A2" data-type="assumption" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#A2">A2</a> <span class="sk-text">Seat counts are at most one minute late.</span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>owner</dt><dd>Lee</dd>
+<dt>confirm by</dt><dd>2026-12-01</dd>
+<dt>contradicts</dt><dd><a class="sk-ref" href="#A1">A1</a></dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="non_goal">
+<h2 class="sk-section-title">Non-goals <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="N1" data-id="N1" data-type="non_goal" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#N1">N1</a> <span class="sk-text">Automatic removal of members above the limit.</span> <span class="sk-badges"><span class="sk-badge" data-field="deferred" data-value="true">deferred</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>reason</dt><dd>An admin chooses who leaves.</dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="risk">
+<h2 class="sk-section-title">Risks <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="R1" data-id="R1" data-type="risk" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#R1">R1</a> <span class="sk-text">A late seat count lets a blocked change through.</span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>likelihood</dt><dd>low</dd>
+<dt>impact</dt><dd>high</dd>
+<dt>mitigation</dt><dd>Recount seats inside the plan change.</dd>
+<dt>owner</dt><dd>Ana</dd>
+<dt>threatens</dt><dd><a class="sk-ref" href="#FR4">FR4</a></dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="open_question">
+<h2 class="sk-section-title">Open questions <span class="sk-count">2</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="Q2" data-id="Q2" data-type="open_question" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#Q2">Q2</a> <span class="sk-text">Do guest users count as seats?</span> <span class="sk-badges"><span class="sk-badge" data-field="blocking" data-value="true">blocking</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>owner</dt><dd>Ana</dd>
+<dt>answer</dt><dd>No, guests are free.</dd>
+<dt>relates to</dt><dd><span class="sk-ref">pa_9Lp4Wd7Ks2Hq6Nb3@1#T1</span></dd>
+</dl>
+</details>
+</li>
+<li class="sk-item sk-item--rejected" id="Q1" data-id="Q1" data-type="open_question" data-status="rejected">
+<p class="sk-line"><a class="sk-id" href="#Q1">Q1</a> <span class="sk-text">Should we email the admin?</span> <span class="sk-badges"><span class="sk-badge" data-field="status" data-value="rejected">rejected</span></span></p>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="decision">
+<h2 class="sk-section-title">Decisions <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="D1" data-id="D1" data-type="decision" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#D1">D1</a> <span class="sk-text">Recount seats inside the plan change.</span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>rationale</dt><dd>The background count can be late.</dd>
+<dt>decided by</dt><dd>Ana</dd>
+<dt>resolves</dt><dd><a class="sk-ref" href="#CR1">CR1</a></dd>
+<dt>depends on</dt><dd><a class="sk-ref" href="#A1">A1</a></dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="term">
+<h2 class="sk-section-title">Terms <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="T1" data-id="T1" data-type="term" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#T1">T1</a> <span class="sk-text">Seat limit</span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>definition</dt><dd>The highest number of seats that a plan allows.</dd>
+<dt>code names</dt><dd><ul><li>Plan.max_seats</li></ul></dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-section" data-type="critique">
+<h2 class="sk-section-title">Critiques <span class="sk-count">1</span></h2>
+<ol class="sk-items">
+<li class="sk-item sk-item--accepted" id="CR1" data-id="CR1" data-type="critique" data-status="accepted">
+<p class="sk-line"><a class="sk-id" href="#CR1">CR1</a> <span class="sk-text">Version 2 trusts a seat count that a background job writes.</span> <span class="sk-badges"><span class="sk-badge" data-field="severity" data-value="major">major severity</span></span></p>
+<details class="sk-details">
+<summary>Details</summary>
+<dl class="sk-fields">
+<dt>category</dt><dd>incorrect</dd>
+<dt>target</dt><dd><a class="sk-ref" href="#A1">pa_2Xc5Rv8Tn1Mb4Kz7@2#A1</a></dd>
+<dt>resolution</dt><dd>fix code: The spec is right, the recount is wrong. (decided by Ana)</dd>
+<dt>evidence</dt><dd><ul><li>“Seat counts are exact.” from <a class="sk-ref" href="#A1">pa_2Xc5Rv8Tn1Mb4Kz7@2#A1</a></li><li>Lee: “We saw a five minute lag last week.”</li><li><a href="https://example.com/incidents/42">Incident 42</a></li></ul></dd>
+<dt>proposed by</dt><dd>Facilitator</dd>
+<dt>votes</dt><dd>2 yes, 0 no, 2 eligible</dd>
+<dt>x-tracker</dt><dd>BILL-77</dd>
+</dl>
+</details>
+</li>
+</ol>
+</section>
+<section class="sk-appendix" hidden>
+<h2 class="sk-section-title">Details</h2>
+<section class="sk-appendix-item" data-id="G2">
+<h3><span class="sk-id">G2</span></h3>
+<dl class="sk-fields">
+<dt>for</dt><dd>Members of orgs that downgrade</dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="S2">
+<h3><span class="sk-id">S2</span></h3>
+<dl class="sk-fields">
+<dt>verification</dt><dd>Support tags tickets with plan-change for one month.</dd>
+<dt>verifies</dt><dd><a class="sk-ref" href="#G2">G2</a></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="FR4">
+<h3><span class="sk-id">FR4</span></h3>
+<dl class="sk-fields">
+<dt>examples</dt><dd><ul><li>12 seats in use, new limit 10. The change is blocked.</li><li>edge: 10 seats in use, new limit 10. The change goes ahead.</li></ul></dd>
+<dt>supersedes</dt><dd><span class="sk-ref">FR2</span></dd>
+<dt>derived from</dt><dd><a class="sk-ref" href="#G2">G2</a></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="FR3">
+<h3><span class="sk-id">FR3</span></h3>
+<div class="sk-detail">
+<p>An invariant. A property-based test fits it.</p>
+</div>
+</section>
+<section class="sk-appendix-item" data-id="ST1">
+<h3><span class="sk-id">ST1</span></h3>
+<dl class="sk-fields">
+<dt>acceptance criteria</dt><dd><ul><li>The page lists the members above the limit.</li></ul></dd>
+<dt>examples</dt><dd><ul><li>forbidden: A member who is not an admin sees the list.</li></ul></dd>
+<dt>refines</dt><dd><a class="sk-ref" href="#FR4">FR4</a></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="C1">
+<h3><span class="sk-id">C1</span></h3>
+<dl class="sk-fields">
+<dt>enforced by</dt><dd>CI job billing-contract</dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="C3">
+<h3><span class="sk-id">C3</span></h3>
+<dl class="sk-fields">
+<dt>rationale</dt><dd>One owner for seat data.</dd>
+<dt>scope</dt><dd><ul><li>lib/billing/</li></ul></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="C4">
+<h3><span class="sk-id">C4</span></h3>
+<dl class="sk-fields">
+<dt>scope</dt><dd><ul><li>this work only</li></ul></dd>
+<dt>mitigates</dt><dd><a class="sk-ref" href="#R1">R1</a></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="A1">
+<h3><span class="sk-id">A1</span></h3>
+<dl class="sk-fields">
+<dt>owner</dt><dd>Lee</dd>
+<dt>evidence</dt><dd><ul><li><code>lib/billing/seat.ex:30-44</code> in acme/billing at <code>0f1e2d3c4b5a</code>: <code>Task.start(fn -&gt; recount(org) end)</code></li></ul></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="A2">
+<h3><span class="sk-id">A2</span></h3>
+<dl class="sk-fields">
+<dt>owner</dt><dd>Lee</dd>
+<dt>confirm by</dt><dd>2026-12-01</dd>
+<dt>contradicts</dt><dd><a class="sk-ref" href="#A1">A1</a></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="N1">
+<h3><span class="sk-id">N1</span></h3>
+<dl class="sk-fields">
+<dt>reason</dt><dd>An admin chooses who leaves.</dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="R1">
+<h3><span class="sk-id">R1</span></h3>
+<dl class="sk-fields">
+<dt>likelihood</dt><dd>low</dd>
+<dt>impact</dt><dd>high</dd>
+<dt>mitigation</dt><dd>Recount seats inside the plan change.</dd>
+<dt>owner</dt><dd>Ana</dd>
+<dt>threatens</dt><dd><a class="sk-ref" href="#FR4">FR4</a></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="Q2">
+<h3><span class="sk-id">Q2</span></h3>
+<dl class="sk-fields">
+<dt>owner</dt><dd>Ana</dd>
+<dt>answer</dt><dd>No, guests are free.</dd>
+<dt>relates to</dt><dd><span class="sk-ref">pa_9Lp4Wd7Ks2Hq6Nb3@1#T1</span></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="D1">
+<h3><span class="sk-id">D1</span></h3>
+<dl class="sk-fields">
+<dt>rationale</dt><dd>The background count can be late.</dd>
+<dt>decided by</dt><dd>Ana</dd>
+<dt>resolves</dt><dd><a class="sk-ref" href="#CR1">CR1</a></dd>
+<dt>depends on</dt><dd><a class="sk-ref" href="#A1">A1</a></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="T1">
+<h3><span class="sk-id">T1</span></h3>
+<dl class="sk-fields">
+<dt>definition</dt><dd>The highest number of seats that a plan allows.</dd>
+<dt>code names</dt><dd><ul><li>Plan.max_seats</li></ul></dd>
+</dl>
+</section>
+<section class="sk-appendix-item" data-id="CR1">
+<h3><span class="sk-id">CR1</span></h3>
+<dl class="sk-fields">
+<dt>category</dt><dd>incorrect</dd>
+<dt>target</dt><dd><a class="sk-ref" href="#A1">pa_2Xc5Rv8Tn1Mb4Kz7@2#A1</a></dd>
+<dt>resolution</dt><dd>fix code: The spec is right, the recount is wrong. (decided by Ana)</dd>
+<dt>evidence</dt><dd><ul><li>“Seat counts are exact.” from <a class="sk-ref" href="#A1">pa_2Xc5Rv8Tn1Mb4Kz7@2#A1</a></li><li>Lee: “We saw a five minute lag last week.”</li><li><a href="https://example.com/incidents/42">Incident 42</a></li></ul></dd>
+<dt>proposed by</dt><dd>Facilitator</dd>
+<dt>votes</dt><dd>2 yes, 0 no, 2 eligible</dd>
+<dt>x-tracker</dt><dd>BILL-77</dd>
+</dl>
+</section>
+</section>
+<footer class="sk-footer">
+<dl class="sk-meta">
+<dt>reference</dt><dd><code>pa_2Xc5Rv8Tn1Mb4Kz7@3</code></dd>
+<dt>created</dt><dd>2026-11-08</dd>
+<dt>people</dt><dd>Ana (decider), Lee, Facilitator (AI)</dd>
+<dt>session</dt><dd><a href="https://example.com/sessions/7781">Seat limits, round 3</a> · elaboration-mob 2</dd>
+<dt>sources</dt><dd><ul><li>Previous version: <code>pa_2Xc5Rv8Tn1Mb4Kz7@2</code></li><li>Input: Billing glossary <code>pa_9Lp4Wd7Ks2Hq6Nb3@1</code></li><li>Input: Seat model <code>acme/billing lib/billing/seat.ex</code></li><li>Input: <a href="https://example.com/pricing">Pricing page</a></li></ul></dd>
+</dl>
+</footer>
+</article>

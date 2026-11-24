@@ -1,10 +1,10 @@
 # Conformance cases
 
 These files, together with the JSON Schema in
-[`schema/artifact/0.1.json`](../schema/artifact/0.1.json), define the correct
-behavior for format 0.1. If an implementation in any language passes all
+[`schema/artifact/0.2.json`](../schema/artifact/0.2.json), define the correct
+behavior for format 0.2. If an implementation in any language passes all
 cases, it is correct. Section 13 of the
-[specification](../spec/0.1/README.md#13-conformance) gives the cases that
+[specification](../spec/0.2/README.md#13-conformance) gives the cases that
 each type of tool must pass.
 
 ## Layout
@@ -21,6 +21,12 @@ conformance/
     generous/<case>/     A hand-written Markdown file and the document that a reader makes from it
     next-version/<case>/ A stored version, an edited Markdown file and what the tool stores
     invalid/<case>/      Markdown files that a reader must reject
+  history/
+    index.json
+    <case>/              Documents in any order and the history that a tool reads from them
+  merge/
+    index.json
+    <case>/              Two documents, maybe a base, and the merged document
   runner/                A check of the cases themselves (Rust)
 ```
 
@@ -56,6 +62,21 @@ the specification tells how to compare documents.
 | `next-version/<case>/` | `stored.json`, `edited.md`, `expected.json` | If you read `edited.md` with the stored version, the result is `expected.json` (specification 10.8). |
 | `invalid/<case>/` | One Markdown file | The reader reports an error. The index gives the file name and the reason. |
 
+### history/
+
+Each case is a folder with documents and `expected.json`. Section 8.3 of the
+specification says how to read a history, and section 13 describes
+`expected.json`. A tool that reads histories can use the cases. A checker
+does not need them.
+
+### merge/
+
+Each case is a folder with `main.json`, `other.json`, `base.json` if the
+documents have a common earlier version, and `expected.json`, the merged
+document. Section 8.4 of the specification says how a tool merges, and
+section 13 says how to compare. A tool that merges documents can use the
+cases. A checker does not need them.
+
 ## The runner
 
 The runner in `runner/` is a small Rust program. CI uses it on each pull
@@ -70,6 +91,9 @@ request. It does these checks:
   Markdown file of a stored document identifies that document.
 - Each `next-version` case keeps the version number, or makes draft version
   n+1 after a final version n.
+- Each document of the history cases is valid.
+- Each document of the merge cases is valid, and each result is the next
+  draft of main with the other document as an input parent.
 - Each file and folder is in its `index.json`.
 
 The runner does not read or write Markdown. The reference implementation in

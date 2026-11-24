@@ -1,0 +1,38 @@
+name: Release notes
+
+# The Release workflow (release.yml) calls this workflow after it announces
+# the GitHub release. RELEASES.md has one section for each x.y version, such
+# as "## 0.2", and a patch release such as 0.2.1 is listed in the section of
+# its x.y. The Release workflow looks for a section with the exact version,
+# so this workflow puts the x.y section at the top of the release notes.
+
+on:
+  workflow_call:
+    inputs:
+      plan:
+        required: true
+        type: string
+
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    env:
+      PLAN: ${{ inputs.plan }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Add the section of RELEASES.md to the release notes
+        run: |
+          tag=$(echo "$PLAN" | jq -r '.announcement_tag')
+          version=$(echo "$PLAN" | jq -r '.releases[] | select(.app_name == "skopos") | .app_version')
+          minor=$(echo "$version" | cut -d. -f1,2)
+          awk -v head="## $minor" '$0 == head { on = 1; next } on && /^## / { exit } on' RELEASES.md > notes.md
+          if [ ! -s notes.md ]; then
+            echo "::error::RELEASES.md has no section \"## $minor\"."
+            exit 1
+          fi
+          printf '\n[All changes](https://openskopos.org/changelog/#v%s)\n\n' "$minor" >> notes.md
+          gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json body --jq .body >> notes.md
+          gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file notes.md

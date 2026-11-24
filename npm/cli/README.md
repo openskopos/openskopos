@@ -36,6 +36,12 @@ The package needs Node 20 or later.
 | `skopos ids FILE...` | Adds an ID to each item that has no ID. |
 | `skopos export FILE --to openspec\|kiro\|speckit` | Writes the files of a spec-driven development tool. |
 | `skopos diff OLD NEW` | Shows the items that are different in two versions. |
+| `skopos history FILE...` | Shows what each version decided, then the items in force now. |
+| `skopos trace REF FILE...` | Shows the life of one item across versions and artifacts. |
+| `skopos merge MAIN OTHER [--base FILE]` | Merges two documents into the next version of main. |
+| `skopos conflicts FILE` | Lists the open conflicts of a merged document. |
+| `skopos resolve FILE ID` | Accepts an item of a conflict and rejects the other. |
+| `skopos render FILE [--html]` | Shows a document for people, as text or as an HTML page. |
 
 For the flags, run `skopos --help` or `skopos <command> --help`. The
 [README of the native tool](https://github.com/openskopos/openskopos/blob/main/crates/skopos/README.md)

@@ -1,8 +1,8 @@
 //! Read, check and write OpenSkopos documents.
 //!
 //! OpenSkopos is a file format for the decisions that a team makes before an
-//! AI agent builds the work. This crate is the reference implementation of format 0.1.
-//! See the specification in `spec/0.1/README.md` of the repository.
+//! AI agent builds the work. This crate is the reference implementation of format 0.2.
+//! See the specification in `spec/0.2/README.md` of the repository.
 //!
 //! All functions are pure: they take strings or [`serde_json::Value`] and
 //! return strings or values. The crate reads no files and uses no network, so
@@ -18,12 +18,13 @@
 //! - [`assign_ids`] gives an ID to each item that has none and updates
 //!   `id_counters`.
 //!
-//! The [`markdown`] module reads and writes Markdown (specification section
+//! [`history::history`] reads a chain of versions and what each one
+//! decided. The [`markdown`] module reads and writes Markdown (specification section
 //! 10). The [`model`] module has serde types for a valid document.
 //!
 //! ```
 //! let text = r#"{
-//!   "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+//!   "$schema": "https://openskopos.org/schema/artifact/0.2.json",
 //!   "id": "pa_7Hk2mQ9xR4tV8wZ1",
 //!   "version": 1,
 //!   "kind": "intent",
@@ -35,7 +36,7 @@
 //! let doc = skopos_core::parse(text, skopos_core::Format::Json).unwrap();
 //! assert!(skopos_core::check(&doc).is_empty());
 //! let yaml = skopos_core::write(&doc, skopos_core::Format::Yaml);
-//! assert!(yaml.starts_with("$schema: https://openskopos.org/schema/artifact/0.1.json\n"));
+//! assert!(yaml.starts_with("$schema: https://openskopos.org/schema/artifact/0.2.json\n"));
 //! ```
 
 use std::fmt;
@@ -45,13 +46,18 @@ pub use serde_json::Value;
 
 pub mod diff;
 pub mod export;
+pub mod fix;
+pub mod history;
 mod ids;
 pub mod markdown;
+pub mod merge;
 pub mod model;
 mod order;
+pub mod render;
 pub mod rules;
 mod schema;
 mod text;
+pub mod words;
 mod yaml;
 
 pub use ids::{assign_ids, parse_item_id, AssignedId, IdReport};
@@ -60,7 +66,7 @@ pub use schema::{check_schema, SCHEMA, SCHEMA_URL};
 pub use text::{parse, to_json, to_yaml, write, Format};
 
 /// One problem in a document.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Problem {
     /// Where the problem is, as a JSON Pointer (RFC 6901). An empty string is
     /// the whole document. `/items/3/id` is the `id` of the fourth item.
@@ -71,26 +77,62 @@ pub struct Problem {
     pub rule: Option<String>,
     /// What is wrong, in words for people.
     pub message: String,
+    /// One plain sentence for people that says what to do, for example
+    /// `C1 needs a modality: always, never, ask_first, prefer or avoid.`
+    #[serde(default)]
+    pub hint: String,
+    /// A change that fixes the problem, when the fix needs no choice from a
+    /// person. See [`fix`].
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<Box<fix::Fix>>,
 }
 
 impl Problem {
-    /// A problem with no rule name.
+    /// A problem with no rule name. The hint is the message as a sentence.
     pub fn new(path: impl Into<String>, message: impl Into<String>) -> Self {
+        let message = message.into();
         Problem {
             path: path.into(),
             rule: None,
-            message: message.into(),
+            hint: sentence(&message),
+            message,
+            fix: None,
         }
     }
 
     /// A problem that breaks a rule of specification section 9.
     pub fn rule(path: impl Into<String>, rule: &str, message: impl Into<String>) -> Self {
         Problem {
-            path: path.into(),
             rule: Some(rule.to_string()),
-            message: message.into(),
+            ..Problem::new(path, message)
         }
     }
+
+    /// The problem with this hint.
+    pub fn with_hint(mut self, hint: impl Into<String>) -> Self {
+        self.hint = hint.into();
+        self
+    }
+
+    /// The problem with this fix.
+    pub fn with_fix(mut self, fix: Option<fix::Fix>) -> Self {
+        self.fix = fix.map(Box::new);
+        self
+    }
+}
+
+/// A message as a sentence: a capital first letter and a full stop.
+pub(crate) fn sentence(message: &str) -> String {
+    let message = message.trim();
+    let mut chars = message.chars();
+    let mut s: String = match chars.next() {
+        Some(first) => first.to_uppercase().chain(chars).collect(),
+        None => String::new(),
+    };
+    if !s.is_empty() && !s.ends_with(['.', '?', '!']) {
+        s.push('.');
+    }
+    s
 }
 
 impl fmt::Display for Problem {

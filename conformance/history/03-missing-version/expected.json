@@ -1,0 +1,52 @@
+{
+  "chains": [
+    {
+      "artifact": "pa_4Hs8Lm2Qx6Vr9Tc3",
+      "versions": [
+        1,
+        3
+      ]
+    }
+  ],
+  "warnings": 1,
+  "items": {
+    "pa_4Hs8Lm2Qx6Vr9Tc3#G1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#FR1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          3,
+          "changed"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#Q1": {
+      "state": "dropped",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          3,
+          "dropped"
+        ]
+      ],
+      "superseded_by": []
+    }
+  }
+}

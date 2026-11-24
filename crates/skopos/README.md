@@ -63,15 +63,37 @@ specification.
 skopos check intent.skopos.json spec.skopos.yaml
 ```
 
-The tool writes one line for each problem:
+The tool writes one line for each problem, and under it a hint that says
+what to do:
 
 ```
 spec.skopos.yaml: /items/2/id: the item ID S1 is also the ID of /items/1 [unique-item-ids]
+  Two items have the ID S1. Give the second one a new ID, such as S4.
+spec.skopos.yaml: /items/5: "modality" is a required property
+  C1 needs a modality: always, never, ask_first, prefer or avoid.
 ```
 
 The line has the file name, the location in the document as a JSON Pointer,
 and the message. If the problem is with a rule of section 9, the line ends
-with the name of the rule. If a document has a problem, the exit code is 1.
+with the name of the rule. If the message says enough, there is no hint line.
+If a document has a problem, the exit code is 1.
+
+Some problems have a fix that needs no choice from a person. For example, a
+counter in `id_counters` that is too low gets the highest number in use, and
+the second of two items with the same ID gets the next free ID. A value such
+as `Accepted` or `ask first` becomes `accepted` or `ask_first`. A missing
+`$schema`, document `status` (`draft`) or item `status` (`proposed`) is
+added. `skopos check --fix` applies these fixes, writes each JSON or YAML
+file again in the canonical layout, and names each fix:
+
+```
+spec.skopos.yaml: fixed: Give the second S1 the ID S4
+spec.skopos.yaml: /items/5: "modality" is a required property
+  C1 needs a modality: always, never, ask_first, prefer or avoid.
+```
+
+The other problems stay, and the exit code is 1 while any are left.
+`--fix` does not change Markdown files.
 
 For a Markdown file, the message starts with the line number in the file:
 
@@ -90,14 +112,25 @@ With `--json`, the tool writes a JSON list with one entry for each file:
       {
         "path": "/items/2/id",
         "rule": "unique-item-ids",
-        "message": "the item ID S1 is also the ID of /items/1"
+        "message": "the item ID S1 is also the ID of /items/1",
+        "hint": "Two items have the ID S1. Give the second one a new ID, such as S4.",
+        "fix": {
+          "label": "Give the second S1 the ID S4",
+          "patch": [
+            { "op": "add", "path": "/items/2/id", "value": "S4" },
+            { "op": "add", "path": "/id_counters/S", "value": 4 }
+          ]
+        }
       }
     ]
   }
 ]
 ```
 
-For a schema problem, `rule` is `null`.
+For a schema problem, `rule` is `null`. `fix` is there only when the problem
+has a certain fix. Its `patch` is a list of JSON Patch operations (RFC 6902).
+With `--fix --json`, each file also has `fixed`: the fixes that the tool
+applied.
 
 ### fmt
 
@@ -294,6 +327,168 @@ dropped    N2   Emails to members above the limit.
 
 With `--json`, the tool writes the differences as JSON. The exit code is 0
 when both documents are valid, even if they differ.
+
+### history
+
+`skopos history` reads versions of one or more artifacts and shows what each
+version decided, then the items that are in force now. Give the files in any
+order. Each file can be JSON, YAML or Markdown, and it must be valid.
+
+```bash
+skopos history specs/*.skopos.json
+```
+
+```
+Seat limits (spec pa_4Hs8Lm2Qx6Vr9Tc3)
+  version 1  final  2026-11-11  3 items
+  version 2  final  2026-11-12  4 items
+    added      FR2  Admins get an email after each plan change.
+    changed    FR1  status, text (status proposed -> accepted)
+    changed    Q1   status (status proposed -> rejected)
+  version 3  final  2026-11-13  3 items
+    added      FR3  A plan change that leaves too many seats is blocked.
+    superseded FR1  by FR3
+    dropped    FR2  Admins get an email after each plan change.
+
+In force now
+  pa_4Hs8Lm2Qx6Vr9Tc3@3
+    G1   No user loses access by surprise when the org changes plan.
+    FR3  A plan change that leaves too many seats is blocked.
+```
+
+The lines under a version are the lines of `skopos diff` between that version
+and the one before it. A missing version is a warning, not an error. When a
+second team starts a new artifact with the first one as an `input` parent,
+the first artifact comes first, and an item of the new artifact that
+supersedes an item of the first one shows under its version. Section 8.3 of
+the [specification](../../spec/0.2/README.md) says how the tool reads a
+history.
+
+With `--since 2`, the tool shows only the versions after version 2. With
+`--json`, it writes the whole history as JSON, with the steps of each item.
+
+### trace
+
+`skopos trace` shows the life of one item: each version that changed it, its
+state now, and the items that replace it, with their rationale, detail and
+evidence.
+
+```bash
+skopos trace pa_4Hs8Lm2Qx6Vr9Tc3#FR1 specs/*.skopos.json
+```
+
+```
+pa_4Hs8Lm2Qx6Vr9Tc3#FR1  requirement
+now: superseded by pa_4Hs8Lm2Qx6Vr9Tc3@3#FR3 (last in pa_4Hs8Lm2Qx6Vr9Tc3@2)
+
+version 1  added       proposed
+    A plan change that leaves too many seats shows a warning.
+version 2  changed     status, text (status proposed -> accepted)
+    A plan change that leaves too many seats shows a warning with the count.
+version 3  superseded  by FR3
+
+pa_4Hs8Lm2Qx6Vr9Tc3@3#FR3 (accepted)
+  A plan change that leaves too many seats is blocked.
+  detail: A warning was not enough: admins ignored it.
+```
+
+The version in the reference string is not needed, because an item ID means
+the same item in every version. An item ID alone, such as `FR2`, works if
+only one artifact has it. If the first version that you give is not
+version 1, its items show as `seen`, because they can be older. The exit code
+is 1 if no file has the item.
+
+### merge
+
+`skopos merge` merges two documents into one. The team picks one document as
+main. The result is the next version of main, as a draft, with the other
+document as an `input` parent. Section 8.4 of the
+[specification](../../spec/0.2/README.md) describes the merge.
+
+```bash
+skopos merge main.skopos.json other.skopos.json --base v1.skopos.json -o merged.skopos.json
+```
+
+The tool writes the merged document, and a summary to standard error:
+
+```
+pa_5Qk9Ts3Hv7Mw2Zd8@2 + pa_8Rc2Nx6Jb4Pf1Lu5@1 -> pa_5Qk9Ts3Hv7Mw2Zd8@3 (draft)
+new        FR3  from FR1 of the other document
+envelope   title (main kept)
+1 conflict:
+  FR1 or FR3: text
+```
+
+- With `--base`, the common earlier version, items with an ID of the base
+  pair by ID. A field that only one document changed merges by itself.
+- Without `--base`, for example for two drafts from the same input, items of
+  the same type with similar text pair. The summary shows each pair, such as
+  `paired     FR1 = FR2 (text, 96%)`. If a pair is wrong, merge again with
+  `--pair MAIN_ID=OTHER_ID` for each pair that is right. Then no other items
+  pair.
+- An item of the other document that is new in the result gets a new ID
+  from the counters of main, and a `derived_from` ref to where it came from.
+  Refs to it are rewritten.
+- A conflict is never a marker in the text. Both items stay as `proposed`,
+  and the item of the other document has a `contradicts` ref to the item of
+  main. So the merged file is always a valid document.
+
+The result is in the format of main, or in the format of the `-o` file. With
+`--json`, the tool writes the whole result as JSON: the document, the pairs,
+the conflicts, the new IDs and the envelope fields that are different.
+
+### conflicts and resolve
+
+`skopos conflicts` lists the conflicts of a merged document that are still
+open. The exit code is 1 while a conflict is open, so CI can stop a merge
+that is not finished.
+
+```bash
+skopos conflicts merged.skopos.json
+```
+
+```
+FR1 or FR3: text
+```
+
+`skopos resolve` accepts one item of a conflict and rejects the other one,
+and writes the file again. The rejected item stays in the record. You can
+also set `status` in any editor.
+
+```bash
+skopos resolve merged.skopos.json FR3
+```
+
+### render
+
+`skopos render` shows a document for people to read: text in the terminal, or
+an HTML page with `--html`. With `--previous`, it marks what changed since an
+earlier version.
+
+```bash
+skopos render spec.skopos.yaml
+skopos render spec-v3.skopos.json --previous spec-v2.skopos.json --html -o spec.html
+```
+
+```
+Σ• Spec · version 3 · draft
+Spec: seat limits on plan changes
+
+17 items: 15 accepted, 1 proposed, 1 rejected.
+Since version 2: 6 added, 5 changed, 1 superseded.
+
+Requirements (2)
++ FR4  A plan change that leaves more seats in use than the new limit is
+       blocked. [must]
+       supersedes: FR2
+  FR3  The seat count never goes below zero. [should]
+```
+
+The text has colors only when the output is a terminal and `NO_COLOR` is not
+set. `--width` sets the width of a line. For HTML, `--no-style` leaves out the
+default stylesheet, `--css FILE` adds your CSS, and `--fragment` writes only
+the document element. See [docs/render.md](../../docs/render.md) for the
+class names and the CSS custom properties.
 
 ## License
 

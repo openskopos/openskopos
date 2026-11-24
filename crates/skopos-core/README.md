@@ -1,7 +1,7 @@
 # skopos-core
 
 `skopos-core` is the reference implementation of the
-[OpenSkopos](https://github.com/openskopos/openskopos) format 0.1 in Rust. It
+[OpenSkopos](https://github.com/openskopos/openskopos) format 0.2 in Rust. It
 reads, checks and writes documents.
 
 All functions are pure. Their inputs are strings or `serde_json::Value`
@@ -12,13 +12,18 @@ does not use the network. It builds for `wasm32-unknown-unknown`.
 
 | Function | What it does |
 |---|---|
-| `check(&Value) -> Vec<Problem>` | Finds all problems in a document. The schema problems are first, then the problems with the rules in section 9 of the specification. If the list is empty, the document is valid. |
+| `check(&Value) -> Vec<Problem>` | Finds all problems in a document, each with a hint, and a fix when the fix is certain. The schema problems are first, then the problems with the rules in section 9 of the specification. If the list is empty, the document is valid. |
 | `check_schema`, `check_rules` | Run only the schema checks, or only the section 9 rules. |
 | `parse(&str, Format) -> Result<Value, Problem>` | Reads JSON or YAML text. |
 | `write(&Value, Format) -> String` | Writes a document as JSON or YAML with the canonical layout. If you parse the text again, you get the same value. |
 | `assign_ids(&mut Value) -> Result<IdReport, Vec<Problem>>` | Adds an ID to each item that has no ID, and updates `id_counters` (specification section 7). |
 | `parse_item_id(&str)` | Reads an item ID, for example `CR12`, and returns its type and number. |
 | `diff::diff(&Value, &Value) -> Diff` | Compares two versions by item ID. The result has the items that were added, changed, dropped and superseded. `Diff::to_text` returns one line for each item. |
+| `history::history(&[Value]) -> History` | Reads documents from one or more artifacts, in any order, as one history: the chain of versions of each artifact, what each version changed, and the steps and state of each item (in force, proposed, rejected, superseded or dropped). A missing version is a warning. See section 8.3 of the specification. `History::to_text` and `History::trace_text` write it for people. |
+| `merge::merge(&Value, &Value, &Options) -> Result<Merge, Problem>` | Merges two documents into the next version of the first one (main), with the other as an input parent. The options are a `base` (the common earlier version), confirmed `pairs` and `now`. A conflict keeps both items as `proposed`, with a `contradicts` ref. See section 8.4 of the specification. `merge::conflicts` lists the open conflicts of a merged document, and `merge::resolve` accepts one item of a pair and rejects the other. |
+| `words::word_diff(&str, &str) -> Vec<Span>` | Compares two texts word by word. Each `Span` has an `op` (`same`, `del` or `ins`) and its `text`. `diff` gives these spans for the texts of changed items (`text_spans`, `field_spans`), and `merge` for each conflict (`text_spans`, with `base_text` in a merge with a base). |
+| `render::html(&Value, &HtmlOptions) -> String` | Renders a document as semantic HTML with `sk-` class names: a full page with the default stylesheet `render::STYLESHEET`, or only the document element. With `previous`, it marks what changed since an earlier version. See [docs/render.md](../../docs/render.md). |
+| `render::terminal(&Value, &TerminalOptions) -> String` | Renders a document as text for a terminal, with or without colors. |
 | `export::export(&Value, Tool, &Options) -> Export` | Makes the files of OpenSpec, Kiro or Spec Kit from a document. The result has the files, and the items that the function did not export. See [docs/exporters.md](../../docs/exporters.md). |
 
 A `Problem` has three fields:
@@ -27,7 +32,13 @@ A `Problem` has three fields:
 |---|---|
 | `path` | The location of the problem, as a JSON Pointer. An empty string is the full document. `/items/3/id` is the `id` of the fourth item. |
 | `rule` | The name of the rule in section 9, for example `unique-item-ids`. For a schema problem, `rule` is `None`. |
-| `message` | What is wrong, in plain words. |
+| `message` | What is wrong, in the words of the schema or the rule. |
+| `hint` | One plain sentence for people that says what to do, for example `C1 needs a modality: always, never, ask_first, prefer or avoid.` |
+| `fix` | A `Fix` when the fix needs no choice from a person, else `None`. A `Fix` has a `label` and a `patch` of JSON Patch operations (RFC 6902). |
+
+The module `fix` applies fixes: `fix::apply(&Value, &Fix)` applies one, and
+`fix::fix_all(&Value)` applies fixes and checks again until no problem has a
+fix.
 
 The module `model` has serde types for a valid document, for example
 `Document`, `Item` and `ItemType`. Use `check` on the value before you
@@ -121,8 +132,8 @@ configuration.
 
 ## The schema
 
-The crate contains a copy of `schema/artifact/0.1.json` in
-`schema/0.1.json`, so the published crate includes the schema. A test makes sure
+The crate contains a copy of `schema/artifact/0.2.json` in
+`schema/0.2.json`, so the published crate includes the schema. A test makes sure
 that the two files are the same. If you change the schema, copy it again.
 
 ## License

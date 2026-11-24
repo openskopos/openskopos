@@ -1,4 +1,4 @@
-//! Serde types for a document of format 0.1.
+//! Serde types for a document of format 0.2.
 //!
 //! These types are for valid documents. Use [`crate::check`] on the
 //! [`Value`] first: a document that is not valid can fail to deserialize.

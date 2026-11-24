@@ -19,8 +19,12 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use skopos_core::export::{self, Options, Tool};
+use skopos_core::fix::{fix_all, Fix};
 use skopos_core::markdown::Fill;
-use skopos_core::{assign_ids, check, diff, markdown, parse, write, Format, Problem, Value};
+use skopos_core::render::{self, HtmlOptions, TerminalOptions};
+use skopos_core::{
+    assign_ids, check, diff, history, markdown, merge, parse, write, Format, Problem, Value,
+};
 
 /// The file system and the terminal, as the commands see them.
 ///
@@ -66,7 +70,7 @@ pub enum Stream {
 #[command(
     name = "skopos",
     version,
-    about = "Check, format, convert, import, export and compare OpenSkopos documents"
+    about = "Check, format, convert, import, export, compare, trace, merge and render OpenSkopos documents"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -77,7 +81,8 @@ struct Cli {
 enum Command {
     /// Check documents against the schema and the rules of the specification.
     ///
-    /// The exit code is 1 if a document has a problem.
+    /// The exit code is 1 if a document has a problem. With --json, each
+    /// problem has a hint for people, and a fix when the fix needs no choice.
     Check {
         /// JSON, YAML or Markdown files (.json, .yaml, .yml or .md)
         #[arg(required = true)]
@@ -85,6 +90,11 @@ enum Command {
         /// Write the problems as JSON
         #[arg(long)]
         json: bool,
+        /// Apply the fixes that need no choice, such as a counter that is too
+        /// low, and write each JSON or YAML file again. Name each fix. The
+        /// problems that are left need a person.
+        #[arg(long)]
+        fix: bool,
     },
     /// Write documents again in the canonical key order and layout.
     Fmt {
@@ -185,6 +195,127 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Read versions of one or more artifacts and show what each version
+    /// decided, then the items in force now.
+    ///
+    /// Give the files in any order. A missing version is a warning. An
+    /// artifact that has another one as an input comes after it.
+    History {
+        /// JSON, YAML or Markdown files
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Show only the versions after this version number
+        #[arg(long, value_name = "VERSION")]
+        since: Option<u64>,
+        /// Write the history as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show the life of one item across versions and artifacts, and what
+    /// replaced it and why.
+    Trace {
+        /// A reference string such as pa_2Xc5Rv8Tn1Mb4Kz7#FR2, or an item ID
+        /// such as FR2 if only one artifact has it
+        reference: String,
+        /// JSON, YAML or Markdown files
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Write the life of the item as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Merge two documents into the next version of the first one.
+    ///
+    /// The result has the other document as an input parent. A conflict
+    /// keeps both items as proposed, with a contradicts ref between them, so
+    /// the result is always a valid document. Without --base or --pair,
+    /// items of the same type with similar text are paired.
+    Merge {
+        /// The document to continue: the result is its next version
+        main: PathBuf,
+        /// The document to merge into it
+        other: PathBuf,
+        /// The common earlier version. Items then pair by ID, and a change
+        /// that only one side made merges by itself.
+        #[arg(long, value_name = "FILE")]
+        base: Option<PathBuf>,
+        /// Two items that are the same item, as MAIN_ID=OTHER_ID. Give it
+        /// once for each pair. No other items pair.
+        #[arg(long = "pair", value_name = "MAIN_ID=OTHER_ID")]
+        pairs: Vec<String>,
+        /// The file to write. Without it, the document goes to standard
+        /// output in the format of main.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Write the whole result as JSON: the document, the pairs, the
+        /// conflicts and the renamed items
+        #[arg(long)]
+        json: bool,
+    },
+    /// List the conflicts of a merged document that are still open.
+    ///
+    /// The exit code is 1 while a conflict is open.
+    Conflicts {
+        /// A merged document
+        file: PathBuf,
+        /// Write the conflicts as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Accept an item of an open conflict and reject the other item of its
+    /// pair. The file is written again.
+    Resolve {
+        /// A merged document, as JSON or YAML
+        file: PathBuf,
+        /// The ID of the item to accept
+        id: String,
+    },
+    /// Show a document for people: as text in the terminal, or as HTML.
+    ///
+    /// The view has the title and summary, one line for each item with its
+    /// ID, and the details of each item. With --previous, it also marks the
+    /// items that were added and changed, shows the changed words, and lists
+    /// the items that were removed.
+    ///
+    /// The text has colors only in a terminal. In a pipe, a file, or with
+    /// NO_COLOR set, it is plain text: `+` marks an added item, `~` a changed
+    /// item, and changed words are `[-old-]` and `{+new+}`.
+    ///
+    /// The HTML class names and CSS custom properties are at
+    /// https://openskopos.org/docs/render/
+    Render {
+        /// A JSON, YAML or Markdown file
+        file: PathBuf,
+        /// Write HTML: one self-contained page with the default stylesheet
+        #[arg(long)]
+        html: bool,
+        /// HTML: leave out the default stylesheet
+        #[arg(long, requires = "html")]
+        no_style: bool,
+        /// HTML: add the CSS of this file after the default stylesheet
+        #[arg(long, value_name = "FILE", requires = "html")]
+        css: Option<PathBuf>,
+        /// HTML: write only the document element, to put in a page of your
+        /// own, with no page and no stylesheet
+        #[arg(long, requires = "html", conflicts_with_all = ["no_style", "css"])]
+        fragment: bool,
+        /// An earlier version of the document to compare with
+        #[arg(long, value_name = "FILE")]
+        previous: Option<PathBuf>,
+        /// Text: the width of a line
+        #[arg(long, default_value_t = 80, conflicts_with = "html")]
+        width: usize,
+        /// The file to write. Without it, the view goes to standard output.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+    },
+}
+
+/// The HTML options of `skopos render`.
+struct HtmlArgs {
+    no_style: bool,
+    css: Option<PathBuf>,
+    fragment: bool,
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -255,7 +386,7 @@ where
     };
     let mut cmd = Commands { host };
     let ok = match cli.command {
-        Command::Check { files, json } => cmd.check(&files, json),
+        Command::Check { files, json, fix } => cmd.check(&files, json, fix),
         Command::Fmt { files, check } => cmd.fmt(&files, check),
         Command::Convert {
             file,
@@ -290,6 +421,49 @@ where
             dry_run,
         ),
         Command::Diff { old, new, json } => cmd.diff(&old, &new, json),
+        Command::History { files, since, json } => cmd.history(&files, since, json),
+        Command::Trace {
+            reference,
+            files,
+            json,
+        } => cmd.trace(&reference, &files, json),
+        Command::Merge {
+            main,
+            other,
+            base,
+            pairs,
+            output,
+            json,
+        } => cmd.merge(
+            &main,
+            &other,
+            base.as_deref(),
+            &pairs,
+            output.as_deref(),
+            json,
+        ),
+        Command::Conflicts { file, json } => cmd.conflicts(&file, json),
+        Command::Resolve { file, id } => cmd.resolve(&file, &id),
+        Command::Render {
+            file,
+            html,
+            no_style,
+            css,
+            fragment,
+            previous,
+            width,
+            output,
+        } => cmd.render(
+            &file,
+            previous.as_deref(),
+            html.then_some(HtmlArgs {
+                no_style,
+                css,
+                fragment,
+            }),
+            width,
+            output.as_deref(),
+        ),
     };
     if ok {
         0
@@ -380,6 +554,9 @@ fn speckit_folder_number(folder: &str) -> Option<(u32, &str)> {
 #[derive(Serialize)]
 struct FileProblems {
     file: String,
+    /// With --fix: the fixes that the tool applied.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    fixed: Vec<Fix>,
     problems: Vec<Problem>,
 }
 
@@ -500,19 +677,30 @@ impl Commands<'_> {
         None
     }
 
-    fn check(&mut self, files: &[PathBuf], json: bool) -> bool {
-        let results: Vec<FileProblems> = files
-            .iter()
-            .map(|path| FileProblems {
+    fn check(&mut self, files: &[PathBuf], json: bool, fix: bool) -> bool {
+        let mut results = Vec::with_capacity(files.len());
+        for path in files {
+            let mut fixed = vec![];
+            let problems = match self.read_any_with_format(path) {
+                // The Markdown reader already checked the document.
+                Ok((_, FileFormat::Markdown)) => vec![],
+                Ok((doc, FileFormat::Data(format))) if fix => {
+                    let (new_doc, applied) = fix_all(&doc);
+                    if !applied.is_empty() && !self.write_file(path, &write(&new_doc, format)) {
+                        return false;
+                    }
+                    fixed = applied;
+                    check(&new_doc)
+                }
+                Ok((doc, FileFormat::Data(_))) => check(&doc),
+                Err(problems) => problems,
+            };
+            results.push(FileProblems {
                 file: path.display().to_string(),
-                problems: match self.read_any_with_format(path) {
-                    // The Markdown reader already checked the document.
-                    Ok((_, FileFormat::Markdown)) => vec![],
-                    Ok((doc, FileFormat::Data(_))) => check(&doc),
-                    Err(problems) => problems,
-                },
-            })
-            .collect();
+                fixed,
+                problems,
+            });
+        }
         let with_problems = results.iter().filter(|r| !r.problems.is_empty()).count();
 
         if json {
@@ -520,10 +708,19 @@ impl Commands<'_> {
             text.push('\n');
             self.out(&text);
         } else {
-            let lines: String = results
-                .iter()
-                .flat_map(|r| r.problems.iter().map(move |p| format!("{}: {p}\n", r.file)))
-                .collect();
+            let mut lines = String::new();
+            for r in &results {
+                for f in &r.fixed {
+                    lines.push_str(&format!("{}: fixed: {}\n", r.file, f.label));
+                }
+                for p in &r.problems {
+                    lines.push_str(&format!("{}: {p}\n", r.file));
+                    // The hint, when it says more than the message.
+                    if !p.hint.is_empty() && p.hint != Problem::new("", &p.message).hint {
+                        lines.push_str(&format!("  {}\n", p.hint));
+                    }
+                }
+            }
             self.out(&lines);
             let count: usize = results.iter().map(|r| r.problems.len()).sum();
             if count == 0 {
@@ -535,6 +732,21 @@ impl Commands<'_> {
                     with_problems,
                     plural(files.len(), "file")
                 ));
+                let fixable = results
+                    .iter()
+                    .flat_map(|r| &r.problems)
+                    .filter(|p| p.fix.is_some())
+                    .count();
+                if fixable > 0 {
+                    self.err(&format!(
+                        "{} can be fixed with skopos check --fix.",
+                        if fixable == 1 {
+                            "1 problem".to_string()
+                        } else {
+                            format!("{fixable} problems")
+                        }
+                    ));
+                }
             }
         }
         with_problems == 0
@@ -915,6 +1127,242 @@ impl Commands<'_> {
             self.out(&text)
         } else {
             self.out(&d.to_text())
+        }
+    }
+
+    /// Reads and checks each file. Reports the problems of every file.
+    fn read_all_valid(&mut self, files: &[PathBuf]) -> Option<Vec<Value>> {
+        let docs: Vec<Option<Value>> = files.iter().map(|p| self.read_valid(p)).collect();
+        docs.into_iter().collect()
+    }
+
+    fn history(&mut self, files: &[PathBuf], since: Option<u64>, json: bool) -> bool {
+        let Some(docs) = self.read_all_valid(files) else {
+            return false;
+        };
+        let h = history::history(&docs);
+        if json {
+            let mut text = serde_json::to_string_pretty(&h).expect("a history serializes");
+            text.push('\n');
+            self.out(&text)
+        } else {
+            self.out(&h.to_text(since))
+        }
+    }
+
+    fn trace(&mut self, reference: &str, files: &[PathBuf], json: bool) -> bool {
+        let Some(docs) = self.read_all_valid(files) else {
+            return false;
+        };
+        let h = history::history(&docs);
+        let item = match h.find(reference) {
+            Ok(item) => item,
+            Err(e) => {
+                self.err(&e);
+                return false;
+            }
+        };
+        if json {
+            let mut text = serde_json::to_string_pretty(item).expect("an item serializes");
+            text.push('\n');
+            self.out(&text)
+        } else {
+            self.out(&h.trace_text(item))
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn merge(
+        &mut self,
+        main_path: &Path,
+        other_path: &Path,
+        base_path: Option<&Path>,
+        pair_args: &[String],
+        output: Option<&Path>,
+        json: bool,
+    ) -> bool {
+        let mut pairs = Vec::new();
+        for p in pair_args {
+            match p.split_once('=') {
+                Some((m, o)) if !m.is_empty() && !o.is_empty() => {
+                    pairs.push((m.to_string(), o.to_string()))
+                }
+                _ => {
+                    self.err(&format!("--pair {p}: write the pair as MAIN_ID=OTHER_ID"));
+                    return false;
+                }
+            }
+        }
+        let Some((main, main_format)) = self.read_valid_with_format(main_path) else {
+            return false;
+        };
+        let Some(other) = self.read_valid(other_path) else {
+            return false;
+        };
+        let base = match base_path {
+            Some(path) => match self.read_valid(path) {
+                Some(doc) => Some(doc),
+                None => return false,
+            },
+            None => None,
+        };
+        let format = match output.map(format_of) {
+            Some(Ok(format)) => format,
+            Some(Err(problem)) => {
+                self.report(output.expect("given"), &problem);
+                return false;
+            }
+            None => main_format,
+        };
+        let options = merge::Options {
+            base: base.as_ref(),
+            pairs: (!pairs.is_empty()).then_some(pairs),
+            now: Some(self.host.fill().now),
+        };
+        let result = match merge::merge(&main, &other, &options) {
+            Ok(r) => r,
+            Err(problem) => {
+                self.report(other_path, &problem);
+                return false;
+            }
+        };
+        let problems = check(&result.doc);
+        if !problems.is_empty() {
+            for p in &problems {
+                self.err(&format!("merged document: {p}"));
+            }
+            return false;
+        }
+        if json {
+            let mut text = serde_json::to_string_pretty(&result).expect("a merge serializes");
+            text.push('\n');
+            return match output {
+                Some(path) => self.write_file(path, &text),
+                None => self.out(&text),
+            };
+        }
+        let text = match format {
+            FileFormat::Data(f) => write(&result.doc, f),
+            FileFormat::Markdown => markdown::write(&result.doc, &[]),
+        };
+        let ok = match output {
+            Some(path) => self.write_file(path, &text),
+            None => self.out(&text),
+        };
+        let summary = result.to_text();
+        self.host.stderr(&summary);
+        ok
+    }
+
+    /// [`Self::read_valid`], with the format of the file.
+    fn read_valid_with_format(&mut self, path: &Path) -> Option<(Value, FileFormat)> {
+        let format = format_of(path).ok();
+        let doc = self.read_valid(path)?;
+        Some((doc, format?))
+    }
+
+    fn conflicts(&mut self, file: &Path, json: bool) -> bool {
+        let Some(doc) = self.read_valid(file) else {
+            return false;
+        };
+        let open = merge::conflicts(&doc);
+        if json {
+            let mut text = serde_json::to_string_pretty(&open).expect("conflicts serialize");
+            text.push('\n');
+            self.out(&text);
+        } else {
+            let lines: String = open.iter().map(|c| format!("{c}\n")).collect();
+            self.out(&lines);
+            if open.is_empty() {
+                self.err(&format!("{}: no open conflicts.", file.display()));
+            } else {
+                self.err(&format!(
+                    "{}: {} open. Accept one item of each pair with skopos resolve, or set status in the file.",
+                    file.display(),
+                    plural(open.len(), "conflict")
+                ));
+            }
+        }
+        open.is_empty()
+    }
+
+    fn resolve(&mut self, file: &Path, id: &str) -> bool {
+        let (format, _, mut doc) = match self.read(file) {
+            Ok(r) => r,
+            Err(problem) => {
+                self.report(file, &problem);
+                return false;
+            }
+        };
+        match merge::resolve(&mut doc, id) {
+            Ok(r) => {
+                self.err(&format!(
+                    "{}: accepted {}, rejected {}",
+                    file.display(),
+                    r.accepted,
+                    r.rejected
+                ));
+                self.write_file(file, &write(&doc, format))
+            }
+            Err(problem) => {
+                self.report(file, &problem);
+                false
+            }
+        }
+    }
+
+    fn render(
+        &mut self,
+        file: &Path,
+        previous: Option<&Path>,
+        html: Option<HtmlArgs>,
+        width: usize,
+        output: Option<&Path>,
+    ) -> bool {
+        let Some(doc) = self.read_or_report(file) else {
+            return false;
+        };
+        let previous = match previous {
+            Some(path) => match self.read_or_report(path) {
+                Some(p) => Some(p),
+                None => return false,
+            },
+            None => None,
+        };
+        let text = match html {
+            Some(h) => {
+                let css = match &h.css {
+                    Some(path) => match self.read_text(path) {
+                        Ok(t) => Some(t),
+                        Err(p) => {
+                            self.report(path, &p);
+                            return false;
+                        }
+                    },
+                    None => None,
+                };
+                render::html(
+                    &doc,
+                    &HtmlOptions {
+                        previous: previous.as_ref(),
+                        fragment: h.fragment,
+                        style: !h.no_style,
+                        css: css.as_deref(),
+                    },
+                )
+            }
+            None => render::terminal(
+                &doc,
+                &TerminalOptions {
+                    previous: previous.as_ref(),
+                    color: output.is_none() && self.host.color(Stream::Stdout),
+                    width,
+                },
+            ),
+        };
+        match output {
+            Some(path) => self.write_file(path, &text),
+            None => self.out(&text),
         }
     }
 }

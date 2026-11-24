@@ -71,7 +71,29 @@
         "confirmation",
         "evidence",
         "text"
-      ]
+      ],
+      "text_spans": [
+        {
+          "op": "same",
+          "text": "Seat counts are"
+        },
+        {
+          "op": "del",
+          "text": "exact."
+        },
+        {
+          "op": "ins",
+          "text": "exact at the time of the plan change."
+        }
+      ],
+      "field_spans": {
+        "confirmation": [
+          {
+            "op": "ins",
+            "text": "refuted"
+          }
+        ]
+      }
     },
     {
       "id": "Q2",
@@ -80,7 +102,15 @@
       "fields": [
         "answer",
         "refs"
-      ]
+      ],
+      "field_spans": {
+        "answer": [
+          {
+            "op": "ins",
+            "text": "No, guests are free."
+          }
+        ]
+      }
     },
     {
       "id": "Q1",

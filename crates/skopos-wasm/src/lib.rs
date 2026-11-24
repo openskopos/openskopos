@@ -30,7 +30,9 @@ use js_sys::{Array, Reflect, Uint8Array};
 use serde::Serialize;
 use serde_json::Value;
 use skopos_core::export::{self, Options, Tool};
+use skopos_core::fix::Fix;
 use skopos_core::markdown::{self, Fill, Warning};
+use skopos_core::render::{self, HtmlOptions, TerminalOptions};
 use skopos_core::{AssignedId, Format, Problem};
 use wasm_bindgen::prelude::*;
 
@@ -87,14 +89,40 @@ export interface Document {
   [key: string]: unknown;
 }
 
+/** One JSON Patch operation (RFC 6902). */
+export interface PatchOp {
+  op: "add" | "replace" | "remove";
+  /** A JSON Pointer. */
+  path: string;
+  value?: unknown;
+}
+
+/** A change that fixes a problem and needs no choice from a person. */
+export interface Fix {
+  /** What the fix does, for example "Set the counter for FR to 4". */
+  label: string;
+  patch: PatchOp[];
+}
+
 /** One problem in a document. */
 export interface Problem {
   /** Where the problem is, as a JSON Pointer. "" is the whole document. */
   path: string;
   /** The name of the rule of specification section 9, or null for a schema problem. */
   rule: string | null;
-  /** What is wrong, in words for people. */
+  /** What is wrong, in the words of the schema or the rule. */
   message: string;
+  /** One plain sentence for people that says what to do. */
+  hint: string;
+  /** Present when the problem has a certain fix. Apply it with `applyFix`. */
+  fix?: Fix;
+}
+
+/** The result of `fixAll`. */
+export interface FixAllResult {
+  doc: Document;
+  /** The fixes that were applied, in order. */
+  fixed: Fix[];
 }
 
 /** A thing that the Markdown reader skipped or changed (specification 10.6). */
@@ -194,10 +222,17 @@ export interface Export {
 
 export interface VersionRef { artifact: string; version: number | null; }
 export interface ItemSummary { id: string; type: string; text: string; }
+/** A piece of text in a word diff: in both texts, removed or new. */
+export interface TextSpan { op: "same" | "del" | "ins"; text: string; }
+
 export interface ChangedItem extends ItemSummary {
   fields: string[];
   status_from?: string | null;
   status_to?: string | null;
+  /** If `text` changed: the old and new text, word by word. */
+  text_spans?: TextSpan[];
+  /** Each other changed field with a text value, word by word. Not `status`. */
+  field_spans?: Record<string, TextSpan[]>;
 }
 export interface SupersededItem extends ItemSummary { by: string[]; }
 
@@ -211,6 +246,183 @@ export interface Diff {
   changed: ChangedItem[];
   dropped: ItemSummary[];
   superseded: SupersededItem[];
+}
+
+export interface HistoryVersion {
+  version: number;
+  status: string;
+  title: string;
+  created_at: string;
+  finalized_at: string | null;
+  /** The number of items. */
+  items: number;
+  /** The changes from the version before it in the chain. null for the first version of the chain. */
+  diff: Diff | null;
+}
+
+/** The versions of one artifact, in version order. */
+export interface HistoryChain {
+  artifact: string;
+  kind: string;
+  title: string;
+  versions: HistoryVersion[];
+}
+
+/** An `input` parent that names a version of an artifact. */
+export interface HistoryLink {
+  artifact: string;
+  version: number;
+  input_artifact: string;
+  input_version: number;
+  /** True if that version is one of the documents. */
+  present: boolean;
+}
+
+export interface HistoryWarning { artifact: string | null; message: string; }
+
+export type ItemState = "in_force" | "proposed" | "rejected" | "superseded" | "dropped";
+
+/** One step in the life of an item. */
+export interface HistoryStep {
+  version: number;
+  change: "seen" | "added" | "changed" | "superseded" | "dropped";
+  /** The status after the step. Absent if the item was removed. */
+  status?: string;
+  /** For "changed": the fields that changed. */
+  fields?: string[];
+  status_from?: string;
+  status_to?: string;
+  /** For "superseded": the IDs of the items that replace it. */
+  by?: string[];
+  /** For "seen", "added" and "changed": the whole item after the step. */
+  item?: Item;
+}
+
+/** The life of one item across versions and artifacts. */
+export interface ItemHistory {
+  /** `<artifact id>#<item id>`, the same in every version. */
+  key: string;
+  artifact: string;
+  id: string;
+  type: string;
+  text: string;
+  status: string;
+  /** The reference string in the last version that has the item. */
+  reference: string;
+  first_version: number;
+  last_version: number;
+  state: ItemState;
+  changed: boolean;
+  steps: HistoryStep[];
+  supersedes: string[];
+  superseded_by: string[];
+  derived_from: string[];
+  derived_into: string[];
+}
+
+/** The result of `history`. */
+export interface History {
+  chains: HistoryChain[];
+  links: HistoryLink[];
+  items: ItemHistory[];
+  warnings: HistoryWarning[];
+}
+
+/** Options for `historyText`. */
+export interface HistoryTextOptions {
+  /** Show only the versions after this version number. */
+  since?: number;
+}
+
+/** Options for `merge` and `mergeText`. */
+export interface MergeOptions {
+  /** The common earlier version. Items with an ID of the base pair by ID. */
+  base?: Document;
+  /** Pairs that people confirmed, as [main ID, other ID]. No other items pair. */
+  pairs?: [string, string][];
+  /** The time for created_at of the result. Default: now. */
+  now?: string;
+}
+
+/** Two items that are the same item. */
+export interface MergePair {
+  main: string;
+  other: string;
+  by: "id" | "text" | "given";
+  /** For a pair by text: how similar the texts are, from 0 to 100. */
+  similarity?: number;
+}
+
+/** A conflict in the merged document. Its items are proposed. */
+export interface MergeConflict {
+  kind: "changed" | "removed_in_main" | "removed_in_other";
+  /** The ID in `doc` of the item of main, if there is one. */
+  main: string | null;
+  /** The ID in `doc` of the item of the other document, if there is one. */
+  other: string | null;
+  /** For "changed": the fields that are different. */
+  fields: string[];
+  /** If both items are in `doc`: main's text to the other's text, word by word. */
+  text_spans?: TextSpan[];
+  /** In a merge with a base: the text of the item in the base. */
+  base_text?: string;
+}
+
+/** The result of `merge`. */
+export interface MergeResult {
+  /** The next version of main, as a draft. */
+  doc: Document;
+  pairs: MergePair[];
+  conflicts: MergeConflict[];
+  /** Items of the other document with their IDs in `doc`. */
+  renamed: { from: string; to: string }[];
+  /** Envelope fields where the other document is different. `doc` keeps main's values. */
+  envelope: string[];
+}
+
+/** An open conflict of a merged document. */
+export interface OpenConflict {
+  main: string;
+  /** The item from the other document, with the contradicts ref. */
+  other: string;
+  fields: string[];
+}
+
+/** The result of `resolve`. */
+export interface ResolveResult {
+  doc: Document;
+  accepted: string;
+  rejected: string;
+}
+
+/** Options for `renderHtml`. */
+export interface RenderHtmlOptions {
+  /**
+   * An earlier version of the artifact. The view then marks the items that
+   * were added and changed, shows the changed words, and lists the items
+   * that were removed.
+   */
+  previous?: Document;
+  /**
+   * Give only the `<article class="sk-doc">` element, to put in a page of
+   * your own: no `<html>`, `<head>` or `<style>`. Use `stylesheet()` for the
+   * CSS. Default: false.
+   */
+  fragment?: boolean;
+  /** Put the default stylesheet in the page. Default: true. */
+  style?: boolean;
+  /** More CSS to put in the page, after the default stylesheet. */
+  css?: string;
+}
+
+/** Options for `renderTerminal`. */
+export interface RenderTerminalOptions {
+  /** An earlier version of the artifact, as for `renderHtml`. */
+  previous?: Document;
+  /** Use ANSI colors. Default: false. */
+  color?: boolean;
+  /** The width of a line, in characters. Default: 80. */
+  width?: number;
 }
 
 /**
@@ -379,6 +591,33 @@ pub fn check(
     Ok(to_js(&skopos_core::check(&from_js(&doc, "doc")?)))
 }
 
+/// Applies the fix of a problem to a document and returns the new document.
+/// The document that you give does not change. Throws a `SkoposError` if the
+/// fix does not fit the document.
+#[wasm_bindgen(js_name = applyFix, unchecked_return_type = "Document")]
+pub fn apply_fix(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Fix")] fix: JsValue,
+) -> Result<JsValue, JsValue> {
+    let doc = from_js(&doc, "doc")?;
+    let fix: Fix = serde_json::from_value(from_js(&fix, "fix")?)
+        .map_err(|e| type_error(&format!("fix must be {{ label, patch }}: {e}")))?;
+    skopos_core::fix::apply(&doc, &fix)
+        .map(|d| to_js(&d))
+        .map_err(|p| problems_error(&[p]))
+}
+
+/// Applies the fixes of all problems that have one, and checks again after
+/// each fix. Returns `{ doc, fixed }`. The problems that are left need a
+/// person.
+#[wasm_bindgen(js_name = fixAll, unchecked_return_type = "FixAllResult")]
+pub fn fix_all(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+) -> Result<JsValue, JsValue> {
+    let (doc, fixed) = skopos_core::fix::fix_all(&from_js(&doc, "doc")?);
+    Ok(to_js(&serde_json::json!({ "doc": doc, "fixed": fixed })))
+}
+
 /// Finds the problems of a document with the JSON Schema only.
 #[wasm_bindgen(js_name = checkSchema, unchecked_return_type = "Problem[]")]
 pub fn check_schema(
@@ -471,13 +710,13 @@ pub fn parse_item_id(id: &str) -> JsValue {
     }
 }
 
-/// The JSON Schema of format 0.1, as text.
+/// The JSON Schema of format 0.2, as text.
 #[wasm_bindgen]
 pub fn schema() -> String {
     skopos_core::SCHEMA.to_string()
 }
 
-/// The URL of the JSON Schema of format 0.1.
+/// The URL of the JSON Schema of format 0.2.
 #[wasm_bindgen(js_name = schemaUrl)]
 pub fn schema_url() -> String {
     skopos_core::SCHEMA_URL.to_string()
@@ -656,6 +895,178 @@ pub fn diff_text(
 ) -> Result<String, JsValue> {
     let d = skopos_core::diff::diff(&from_js(&old_doc, "oldDoc")?, &from_js(&new_doc, "newDoc")?);
     Ok(d.to_text())
+}
+
+// ------------------------------------------------------------------ words
+
+/// The difference between two texts, word by word, as `diff` and `merge`
+/// give it.
+#[wasm_bindgen(js_name = wordDiff, unchecked_return_type = "TextSpan[]")]
+pub fn word_diff(old: &str, new: &str) -> JsValue {
+    to_js(&skopos_core::words::word_diff(old, new))
+}
+
+// ------------------------------------------------------------------ history
+
+fn history_of(docs: &JsValue) -> Result<skopos_core::history::History, JsValue> {
+    let docs = from_js(docs, "docs")?;
+    let docs = docs
+        .as_array()
+        .ok_or_else(|| type_error("docs must be a list of documents"))?;
+    Ok(skopos_core::history::history(docs))
+}
+
+/// The history of documents from one or more artifacts, in any order: the
+/// chain of versions of each artifact, what each version changed, and the
+/// life and state of each item. Does not check the documents: use `check`
+/// first.
+#[wasm_bindgen(unchecked_return_type = "History")]
+pub fn history(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&history_of(&docs)?))
+}
+
+/// `history(docs)` as text for people, as `skopos history` writes it.
+#[wasm_bindgen(js_name = historyText)]
+pub fn history_text(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "HistoryTextOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let options = from_js_opt(&options, "options")?;
+    let since = match options.as_ref().and_then(|o| o.get("since")) {
+        None | Some(Value::Null) => None,
+        Some(n) => Some(
+            n.as_u64()
+                .ok_or_else(|| type_error("options.since must be a whole number"))?,
+        ),
+    };
+    Ok(history_of(&docs)?.to_text(since))
+}
+
+fn traced<T>(
+    docs: &JsValue,
+    reference: &str,
+    f: impl FnOnce(&skopos_core::history::History, &skopos_core::history::ItemHistory) -> T,
+) -> Result<T, JsValue> {
+    let h = history_of(docs)?;
+    match h.find(reference) {
+        Ok(item) => Ok(f(&h, item)),
+        Err(message) => {
+            let e = js_sys::Error::new(&message);
+            e.set_name("SkoposError");
+            Err(e.into())
+        }
+    }
+}
+
+/// The life of one item, from a reference string such as
+/// `pa_2Xc5Rv8Tn1Mb4Kz7#FR2`, or an item ID if only one artifact has it.
+/// Throws a `SkoposError` if no document has the item, or if the ID is in
+/// more than one artifact.
+#[wasm_bindgen(unchecked_return_type = "ItemHistory")]
+pub fn trace(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    reference: &str,
+) -> Result<JsValue, JsValue> {
+    traced(&docs, reference, |_, item| to_js(item))
+}
+
+/// `trace(docs, reference)` as text for people, as `skopos trace` writes it.
+#[wasm_bindgen(js_name = traceText)]
+pub fn trace_text(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    reference: &str,
+) -> Result<String, JsValue> {
+    traced(&docs, reference, |h, item| h.trace_text(item))
+}
+
+// ------------------------------------------------------------------ merge
+
+fn merge_of(
+    main: &JsValue,
+    other: &JsValue,
+    options: &Option<JsValue>,
+) -> Result<skopos_core::merge::Merge, JsValue> {
+    let main = from_js(main, "main")?;
+    let other = from_js(other, "other")?;
+    let options = from_js_opt(options, "options")?;
+    let base = match options.as_ref().and_then(|o| o.get("base")) {
+        None | Some(Value::Null) => None,
+        Some(b) => Some(b.clone()),
+    };
+    let pairs = match options.as_ref().and_then(|o| o.get("pairs")) {
+        None | Some(Value::Null) => None,
+        Some(p) => Some(
+            serde_json::from_value::<Vec<(String, String)>>(p.clone()).map_err(|e| {
+                type_error(&format!(
+                    "options.pairs must be a list of [mainId, otherId]: {e}"
+                ))
+            })?,
+        ),
+    };
+    let options = skopos_core::merge::Options {
+        base: base.as_ref(),
+        pairs,
+        now: Some(option_string(&options, "now").unwrap_or_else(now)),
+    };
+    skopos_core::merge::merge(&main, &other, &options).map_err(|p| problems_error(&[p]))
+}
+
+/// Merges two documents into the next version of main, with the other
+/// document as an input parent. A conflict keeps both items as proposed,
+/// with a contradicts ref. Does not check the documents: use `check` first.
+#[wasm_bindgen(unchecked_return_type = "MergeResult")]
+pub fn merge(
+    #[wasm_bindgen(unchecked_param_type = "Document")] main: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Document")] other: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "MergeOptions")] options: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&merge_of(&main, &other, &options)?))
+}
+
+/// The summary of `merge(main, other, options)` as text, as `skopos merge`
+/// writes it.
+#[wasm_bindgen(js_name = mergeText)]
+pub fn merge_text(
+    #[wasm_bindgen(unchecked_param_type = "Document")] main: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Document")] other: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "MergeOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    Ok(merge_of(&main, &other, &options)?.to_text())
+}
+
+/// The open conflicts of a merged document.
+#[wasm_bindgen(unchecked_return_type = "OpenConflict[]")]
+pub fn conflicts(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&skopos_core::merge::conflicts(&from_js(
+        &doc, "doc",
+    )?)))
+}
+
+/// Accepts the item with this ID and rejects the other item of its open
+/// conflict. Throws a `SkoposError` if the item is not in an open conflict.
+/// Does not change the document that you give to it.
+#[wasm_bindgen(unchecked_return_type = "ResolveResult")]
+pub fn resolve(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    id: &str,
+) -> Result<JsValue, JsValue> {
+    let mut doc = from_js(&doc, "doc")?;
+    let r = skopos_core::merge::resolve(&mut doc, id).map_err(|p| problems_error(&[p]))?;
+    #[derive(Serialize)]
+    struct ResolveResult<'a> {
+        doc: &'a Value,
+        accepted: &'a str,
+        rejected: &'a str,
+    }
+    Ok(to_js(&ResolveResult {
+        doc: &doc,
+        accepted: &r.accepted,
+        rejected: &r.rejected,
+    }))
 }
 
 // ------------------------------------------------------------------ CLI
@@ -846,4 +1257,75 @@ pub fn run_cli(args: Vec<String>, host: CliHost) -> u8 {
     let mut host = JsHost { js: host, platform };
     let argv = std::iter::once("skopos".to_string()).chain(args);
     skopos::run(argv, &mut host)
+}
+
+// ------------------------------------------------------------------ render
+
+/// The `previous` document of a render options object, if it is there.
+fn option_previous(options: &Option<Value>) -> Option<&Value> {
+    options.as_ref()?.get("previous").filter(|v| !v.is_null())
+}
+
+fn option_bool(options: &Option<Value>, key: &str) -> Result<Option<bool>, JsValue> {
+    match options.as_ref().and_then(|o| o.get(key)) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Bool(b)) => Ok(Some(*b)),
+        Some(_) => Err(type_error(&format!("options.{key} must be true or false"))),
+    }
+}
+
+/// Renders a document as HTML: one self-contained page, or with
+/// `fragment: true` only the `<article class="sk-doc">` element. Each item
+/// element has the item ID as its `id` and `data-id`. The class names are in
+/// docs/render.md.
+#[wasm_bindgen(js_name = renderHtml)]
+pub fn render_html(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "RenderHtmlOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let doc = from_js(&doc, "doc")?;
+    let options = from_js_opt(&options, "options")?;
+    let css = option_string(&options, "css");
+    Ok(render::html(
+        &doc,
+        &HtmlOptions {
+            previous: option_previous(&options),
+            fragment: option_bool(&options, "fragment")?.unwrap_or(false),
+            style: option_bool(&options, "style")?.unwrap_or(true),
+            css: css.as_deref(),
+        },
+    ))
+}
+
+/// Renders a document as text for a terminal, with ANSI colors if
+/// `color` is true.
+#[wasm_bindgen(js_name = renderTerminal)]
+pub fn render_terminal(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "RenderTerminalOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let doc = from_js(&doc, "doc")?;
+    let options = from_js_opt(&options, "options")?;
+    let width = match options.as_ref().and_then(|o| o.get("width")) {
+        None | Some(Value::Null) => 80,
+        Some(n) => n
+            .as_u64()
+            .and_then(|n| usize::try_from(n).ok())
+            .ok_or_else(|| type_error("options.width must be a whole number"))?,
+    };
+    Ok(render::terminal(
+        &doc,
+        &TerminalOptions {
+            previous: option_previous(&options),
+            color: option_bool(&options, "color")?.unwrap_or(false),
+            width,
+        },
+    ))
+}
+
+/// The default stylesheet of `renderHtml`. Every color and font is a
+/// `--sk-*` custom property; set them on `:root` to change them.
+#[wasm_bindgen]
+pub fn stylesheet() -> String {
+    render::STYLESHEET.to_string()
 }
