@@ -1,5 +1,5 @@
 {
-  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "$schema": "https://openskopos.org/schema/artifact/0.2.json",
   "id": "pa_5Qk9Ts3Hv7Mw2Zd8",
   "version": 1,
   "kind": "spec",

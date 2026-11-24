@@ -361,7 +361,7 @@ and the one before it. A missing version is a warning, not an error. When a
 second team starts a new artifact with the first one as an `input` parent,
 the first artifact comes first, and an item of the new artifact that
 supersedes an item of the first one shows under its version. Section 8.3 of
-the [specification](../../spec/0.1/README.md) says how the tool reads a
+the [specification](../../spec/0.2/README.md) says how the tool reads a
 history.
 
 With `--since 2`, the tool shows only the versions after version 2. With
@@ -403,7 +403,7 @@ is 1 if no file has the item.
 `skopos merge` merges two documents into one. The team picks one document as
 main. The result is the next version of main, as a draft, with the other
 document as an `input` parent. Section 8.4 of the
-[specification](../../spec/0.1/README.md) describes the merge.
+[specification](../../spec/0.2/README.md) describes the merge.
 
 ```bash
 skopos merge main.skopos.json other.skopos.json --base v1.skopos.json -o merged.skopos.json

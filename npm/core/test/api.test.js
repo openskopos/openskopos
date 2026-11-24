@@ -55,7 +55,7 @@ test("the version is the version of the package", () => {
 test("the schema is the published schema", () => {
   const s = JSON.parse(schema());
   assert.equal(s.$id, schemaUrl());
-  assert.equal(schemaUrl(), "https://openskopos.org/schema/artifact/0.1.json");
+  assert.equal(schemaUrl(), "https://openskopos.org/schema/artifact/0.2.json");
 });
 
 test("parse throws a SkoposError with one problem", () => {

@@ -710,13 +710,13 @@ pub fn parse_item_id(id: &str) -> JsValue {
     }
 }
 
-/// The JSON Schema of format 0.1, as text.
+/// The JSON Schema of format 0.2, as text.
 #[wasm_bindgen]
 pub fn schema() -> String {
     skopos_core::SCHEMA.to_string()
 }
 
-/// The URL of the JSON Schema of format 0.1.
+/// The URL of the JSON Schema of format 0.2.
 #[wasm_bindgen(js_name = schemaUrl)]
 pub fn schema_url() -> String {
     skopos_core::SCHEMA_URL.to_string()

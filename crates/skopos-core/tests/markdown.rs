@@ -244,7 +244,7 @@ fn unknown_keys_in_structured_fields_are_errors() {
 #[test]
 fn details_and_extension_values_round_trip() {
     let doc = serde_json::json!({
-        "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+        "$schema": "https://openskopos.org/schema/artifact/0.2.json",
         "id": "pa_7Hk2mQ9xR4tV8wZ1",
         "version": 1,
         "kind": "intent",
@@ -275,7 +275,7 @@ fn details_and_extension_values_round_trip() {
 #[test]
 fn values_that_look_like_markup_round_trip() {
     let doc = serde_json::json!({
-        "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+        "$schema": "https://openskopos.org/schema/artifact/0.2.json",
         "id": "pa_3fQ8nV2kLm7Xc1Rt",
         "version": 1,
         "kind": "critique",

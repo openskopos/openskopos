@@ -1,8 +1,8 @@
 //! Read, check and write OpenSkopos documents.
 //!
 //! OpenSkopos is a file format for the decisions that a team makes before an
-//! AI agent builds the work. This crate is the reference implementation of format 0.1.
-//! See the specification in `spec/0.1/README.md` of the repository.
+//! AI agent builds the work. This crate is the reference implementation of format 0.2.
+//! See the specification in `spec/0.2/README.md` of the repository.
 //!
 //! All functions are pure: they take strings or [`serde_json::Value`] and
 //! return strings or values. The crate reads no files and uses no network, so
@@ -24,7 +24,7 @@
 //!
 //! ```
 //! let text = r#"{
-//!   "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+//!   "$schema": "https://openskopos.org/schema/artifact/0.2.json",
 //!   "id": "pa_7Hk2mQ9xR4tV8wZ1",
 //!   "version": 1,
 //!   "kind": "intent",
@@ -36,7 +36,7 @@
 //! let doc = skopos_core::parse(text, skopos_core::Format::Json).unwrap();
 //! assert!(skopos_core::check(&doc).is_empty());
 //! let yaml = skopos_core::write(&doc, skopos_core::Format::Yaml);
-//! assert!(yaml.starts_with("$schema: https://openskopos.org/schema/artifact/0.1.json\n"));
+//! assert!(yaml.starts_with("$schema: https://openskopos.org/schema/artifact/0.2.json\n"));
 //! ```
 
 use std::fmt;

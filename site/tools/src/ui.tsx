@@ -191,7 +191,7 @@ export function verdictOf(text: string, r: ReadResult | undefined): Verdict {
   return r.problems.length ? "invalid" : "valid";
 }
 
-export function Status({ verdict, count, version = "0.1" }: { verdict: Verdict; count?: number; version?: string }) {
+export function Status({ verdict, count, version = "0.2" }: { verdict: Verdict; count?: number; version?: string }) {
   const text =
     verdict === "valid" ? `Valid OpenSkopos ${version}` : verdict === "invalid" ? `${count} ${count === 1 ? "problem" : "problems"}` : verdict === "unreadable" ? "Cannot read the text" : "No document";
   return (
@@ -224,7 +224,7 @@ export function FixButton({ doc, fix, apply }: { doc?: Document; fix?: Fix; appl
 }
 
 /** The anchor of a rule in section 9 of the specification. */
-export const ruleUrl = "/spec/0.1/#9-rules-that-the-schema-cannot-check";
+export const ruleUrl = "/spec/0.2/#9-rules-that-the-schema-cannot-check";
 
 /**
  * A document slot for Compare, Merge and Agent file. Empty, it shows an
@@ -285,7 +285,7 @@ export function DocInput({
           )}
         </div>
         <div class="slot-actions">
-          {verdict === "valid" ? <span class="status valid" title="Valid OpenSkopos 0.1" aria-label="Valid"><i /></span> : verdict !== "empty" && <Status verdict={verdict} count={result?.problems.length} />}
+          {verdict === "valid" ? <span class="status valid" title="Valid OpenSkopos 0.2" aria-label="Valid"><i /></span> : verdict !== "empty" && <Status verdict={verdict} count={result?.problems.length} />}
           {verdict === "valid" && (
             <button type="button" class="btn ghost small" aria-expanded={!folded} onClick={() => setEditing(!editing)}>
               {folded ? "Edit" : "Fold"}

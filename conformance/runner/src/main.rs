@@ -22,7 +22,7 @@ use std::process::ExitCode;
 use jsonschema::Validator;
 use serde_json::Value;
 
-const SCHEMA_ID: &str = "https://openskopos.org/schema/artifact/0.1.json";
+const SCHEMA_ID: &str = "https://openskopos.org/schema/artifact/0.2.json";
 const SEMANTIC_RULES: [&str; 4] = [
     "unique-item-ids",
     "counters-cover-items",
@@ -68,12 +68,12 @@ fn main() -> ExitCode {
 }
 
 fn run(root: &Path) -> Result<Run, String> {
-    let schema = read_json(&root.join("schema/artifact/0.1.json"))?;
+    let schema = read_json(&root.join("schema/artifact/0.2.json"))?;
     let mut run = Run { failures: vec![], passed: 0 };
 
     run.check(
         jsonschema::meta::is_valid(&schema),
-        "schema/artifact/0.1.json is a valid JSON Schema".into(),
+        "schema/artifact/0.2.json is a valid JSON Schema".into(),
     );
     run.check(
         schema["$id"] == SCHEMA_ID,

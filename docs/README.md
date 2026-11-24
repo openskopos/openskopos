@@ -1,7 +1,7 @@
 # Documentation
 
 These pages tell you how to use OpenSkopos documents and the tools of the
-reference implementation. The [specification](../spec/0.1/README.md) defines
+reference implementation. The [specification](../spec/0.2/README.md) defines
 the format.
 
 ## Start here
@@ -29,8 +29,8 @@ the format.
 
 ## The format
 
-- [Specification 0.1](../spec/0.1/README.md)
+- [Specification 0.2](../spec/0.2/README.md)
 - [Changelog of the format](../spec/CHANGELOG.md)
-- [JSON Schema 0.1](../schema/artifact/0.1.json)
+- [JSON Schema 0.2](../schema/artifact/0.2.json)
 - [Conformance cases](../conformance/README.md): the documents that all
   implementations must accept or reject.

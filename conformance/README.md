@@ -1,10 +1,10 @@
 # Conformance cases
 
 These files, together with the JSON Schema in
-[`schema/artifact/0.1.json`](../schema/artifact/0.1.json), define the correct
-behavior for format 0.1. If an implementation in any language passes all
+[`schema/artifact/0.2.json`](../schema/artifact/0.2.json), define the correct
+behavior for format 0.2. If an implementation in any language passes all
 cases, it is correct. Section 13 of the
-[specification](../spec/0.1/README.md#13-conformance) gives the cases that
+[specification](../spec/0.2/README.md#13-conformance) gives the cases that
 each type of tool must pass.
 
 ## Layout

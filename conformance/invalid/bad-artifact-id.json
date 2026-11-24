@@ -1,5 +1,5 @@
 {
-  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "$schema": "https://openskopos.org/schema/artifact/0.2.json",
   "id": "artifact-1",
   "version": 1,
   "kind": "critique",

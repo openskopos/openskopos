@@ -92,7 +92,7 @@ fn certain_fixes() {
 #[test]
 fn no_fix_when_a_person_must_choose() {
     let doc = json!({
-        "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+        "$schema": "https://openskopos.org/schema/artifact/0.2.json",
         "id": "pa_7Hk2mQ9xR4tV8wZ1", "version": 1, "kind": "spec", "title": "T",
         "status": "draft", "created_at": "2026-11-05T09:00:00Z", "id_counters": {"C": 1, "FR": 1},
         "items": [

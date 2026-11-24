@@ -184,11 +184,11 @@ fn typed_model_keeps_every_valid_document() {
 
 #[test]
 fn embedded_schema_is_the_published_file() {
-    let file = fs::read_to_string(conformance().join("../schema/artifact/0.1.json")).unwrap();
+    let file = fs::read_to_string(conformance().join("../schema/artifact/0.2.json")).unwrap();
     assert_eq!(
         skopos_core::SCHEMA,
         file,
-        "copy schema/artifact/0.1.json to crates/skopos-core/schema/0.1.json"
+        "copy schema/artifact/0.2.json to crates/skopos-core/schema/0.2.json"
     );
     let schema: Value = serde_json::from_str(&file).unwrap();
     assert_eq!(schema["$id"], skopos_core::SCHEMA_URL);

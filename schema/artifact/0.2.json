@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://openskopos.org/schema/artifact/0.1.json",
+  "$id": "https://openskopos.org/schema/artifact/0.2.json",
   "title": "OpenSkopos artifact",
-  "description": "One version of an OpenSkopos artifact, format version 0.1. See https://github.com/openskopos/openskopos/tree/main/spec/0.1. Rules that JSON Schema cannot express: item IDs are unique in a version, a previous_version parent has the same artifact ID and version - 1, an item ID is never used again for a different item in the same artifact, and each id_counters value is at least the highest number of that prefix in items.",
+  "description": "One version of an OpenSkopos artifact, format version 0.2. See https://github.com/openskopos/openskopos/tree/main/spec/0.2. Rules that JSON Schema cannot express: item IDs are unique in a version, a previous_version parent has the same artifact ID and version - 1, an item ID is never used again for a different item in the same artifact, and each id_counters value is at least the highest number of that prefix in items.",
   "type": "object",
   "required": [
     "$schema",

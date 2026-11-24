@@ -1,4 +1,4 @@
-//! Validation against the JSON Schema of format 0.1.
+//! Validation against the JSON Schema of format 0.2.
 
 use std::collections::HashSet;
 use std::sync::OnceLock;
@@ -10,12 +10,12 @@ use crate::fix::{either, item_label, new_id_fix, Fix, Op};
 use crate::model::ItemType;
 use crate::{parse_item_id, pointer, whole_number, Problem};
 
-/// The JSON Schema of format 0.1, as text. It is the same file as
-/// `schema/artifact/0.1.json` in the repository.
-pub const SCHEMA: &str = include_str!("../schema/0.1.json");
+/// The JSON Schema of format 0.2, as text. It is the same file as
+/// `schema/artifact/0.2.json` in the repository.
+pub const SCHEMA: &str = include_str!("../schema/0.2.json");
 
-/// The `$schema` URL of format 0.1.
-pub const SCHEMA_URL: &str = "https://openskopos.org/schema/artifact/0.1.json";
+/// The `$schema` URL of format 0.2.
+pub const SCHEMA_URL: &str = "https://openskopos.org/schema/artifact/0.2.json";
 
 fn validator() -> &'static Validator {
     static VALIDATOR: OnceLock<Validator> = OnceLock::new();
@@ -314,7 +314,7 @@ fn advise(
             let value = e.instance.as_str().unwrap_or_default();
             let hint = match segments {
                 [] | ["$schema"] => format!(
-                    "This tool reads format 0.1. If the document is format 0.1, set $schema to {SCHEMA_URL}."
+                    "This tool reads format 0.2. If the document is format 0.2, set $schema to {SCHEMA_URL}."
                 ),
                 ["items", _, "id"] => match (parse_item_id(value), item_type) {
                     (Some(_), Some(t)) => format!(

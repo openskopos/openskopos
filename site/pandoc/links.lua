@@ -10,6 +10,7 @@
 -- Table at the end of this file).
 
 local pages = {
+  ["spec/0.2/README.md"] = "/spec/0.2/",
   ["spec/0.1/README.md"] = "/spec/0.1/",
   ["spec/CHANGELOG.md"] = "/spec/changelog/",
   ["docs/README.md"] = "/docs/",
@@ -21,6 +22,7 @@ local pages = {
   ["npm/core/README.md"] = "/docs/javascript/",
   ["npm/cli/README.md"] = "/docs/npm-cli/",
   ["conformance/README.md"] = "/docs/conformance/",
+  ["schema/artifact/0.2.json"] = "/schema/artifact/0.2.json",
   ["schema/artifact/0.1.json"] = "/schema/artifact/0.1.json",
 }
 

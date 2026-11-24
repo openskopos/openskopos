@@ -1,5 +1,5 @@
 # YAML form of an OpenSkopos document. Dates, times and the keys "yes" and "no" are quoted.
-$schema: https://openskopos.org/schema/artifact/0.1.json
+$schema: https://openskopos.org/schema/artifact/0.2.json
 id: pa_5Rt8Yu1Io4Pa7Sd0
 version: 1
 kind: agent_rules

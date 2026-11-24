@@ -111,13 +111,13 @@ worker.
 | `stylesheet()` | Returns the default CSS of `renderHtml`. Every color and font is a `--sk-*` custom property. |
 | `renderTerminal(doc, options?)` | Renders a document as text for a terminal. The options are `previous`, `color` (default `false`) and `width` (default 80). |
 | `newArtifactId()` | Returns a new random artifact ID, for example `pa_7Hk2mQ9xR4tV8wZ1`. |
-| `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.1 as text, and its URL. |
+| `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.2 as text, and its URL. |
 | `rules()` | Returns the names of the four rules in section 9. |
 | `version()` | Returns the version of the package. |
 | `runCli(args, host)` | Operates the `skopos` command line tool. The package `@openskopos/cli` uses this function. |
 
 The TypeScript types are in the package. For the format, see the
-[specification](https://github.com/openskopos/openskopos/blob/main/spec/0.1/README.md).
+[specification](https://github.com/openskopos/openskopos/blob/main/spec/0.2/README.md).
 
 ## License
 

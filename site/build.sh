@@ -33,6 +33,7 @@ cp brand/avatar-512-light.png "$out/og.png"
 # "toc" if the page gets a table of contents (the specification has its own),
 # and the description for search engines (can be empty).
 pages='
+spec/0.2/README.md|spec/0.2|Specification 0.2||The OpenSkopos specification 0.2: the file format for the decisions that a team makes before an AI agent builds the work.
 spec/0.1/README.md|spec/0.1|Specification 0.1||The OpenSkopos specification 0.1: the file format for the decisions that a team makes before an AI agent builds the work.
 spec/CHANGELOG.md|spec/changelog|Changelog of the format||The changes to the OpenSkopos format, by format version.
 docs/README.md|docs|Documentation||How to use OpenSkopos documents and the skopos tool for spec-driven development.

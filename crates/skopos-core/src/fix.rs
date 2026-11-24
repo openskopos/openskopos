@@ -12,7 +12,7 @@
 //!
 //! ```
 //! let doc = serde_json::json!({
-//!   "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+//!   "$schema": "https://openskopos.org/schema/artifact/0.2.json",
 //!   "id": "pa_7Hk2mQ9xR4tV8wZ1", "version": 1, "kind": "intent",
 //!   "title": "Faster invoices", "status": "draft", "created_at": "2026-11-05T09:00:00Z",
 //!   "id_counters": {"G": 0},

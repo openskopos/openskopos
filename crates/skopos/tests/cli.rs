@@ -224,7 +224,7 @@ fn fmt_writes_the_canonical_layout() {
     let file = dir.join("doc.skopos.json");
     fs::write(
         &file,
-        r#"{"items":[],"title":"Short","kind":"intent","version":1,"id":"pa_7Hk2mQ9xR4tV8wZ1","status":"draft","created_at":"2026-11-05T09:00:00Z","$schema":"https://openskopos.org/schema/artifact/0.1.json"}"#,
+        r#"{"items":[],"title":"Short","kind":"intent","version":1,"id":"pa_7Hk2mQ9xR4tV8wZ1","status":"draft","created_at":"2026-11-05T09:00:00Z","$schema":"https://openskopos.org/schema/artifact/0.2.json"}"#,
     )
     .unwrap();
     let path = file.to_str().unwrap();
@@ -236,7 +236,7 @@ fn fmt_writes_the_canonical_layout() {
     let text = fs::read_to_string(&file).unwrap();
     assert!(
         text.starts_with(
-            "{\n  \"$schema\": \"https://openskopos.org/schema/artifact/0.1.json\",\n  \"id\": "
+            "{\n  \"$schema\": \"https://openskopos.org/schema/artifact/0.2.json\",\n  \"id\": "
         ),
         "{text}"
     );
@@ -253,7 +253,7 @@ fn ids_gives_new_items_ids_from_the_counters() {
     let file = dir.join("intent.skopos.yaml");
     fs::write(
         &file,
-        "$schema: https://openskopos.org/schema/artifact/0.1.json\n\
+        "$schema: https://openskopos.org/schema/artifact/0.2.json\n\
          id: pa_7Hk2mQ9xR4tV8wZ1\nversion: 1\nkind: intent\ntitle: Downgrades\nstatus: draft\n\
          id_counters:\n  G: 3\n\
          items:\n\

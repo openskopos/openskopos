@@ -1,7 +1,7 @@
 # skopos-core
 
 `skopos-core` is the reference implementation of the
-[OpenSkopos](https://github.com/openskopos/openskopos) format 0.1 in Rust. It
+[OpenSkopos](https://github.com/openskopos/openskopos) format 0.2 in Rust. It
 reads, checks and writes documents.
 
 All functions are pure. Their inputs are strings or `serde_json::Value`
@@ -132,8 +132,8 @@ configuration.
 
 ## The schema
 
-The crate contains a copy of `schema/artifact/0.1.json` in
-`schema/0.1.json`, so the published crate includes the schema. A test makes sure
+The crate contains a copy of `schema/artifact/0.2.json` in
+`schema/0.2.json`, so the published crate includes the schema. A test makes sure
 that the two files are the same. If you change the schema, copy it again.
 
 ## License

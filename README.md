@@ -18,11 +18,11 @@ people, commits, tickets and agents can refer to it.
 
 ## Status
 
-Version 0.1 is published. All 0.x versions are unstable, and each new 0.y
+Version 0.2 is published. All 0.x versions are unstable, and each new 0.y
 version can have breaking changes.
 
-- [Specification 0.1](spec/0.1/README.md)
-- [JSON Schema 0.1](schema/artifact/0.1.json)
+- [Specification 0.2](spec/0.2/README.md)
+- [JSON Schema 0.2](schema/artifact/0.2.json)
 - [Conformance cases](conformance/README.md)
 - [Changelog](spec/CHANGELOG.md)
 - [Documentation](docs/README.md), also on [openskopos.org](https://openskopos.org)
