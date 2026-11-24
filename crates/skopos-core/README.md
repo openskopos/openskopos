@@ -19,6 +19,7 @@ does not use the network. It builds for `wasm32-unknown-unknown`.
 | `assign_ids(&mut Value) -> Result<IdReport, Vec<Problem>>` | Adds an ID to each item that has no ID, and updates `id_counters` (specification section 7). |
 | `parse_item_id(&str)` | Reads an item ID, for example `CR12`, and returns its type and number. |
 | `diff::diff(&Value, &Value) -> Diff` | Compares two versions by item ID. The result has the items that were added, changed, dropped and superseded. `Diff::to_text` returns one line for each item. |
+| `history::history(&[Value]) -> History` | Reads documents from one or more artifacts, in any order, as one history: the chain of versions of each artifact, what each version changed, and the steps and state of each item (in force, proposed, rejected, superseded or dropped). A missing version is a warning. See section 8.3 of the specification. `History::to_text` and `History::trace_text` write it for people. |
 | `export::export(&Value, Tool, &Options) -> Export` | Makes the files of OpenSpec, Kiro or Spec Kit from a document. The result has the files, and the items that the function did not export. See [docs/exporters.md](../../docs/exporters.md). |
 
 A `Problem` has three fields:

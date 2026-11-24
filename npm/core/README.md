@@ -100,6 +100,8 @@ worker.
 | `exportTo(doc, tool, options?)` | Makes the files of OpenSpec, Kiro or Spec Kit. `tool` is `"openspec"`, `"kiro"` or `"speckit"`. The options are `name`, `number` and `existing`. |
 | `exportName(doc, options?)` | Returns the name that `exportTo` uses for the folder. |
 | `diff(oldDoc, newDoc)` | Compares two versions by item ID. `diffText(oldDoc, newDoc)` returns the same result as text. |
+| `history(docs)` | Reads documents from one or more artifacts, in any order, as one history. Returns `{ chains, links, items, warnings }`. Each item has a `key` (`<artifact id>#<item id>`), its `reference` string, its `state` now and its `steps` across the versions. `historyText(docs, { since? })` returns it as text. |
+| `trace(docs, reference)` | Returns the history of one item, from a reference string such as `pa_2Xc5Rv8Tn1Mb4Kz7#FR2`. `traceText(docs, reference)` returns it as text, with the items that replace it and why. |
 | `newArtifactId()` | Returns a new random artifact ID, for example `pa_7Hk2mQ9xR4tV8wZ1`. |
 | `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.1 as text, and its URL. |
 | `rules()` | Returns the names of the four rules in section 9. |

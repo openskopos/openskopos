@@ -577,6 +577,63 @@ fn diff_names_items_by_id() {
 }
 
 #[test]
+fn history_and_trace_read_versions_in_any_order_and_format() {
+    let case = conformance().join("history/01-three-versions");
+    let dir = temp_dir("history");
+    let md = dir.join("v2.md").display().to_string();
+    let v2 = case.join("v2.json").display().to_string();
+    assert!(skopos(&["convert", &v2, "--to", "markdown", "-o", &md])
+        .status
+        .success());
+    let v1 = case.join("v1.json").display().to_string();
+    let v3 = case.join("v3.json").display().to_string();
+
+    let out = skopos(&["history", &v3, &md, &v1]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("  version 3  final  2026-11-13  3 items\n    added      FR3"),
+        "{text}"
+    );
+    assert!(text.contains("    superseded FR1  by FR3\n"), "{text}");
+    assert!(
+        text.contains("In force now\n  pa_4Hs8Lm2Qx6Vr9Tc3@3\n    G1 "),
+        "{text}"
+    );
+
+    let text =
+        String::from_utf8(skopos(&["history", "--since", "2", &v1, &md, &v3]).stdout).unwrap();
+    assert!(!text.contains("version 2"), "{text}");
+    assert!(text.contains("version 3"), "{text}");
+
+    let json = stdout_json(&skopos(&["history", "--json", &v1, &md, &v3]));
+    assert_eq!(json["chains"][0]["versions"].as_array().unwrap().len(), 3);
+    let fr1 = json["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["id"] == "FR1")
+        .unwrap();
+    assert_eq!(fr1["state"], "superseded");
+
+    let out = skopos(&["trace", "pa_4Hs8Lm2Qx6Vr9Tc3@1#FR1", &v1, &md, &v3]);
+    let text = String::from_utf8(out.stdout).unwrap();
+    assert!(
+        text.contains("now: superseded by pa_4Hs8Lm2Qx6Vr9Tc3@3#FR3"),
+        "{text}"
+    );
+    assert!(text.contains("detail: A warning was not enough"), "{text}");
+
+    let out = skopos(&["trace", "FR9", &v1, &v3]);
+    assert_eq!(out.status.code(), Some(1));
+    assert!(String::from_utf8_lossy(&out.stderr).contains("no document has the item FR9"));
+}
+
+#[test]
 fn export_with_force_removes_files_of_an_earlier_export() {
     let dir = temp_dir("export-stale");
     let root = dir.to_str().unwrap();

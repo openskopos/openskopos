@@ -505,6 +505,47 @@ An external parent is material that is not an OpenSkopos document:
 same artifact ID. `input` names material that the method used. With the
 `digest`, a tool can find if an input changed after the session.
 
+### 8.3 Reading a history (informative)
+
+This section does not add rules. It says how a tool can read several
+documents as one history, so that tools give the same answer.
+
+1. Put the documents of each artifact in a chain, in version order. If a
+   version is missing, report it as a warning, and compare the versions on
+   each side of the gap.
+2. Put an artifact before the artifacts that have one of its versions as an
+   `input` parent. This shows a hand-over (8.1.6) in the order in which it
+   happened.
+3. Compare each pair of consecutive versions by item ID. An item is
+   added, changed, superseded or dropped, as in this table.
+
+   | Change | In the older version | In the newer version |
+   |---|---|---|
+   | added | No item with the ID. | An item with the ID. |
+   | changed | An item with the ID. | An item with the ID and a different field. A different order of items or refs is not a change. |
+   | superseded | An item with the ID. | No item with the ID, and an item that is not rejected links to it with `supersedes`. |
+   | dropped | An item with the ID. | No item with the ID, and no item supersedes it. |
+
+4. Join the changes of each item into one timeline. A change of `status` is a
+   change of a field, so the timeline shows when the team accepted or
+   rejected the item.
+5. Follow refs with `artifact` across chains. When an item that is not
+   rejected in the latest version of its artifact supersedes an item of
+   another artifact, the other item is superseded too.
+
+The state of an item is its state in the latest version of its artifact:
+
+| State | Meaning |
+|---|---|
+| in force | The item is accepted, and no item supersedes it. |
+| proposed | The item is proposed. The team has not decided. |
+| rejected | The item is rejected. It stays in the record. |
+| superseded | An item that is not rejected supersedes it. |
+| dropped | A version removed the item, and no item supersedes it. |
+
+The cases in `conformance/history/` show a chain of three versions, a
+hand-over to a second artifact and a missing version.
+
 ## 9. Rules that the schema cannot check
 
 JSON Schema cannot express these rules. A tool that writes a document must
@@ -894,3 +935,11 @@ ignore the order of keys and the order of items between types.
 
 The index of the Markdown cases states the number of warnings for each
 generous case. A reader can use its own words for its warnings.
+
+A tool that reads a history (8.3) can also use the cases in
+`conformance/history/`. Each case has documents in any order and an
+`expected.json` with the chains and their versions, the number of warnings,
+and for each item, as `<artifact id>#<item id>`, its state, its changes as
+`[version, change]` pairs, and the items that supersede it. A change is
+`added`, `changed`, `superseded` or `dropped`, or `seen` for an item in the
+first version given of a chain that does not start at version 1.

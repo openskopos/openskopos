@@ -11,6 +11,8 @@ import init, {
   diffText,
   exportName,
   exportTo,
+  history,
+  historyText,
   markdownRead,
   newArtifactId,
   nextVersion,
@@ -21,6 +23,8 @@ import init, {
   schemaUrl,
   toJson,
   toYaml,
+  trace,
+  traceText,
   version,
   write,
 } from "@openskopos/core";
@@ -131,6 +135,25 @@ test("diff and diffText", () => {
   assert.equal(d.same_artifact, true);
   assert.equal(d.from.version + 1, d.to.version);
   assert.equal(typeof diffText(a, b), "string");
+});
+
+test("history, historyText, trace and traceText", () => {
+  const dir = "history/02-hand-over/";
+  const docs = [json(`${dir}second-team.json`), json(`${dir}first-team.json`)];
+  const h = history(docs);
+  assert.deepEqual(
+    h.chains.map((c) => c.artifact),
+    ["pa_4Hs8Lm2Qx6Vr9Tc3", "pa_7Wn3Kd5Pz1Gy8Fb2"],
+  );
+  const d2 = h.items.find((i) => i.key === "pa_4Hs8Lm2Qx6Vr9Tc3#D2");
+  assert.equal(d2.state, "superseded");
+  assert.deepEqual(d2.superseded_by, ["pa_7Wn3Kd5Pz1Gy8Fb2@1#D1"]);
+  assert.equal(d2.steps[0].change, "added");
+  assert.match(historyText(docs, { since: 0 }), /superseded pa_4Hs8Lm2Qx6Vr9Tc3@1#D2  by D1/);
+  assert.equal(trace(docs, "pa_4Hs8Lm2Qx6Vr9Tc3#D2").key, d2.key);
+  assert.match(traceText(docs, "pa_4Hs8Lm2Qx6Vr9Tc3#D2"), /rationale: The nightly count/);
+  assert.throws(() => trace(docs, "D1"), { name: "SkoposError", message: /more than one artifact/ });
+  assert.throws(() => history({}), TypeError);
 });
 
 // A host with files in memory, for runCli.

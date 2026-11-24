@@ -8,6 +8,7 @@
 //! - The JSON files of the Markdown cases are valid, and each Markdown file
 //!   of a stored document names it in the front matter. Reading and writing
 //!   Markdown is for an implementation to test. This runner does not do it.
+//! - The documents of the history cases are valid.
 //!
 //! Usage: `cargo run --manifest-path conformance/runner/Cargo.toml [repo root]`
 
@@ -87,7 +88,33 @@ fn run(root: &Path) -> Result<Run, String> {
     check_valid(&mut run, &validator, &conf.join("valid"))?;
     check_invalid(&mut run, &validator, &conf.join("invalid"))?;
     check_markdown(&mut run, &validator, &conf.join("markdown"))?;
+    check_history(&mut run, &validator, &conf.join("history"))?;
     Ok(run)
+}
+
+/// Each document of a history case is valid, and each case has an
+/// `expected.json` with the keys of section 13.
+fn check_history(run: &mut Run, v: &Validator, dir: &Path) -> Result<(), String> {
+    let mut listed = BTreeSet::new();
+    for case in index_cases(dir, "cases")? {
+        let name = str_field(&case, "case")?;
+        listed.insert(name.to_string());
+        let d = dir.join(name);
+        let files = sorted_files(&d)?;
+        for f in files.iter().filter(|f| *f != "expected.json") {
+            let doc = read_doc(&d.join(f))?;
+            let ok = schema_errors(v, &doc).is_empty() && semantic_errors(&doc).is_empty();
+            run.check(ok, format!("history/{name}/{f} is valid"));
+        }
+        let expected = read_json(&d.join("expected.json"))?;
+        run.check(
+            ["chains", "warnings", "items"]
+                .iter()
+                .all(|k| expected.get(k).is_some()),
+            format!("history/{name}/expected.json has chains, warnings and items"),
+        );
+    }
+    check_listed_dirs(run, dir, &listed, "history")
 }
 
 fn check_valid(run: &mut Run, v: &Validator, dir: &Path) -> Result<(), String> {

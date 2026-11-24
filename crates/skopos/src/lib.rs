@@ -20,7 +20,9 @@ use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use skopos_core::export::{self, Options, Tool};
 use skopos_core::markdown::Fill;
-use skopos_core::{assign_ids, check, diff, markdown, parse, write, Format, Problem, Value};
+use skopos_core::{
+    assign_ids, check, diff, history, markdown, parse, write, Format, Problem, Value,
+};
 
 /// The file system and the terminal, as the commands see them.
 ///
@@ -66,7 +68,7 @@ pub enum Stream {
 #[command(
     name = "skopos",
     version,
-    about = "Check, format, convert, import, export and compare OpenSkopos documents"
+    about = "Check, format, convert, import, export, compare and trace OpenSkopos documents"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -185,6 +187,35 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Read versions of one or more artifacts and show what each version
+    /// decided, then the items in force now.
+    ///
+    /// Give the files in any order. A missing version is a warning. An
+    /// artifact that has another one as an input comes after it.
+    History {
+        /// JSON, YAML or Markdown files
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Show only the versions after this version number
+        #[arg(long, value_name = "VERSION")]
+        since: Option<u64>,
+        /// Write the history as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Show the life of one item across versions and artifacts, and what
+    /// replaced it and why.
+    Trace {
+        /// A reference string such as pa_2Xc5Rv8Tn1Mb4Kz7#FR2, or an item ID
+        /// such as FR2 if only one artifact has it
+        reference: String,
+        /// JSON, YAML or Markdown files
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Write the life of the item as JSON
+        #[arg(long)]
+        json: bool,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -290,6 +321,12 @@ where
             dry_run,
         ),
         Command::Diff { old, new, json } => cmd.diff(&old, &new, json),
+        Command::History { files, since, json } => cmd.history(&files, since, json),
+        Command::Trace {
+            reference,
+            files,
+            json,
+        } => cmd.trace(&reference, &files, json),
     };
     if ok {
         0
@@ -915,6 +952,47 @@ impl Commands<'_> {
             self.out(&text)
         } else {
             self.out(&d.to_text())
+        }
+    }
+
+    /// Reads and checks each file. Reports the problems of every file.
+    fn read_all_valid(&mut self, files: &[PathBuf]) -> Option<Vec<Value>> {
+        let docs: Vec<Option<Value>> = files.iter().map(|p| self.read_valid(p)).collect();
+        docs.into_iter().collect()
+    }
+
+    fn history(&mut self, files: &[PathBuf], since: Option<u64>, json: bool) -> bool {
+        let Some(docs) = self.read_all_valid(files) else {
+            return false;
+        };
+        let h = history::history(&docs);
+        if json {
+            let mut text = serde_json::to_string_pretty(&h).expect("a history serializes");
+            text.push('\n');
+            self.out(&text)
+        } else {
+            self.out(&h.to_text(since))
+        }
+    }
+
+    fn trace(&mut self, reference: &str, files: &[PathBuf], json: bool) -> bool {
+        let Some(docs) = self.read_all_valid(files) else {
+            return false;
+        };
+        let h = history::history(&docs);
+        let item = match h.find(reference) {
+            Ok(item) => item,
+            Err(e) => {
+                self.err(&e);
+                return false;
+            }
+        };
+        if json {
+            let mut text = serde_json::to_string_pretty(item).expect("an item serializes");
+            text.push('\n');
+            self.out(&text)
+        } else {
+            self.out(&h.trace_text(item))
         }
     }
 }

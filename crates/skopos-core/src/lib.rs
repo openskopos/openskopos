@@ -18,7 +18,8 @@
 //! - [`assign_ids`] gives an ID to each item that has none and updates
 //!   `id_counters`.
 //!
-//! The [`markdown`] module reads and writes Markdown (specification section
+//! [`history::history`] reads a chain of versions and what each one
+//! decided. The [`markdown`] module reads and writes Markdown (specification section
 //! 10). The [`model`] module has serde types for a valid document.
 //!
 //! ```
@@ -45,6 +46,7 @@ pub use serde_json::Value;
 
 pub mod diff;
 pub mod export;
+pub mod history;
 mod ids;
 pub mod markdown;
 pub mod model;

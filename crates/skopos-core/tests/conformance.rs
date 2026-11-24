@@ -6,6 +6,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde_json::Value;
+use skopos_core::history::history;
 use skopos_core::{check, check_rules, check_schema, model::Document, parse, rules, write, Format};
 
 fn conformance() -> PathBuf {
@@ -31,6 +32,15 @@ fn cases(dir: &str) -> Vec<Value> {
         .clone()
 }
 
+/// The `expected.json` of a history case, which is not a document.
+fn is_history_expectation(path: &Path) -> bool {
+    path.ends_with("expected.json")
+        && path
+            .parent()
+            .and_then(Path::parent)
+            .is_some_and(|p| p.ends_with("history"))
+}
+
 /// Every JSON or YAML document in the conformance folder.
 fn all_documents() -> Vec<PathBuf> {
     fn walk(dir: &Path, out: &mut Vec<PathBuf>) {
@@ -44,6 +54,7 @@ fn all_documents() -> Vec<PathBuf> {
                 path.extension().and_then(|e| e.to_str()),
                 Some("json" | "yaml" | "yml")
             ) && !path.ends_with("index.json")
+                && !is_history_expectation(&path)
             {
                 out.push(path);
             }
@@ -209,4 +220,73 @@ fn parents_message_follows_the_schema_branch() {
         messages,
         ["version 2 must have exactly one previous_version parent"]
     );
+}
+
+#[test]
+fn history_cases_give_the_expected_history() {
+    for case in cases("history") {
+        let name = case["case"].as_str().unwrap();
+        let dir = conformance().join("history").join(name);
+        let mut docs = vec![];
+        for entry in fs::read_dir(&dir).unwrap() {
+            let path = entry.unwrap().path();
+            if !path.ends_with("expected.json") {
+                docs.push(read(&path));
+            }
+        }
+        let expected = read(&dir.join("expected.json"));
+        // The order of the files must not matter.
+        let h = history(&docs);
+        docs.reverse();
+        assert_eq!(
+            h,
+            history(&docs),
+            "{name}: the order of the files changes the history"
+        );
+
+        let chains: Vec<Value> = h
+            .chains
+            .iter()
+            .map(|c| {
+                let versions: Vec<u64> = c.versions.iter().map(|v| v.version).collect();
+                serde_json::json!({"artifact": c.artifact, "versions": versions})
+            })
+            .collect();
+        assert_eq!(Value::from(chains), expected["chains"], "{name}: chains");
+        assert_eq!(
+            h.warnings.len() as u64,
+            expected["warnings"].as_u64().unwrap(),
+            "{name}: warnings {:?}",
+            h.warnings
+        );
+        let items = expected["items"].as_object().unwrap();
+        let keys: BTreeSet<&str> = h.items.iter().map(|i| i.key.as_str()).collect();
+        let want: BTreeSet<&str> = items.keys().map(String::as_str).collect();
+        assert_eq!(keys, want, "{name}: items");
+        for (key, want) in items {
+            let item = serde_json::to_value(h.item(key).unwrap()).unwrap();
+            let changes: Vec<Value> = item["steps"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|s| serde_json::json!([s["version"], s["change"]]))
+                .collect();
+            assert_eq!(item["state"], want["state"], "{name}: {key} state");
+            assert_eq!(
+                Value::from(changes),
+                want["changes"],
+                "{name}: {key} changes"
+            );
+            for list in [
+                "superseded_by",
+                "supersedes",
+                "derived_from",
+                "derived_into",
+            ] {
+                if let Some(w) = want.get(list) {
+                    assert_eq!(&item[list], w, "{name}: {key} {list}");
+                }
+            }
+        }
+    }
 }
