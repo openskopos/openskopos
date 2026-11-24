@@ -55,6 +55,7 @@ mod order;
 pub mod rules;
 mod schema;
 mod text;
+pub mod words;
 mod yaml;
 
 pub use ids::{assign_ids, parse_item_id, AssignedId, IdReport};

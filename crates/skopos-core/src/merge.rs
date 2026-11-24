@@ -40,6 +40,7 @@ use serde_json::{json, Map, Value};
 
 use crate::diff::{different_keys, items_by_id, same_field, NOT_CONTENT};
 use crate::model::ItemType;
+use crate::words::{word_diff, Span};
 use crate::{assign_ids, parse_item_id, Problem};
 
 /// The least similarity, in percent, for two items to pair by text.
@@ -109,6 +110,13 @@ pub struct Conflict {
     pub other: Option<String>,
     /// For `changed`: the fields that are different, in alphabetical order.
     pub fields: Vec<String>,
+    /// If both items are in the result: the text of the item of main to the
+    /// text of the item of the other document, word by word.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_spans: Option<Vec<Span>>,
+    /// In a merge with a base: the text of the item in the base.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub base_text: Option<String>,
 }
 
 /// An item of the other document that has a new ID in the result.
@@ -515,6 +523,8 @@ pub fn merge(main: &Value, other: &Value, options: &Options) -> Result<Merge, Pr
                 main: Some(id.to_string()),
                 other: Some(new),
                 fields: fields.clone(),
+                text_spans: None,
+                base_text: None,
             });
             continue;
         }
@@ -535,6 +545,8 @@ pub fn merge(main: &Value, other: &Value, options: &Options) -> Result<Merge, Pr
                 main: Some(id.to_string()),
                 other: by,
                 fields: Vec::new(),
+                text_spans: None,
+                base_text: None,
             });
             continue;
         }
@@ -563,6 +575,8 @@ pub fn merge(main: &Value, other: &Value, options: &Options) -> Result<Merge, Pr
                 main: by,
                 other: Some(id.to_string()),
                 fields: Vec::new(),
+                text_spans: None,
+                base_text: None,
             });
             continue;
         }
@@ -583,6 +597,27 @@ pub fn merge(main: &Value, other: &Value, options: &Options) -> Result<Merge, Pr
         });
     }
     renamed.sort_by_key(|r| o_items.iter().position(|(id, _)| *id == r.from));
+    let text_in_out = |id: &Option<String>| {
+        let id = id.as_deref()?;
+        out.iter()
+            .find(|i| str_of(i, "id") == id)
+            .map(|i| str_of(i, "text").to_string())
+    };
+    for c in &mut conflicts {
+        if let (Some(m), Some(o)) = (text_in_out(&c.main), text_in_out(&c.other)) {
+            c.text_spans = Some(word_diff(&m, &o));
+        }
+        if three_way {
+            let base_id = match c.kind {
+                ConflictKind::RemovedInMain => &c.other,
+                _ => &c.main,
+            };
+            c.base_text = base_id
+                .as_deref()
+                .and_then(|id| b_by.get(id))
+                .map(|b| str_of(b, "text").to_string());
+        }
+    }
     conflicts.sort_by_key(|c| {
         let key = c
             .main
@@ -1002,6 +1037,40 @@ mod tests {
         assert_eq!(r.rejected, "FR2");
         assert!(merge::conflicts(&d).is_empty());
         assert_eq!(d["items"][1]["status"], "rejected");
+    }
+
+    #[test]
+    fn a_conflict_has_its_words_and_the_base_text() {
+        let base = doc("pa_1", 1, json!([req("FR1", "Warn the admin.")]));
+        let main = doc("pa_1", 2, json!([req("FR1", "Block the change.")]));
+        let other = doc("pa_2", 1, json!([req("FR1", "Warn the admin by email.")]));
+        let options = Options {
+            base: Some(&base),
+            ..Default::default()
+        };
+        let c = &merge(&main, &other, &options).unwrap().conflicts[0];
+        assert_eq!(c.base_text.as_deref(), Some("Warn the admin."));
+        let spans: Vec<(crate::words::Op, &str)> = c
+            .text_spans
+            .as_ref()
+            .unwrap()
+            .iter()
+            .map(|s| (s.op, s.text.as_str()))
+            .collect();
+        use crate::words::Op::*;
+        assert_eq!(
+            spans,
+            [
+                (Del, "Block"),
+                (Ins, "Warn"),
+                (Same, "the"),
+                (Del, "change."),
+                (Ins, "admin by email.")
+            ]
+        );
+        // Without a base there is no base text.
+        let c = &merge(&main, &other, &Options::default()).unwrap();
+        assert!(c.conflicts.iter().all(|c| c.base_text.is_none()));
     }
 
     #[test]

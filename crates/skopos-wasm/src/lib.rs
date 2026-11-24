@@ -194,10 +194,17 @@ export interface Export {
 
 export interface VersionRef { artifact: string; version: number | null; }
 export interface ItemSummary { id: string; type: string; text: string; }
+/** A piece of text in a word diff: in both texts, removed or new. */
+export interface TextSpan { op: "same" | "del" | "ins"; text: string; }
+
 export interface ChangedItem extends ItemSummary {
   fields: string[];
   status_from?: string | null;
   status_to?: string | null;
+  /** If `text` changed: the old and new text, word by word. */
+  text_spans?: TextSpan[];
+  /** Each other changed field with a text value, word by word. Not `status`. */
+  field_spans?: Record<string, TextSpan[]>;
 }
 export interface SupersededItem extends ItemSummary { by: string[]; }
 
@@ -327,6 +334,10 @@ export interface MergeConflict {
   other: string | null;
   /** For "changed": the fields that are different. */
   fields: string[];
+  /** If both items are in `doc`: main's text to the other's text, word by word. */
+  text_spans?: TextSpan[];
+  /** In a merge with a base: the text of the item in the base. */
+  base_text?: string;
 }
 
 /** The result of `merge`. */
@@ -799,6 +810,15 @@ pub fn diff_text(
 ) -> Result<String, JsValue> {
     let d = skopos_core::diff::diff(&from_js(&old_doc, "oldDoc")?, &from_js(&new_doc, "newDoc")?);
     Ok(d.to_text())
+}
+
+// ------------------------------------------------------------------ words
+
+/// The difference between two texts, word by word, as `diff` and `merge`
+/// give it.
+#[wasm_bindgen(js_name = wordDiff, unchecked_return_type = "TextSpan[]")]
+pub fn word_diff(old: &str, new: &str) -> JsValue {
+    to_js(&skopos_core::words::word_diff(old, new))
 }
 
 // ------------------------------------------------------------------ history

@@ -27,6 +27,7 @@ import init, {
   schemaUrl,
   toJson,
   toYaml,
+  wordDiff,
   trace,
   traceText,
   version,
@@ -141,6 +142,25 @@ test("diff and diffText", () => {
   assert.equal(typeof diffText(a, b), "string");
 });
 
+test("wordDiff, and word changes in diff and merge", () => {
+  assert.deepEqual(wordDiff("Count every hour.", "Count at once."), [
+    { op: "same", text: "Count" },
+    { op: "del", text: "every hour." },
+    { op: "ins", text: "at once." },
+  ]);
+  const a = json("valid/spec-all-types-v3.json");
+  const b = structuredClone(a);
+  b.items[0].text = `${a.items[0].text} Now.`;
+  const changed = diff(a, b).changed[0];
+  assert.deepEqual(changed.text_spans.at(-1), { op: "ins", text: "Now." });
+
+  const dir = "merge/02-edit-edit/";
+  const [main, other, base] = ["main", "other", "base"].map((f) => json(`${dir}${f}.json`));
+  const c = merge(main, other, { base }).conflicts[0];
+  assert.equal(c.base_text, base.items.find((i) => i.id === "FR1").text);
+  assert.ok(c.text_spans.some((s) => s.op === "del"));
+});
+
 test("history, historyText, trace and traceText", () => {
   const dir = "history/02-hand-over/";
   const docs = [json(`${dir}second-team.json`), json(`${dir}first-team.json`)];
@@ -166,7 +186,9 @@ test("merge, mergeText, conflicts and resolve", () => {
   const m = merge(main, other, { base, now: "2026-11-24T12:00:00Z" });
   assert.equal(m.doc.version, main.version + 1);
   assert.equal(m.doc.created_at, "2026-11-24T12:00:00Z");
-  assert.deepEqual(m.conflicts, [{ kind: "changed", main: "FR1", other: "FR3", fields: ["text"] }]);
+  const [c] = m.conflicts;
+  assert.equal(m.conflicts.length, 1);
+  assert.deepEqual([c.kind, c.main, c.other, c.fields], ["changed", "FR1", "FR3", ["text"]]);
   assert.deepEqual(check(m.doc), []);
   assert.match(mergeText(main, other, { base }), /FR1 or FR3: text/);
   assert.deepEqual(conflicts(m.doc), [{ main: "FR1", other: "FR3", fields: ["text"] }]);

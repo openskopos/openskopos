@@ -316,8 +316,16 @@ fn merge_cases_give_the_expected_document() {
         expected.as_object_mut().unwrap().remove("created_at");
         doc.as_object_mut().unwrap().remove("created_at");
         assert_eq!(doc, expected, "{name}: document");
+        // The index gives the kind, the IDs and the fields of each conflict.
+        let conflicts: Vec<Value> = m
+            .conflicts
+            .iter()
+            .map(|c| {
+                serde_json::json!({"kind": c.kind, "main": c.main, "other": c.other, "fields": c.fields})
+            })
+            .collect();
         assert_eq!(
-            serde_json::to_value(&m.conflicts).unwrap(),
+            Value::from(conflicts),
             case["conflicts"],
             "{name}: conflicts"
         );
