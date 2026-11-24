@@ -40,7 +40,7 @@ export function AgentFile({ incoming }: { go: Go; incoming?: Handoff }) {
       </div>
       <div class="agent-grid">
         <div class="agent-inputs">
-          <DocInput title="Main document" value={main} onChange={setMain} result={mainRead} height="200px" />
+          <DocInput title="Main document" hint="The document the agent works from" value={main} onChange={setMain} result={mainRead} height="200px" />
           {inputs.map((f, i) => (
             <InputSlot key={i} file={f} n={i + 1} set={(nf) => setInputs(inputs.map((x, k) => (k === i ? nf : x)))} remove={() => setInputs(inputs.filter((_, k) => k !== i))} />
           ))}
@@ -82,6 +82,8 @@ function ResultPane({ main, valid, inputs, output, setOutput }: { main?: Documen
   const [pick, setPick] = useState(0);
   const files = (result && "files" in result && result.files) || [];
   const file = files[Math.min(pick, files.length - 1)];
+  // The folder that every file shares, shown once above the list.
+  const prefix = files.length > 1 ? files.map((f) => f.path).reduce((a, b) => { let n = 0; while (n < a.length && a[n] === b[n]) n++; return a.slice(0, a.lastIndexOf("/", n - 1) + 1); }) : "";
 
   return (
     <div class="pane agent-out">
@@ -94,7 +96,7 @@ function ResultPane({ main, valid, inputs, output, setOutput }: { main?: Documen
             setOutput(o);
           }}
           options={[
-            { value: "agent", label: "Agent file" },
+            { value: "agent", label: "Single Markdown" },
             { value: "openspec", label: "OpenSpec" },
             { value: "kiro", label: "Kiro" },
             { value: "speckit", label: "Spec Kit" },
@@ -123,24 +125,28 @@ function ResultPane({ main, valid, inputs, output, setOutput }: { main?: Documen
       {result && "error" in result && <p class="bad-text pad-x">{result.error}</p>}
       {files.length > 1 && (
         <div class="file-tabs">
+          {prefix && <span class="muted small-text file-prefix">{prefix}</span>}
           {files.map((f, i) => (
-            <button type="button" aria-pressed={f === file} onClick={() => setPick(i)}>
-              {f.path}
+            <button type="button" aria-pressed={f === file} onClick={() => setPick(i)} title={f.path}>
+              {f.path.slice(prefix.length)}
             </button>
           ))}
         </div>
       )}
       {file && (
         <div class="pane-body">
-          <Editor label={file.path} value={file.text} format="markdown" readOnly />
+          <Editor key={file.path} label={file.path} value={file.text} format={/\.json$/.test(file.path) ? "json" : /\.ya?ml$/.test(file.path) ? "yaml" : "markdown"} readOnly />
         </div>
       )}
       {result && "notes" in result && result.notes && result.notes.length > 0 && (
-        <div class="strip notes">
+        <details class="strip notes">
+          <summary>
+            {result.notes.length} {result.notes.length === 1 ? "item is" : "items are"} left out of this export
+          </summary>
           {result.notes!.map((n) => (
             <div>{n}</div>
           ))}
-        </div>
+        </details>
       )}
     </div>
   );

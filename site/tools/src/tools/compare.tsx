@@ -4,14 +4,15 @@ import { core, type Diff, type Document, type Item } from "../core";
 import { versionPair } from "../examples";
 import type { Go, Handoff } from "../nav";
 import { readShared, shareUrl } from "../share";
-import { copy, DocInput, hasReadable, Readable, Segmented, useRead, useStored, type TextFile } from "../ui";
+import { copy, DocInput, hasReadable, Readable, Segmented, Spans, useRead, useStored, type TextFile } from "../ui";
+import type { TextSpan } from "../core";
 
 const empty: TextFile = { name: "", text: "" };
 
 export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
   const [older, setOlder] = useStored<TextFile>("compare:old", empty);
   const [newer, setNewer] = useStored<TextFile>("compare:new", empty);
-  const [view, setView] = useStored<"changes" | "readable">("compare:view", "changes");
+  const [view, setView] = useStored<"changes" | "readable">("compare:view", "readable");
   const a = useRead(older);
   const b = useRead(newer);
 
@@ -49,7 +50,7 @@ export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
         >
           Try an example
         </button>
-        <button type="button" class="btn ghost" onClick={() => {
+        <button type="button" class="btn ghost" disabled={!older.text.trim() || !newer.text.trim()} onClick={() => {
             setOlder(newer);
             setNewer(older);
           }}>
@@ -57,15 +58,15 @@ export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
         </button>
         {result && "diff" in result && (
           <button type="button" class="btn ghost" onClick={async () => copy(await shareUrl({ old: older, new: newer }), "Link copied. The documents are in the link, not on a server.")}>
-            Copy share link
+            Share
           </button>
         )}
       </div>
       <div class="compare-inputs">
-        <DocInput title="Older version" value={older} onChange={setOlder} result={a} height="220px" />
-        <DocInput title="Newer version" value={newer} onChange={setNewer} result={b} height="220px" />
+        <DocInput title="Older version" hint="Paste, drop or open the earlier version" value={older} onChange={setOlder} result={a} height="220px" />
+        <DocInput title="Newer version" hint="Paste, drop or open the later version" value={newer} onChange={setNewer} result={b} height="220px" />
       </div>
-      {!result && <p class="muted center-text">Add two versions of one document. Core compares their items by ID, the same as <code>skopos diff</code>.</p>}
+      {!result && <p class="muted center-text">Add two versions of one document. Their items are compared by ID, the same as <code>skopos diff</code>.</p>}
       {result && "error" in result && <p class="bad-text">{result.error}</p>}
       {result && "diff" in result && hasReadable() && (
         <Segmented
@@ -73,8 +74,8 @@ export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
           value={view}
           onChange={setView}
           options={[
-            { value: "changes", label: "List of changes" },
-            { value: "readable", label: "Newer version, with changes marked" },
+            { value: "readable", label: "Changes marked" },
+            { value: "changes", label: "List" },
           ]}
         />
       )}
@@ -100,16 +101,12 @@ function DiffView({ diff, text, oldDoc, newDoc }: { diff: Diff; text: string; ol
   return (
     <div class="diff">
       <div class="diff-head">
-        <code>
-          {diff.from.artifact}@{diff.from.version ?? "?"}
-        </code>
-        <span class="muted">→</span>
-        <code>
-          {diff.to.artifact}@{diff.to.version ?? "?"}
-        </code>
-        {!diff.same_artifact && <span class="pill proposed">different artifacts</span>}
+        <b title={`${diff.from.artifact} → ${diff.to.artifact}`}>
+          Version {diff.from.version ?? "?"} → version {diff.to.version ?? "?"}
+        </b>
+        {!diff.same_artifact && <span class="pill proposed">different documents</span>}
         <span class="grow" />
-        {counts.map(([k, n]) => (
+        {counts.filter(([, n]) => n > 0).map(([k, n]) => (
           <span class={`count ${k} ${n ? "" : "zero"}`}>
             <b>{n}</b> {k}
           </span>
@@ -140,29 +137,20 @@ function DiffView({ diff, text, oldDoc, newDoc }: { diff: Diff; text: string; ol
               <span class="diff-kind">changed</span>
               <span class="id">{i.id}</span>
               <div class="txt">
-                <div class="fields-changed">
-                  {i.fields.map((f) => (
-                    <code>{f}</code>
-                  ))}
-                  {i.status_from && i.status_to && (
-                    <span class="muted">
-                      {" "}
-                      status {i.status_from} → {i.status_to}
-                    </span>
-                  )}
-                </div>
-                {i.fields.map((f) => (
-                  <div class="change">
-                    <div class="before">
-                      <span class="muted">{f}, before</span>
-                      <div>{show(before?.[f])}</div>
-                    </div>
-                    <div class="after">
-                      <span class="muted">{f}, after</span>
-                      <div>{show(after?.[f])}</div>
-                    </div>
+                {i.status_from && i.status_to && (
+                  <div class="muted small-text">
+                    status {i.status_from} → {i.status_to}
                   </div>
-                ))}
+                )}
+                {i.fields.filter((f) => f !== "status").map((f) => {
+                  const spans = (f === "text" ? (i as { text_spans?: TextSpan[] }).text_spans : (i as { field_spans?: Record<string, TextSpan[]> }).field_spans?.[f]);
+                  return (
+                    <div class="change-one">
+                      {f !== "text" && <span class="muted small-text">{f.replace(/_/g, " ")}</span>}
+                      <div>{spans ? <Spans spans={spans} /> : <>{show(before?.[f])} <span class="muted">→</span> {show(after?.[f])}</>}</div>
+                    </div>
+                  );
+                })}
               </div>
             </li>
           );

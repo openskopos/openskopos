@@ -73,9 +73,17 @@ export function History(_: { go: Go; incoming?: Handoff }) {
       </div>
 
       {!files.length && (
-        <div class="blank-drop">
+        <div class="blank inline">
           <p class="blank-title">Drop several versions of a document here</p>
-          <p class="muted">In any order, from one or more artifacts. Core sorts them into chains by artifact ID and version, follows the input parents, and shows the life of every item.</p>
+          <p class="muted">In any order, and from more than one document. They are sorted into versions, linked to the documents they took as input, and every item gets its story.</p>
+          <div class="row center wrap">
+            <button type="button" class="btn" onClick={async () => add(await openFiles(true))}>
+              Open files
+            </button>
+            <button type="button" class="btn ghost" onClick={() => setFiles(historyChain)}>
+              Try an example
+            </button>
+          </div>
         </div>
       )}
 
@@ -92,9 +100,8 @@ export function History(_: { go: Go; incoming?: Handoff }) {
             {h.chains.map((c) => (
               <div class="chain">
                 <div class="chain-head">
-                  <span class="eyebrow">{c.kind}</span>
-                  <span class="chain-title">{c.title}</span>
-                  <code class="aid">{c.artifact}</code>
+                  <span class="chain-title" title={c.artifact}>{c.title}</span>
+                  <span class="muted small-text">{c.kind.replace(/_/g, " ")}</span>
                 </div>
                 <ol class="versions">
                   {c.versions.map((v) => (
@@ -120,8 +127,9 @@ export function History(_: { go: Go; incoming?: Handoff }) {
               </div>
             ))}
           </div>
+          <p class="muted small-text legend">● final version · ○ draft · +added ~changed −dropped</p>
           {h.warnings.length > 0 && (
-            <div class="warnings">
+            <div class="warnings muted small-text">
               {h.warnings.map((w) => (
                 <div>{w.message}</div>
               ))}
@@ -133,7 +141,7 @@ export function History(_: { go: Go; incoming?: Handoff }) {
               label="Items"
               value={filter}
               onChange={setFilter}
-              options={(["now", "changed", "superseded", "dropped", "rejected", "proposed", "all"] as Filter[]).map((f) => ({
+              options={(["now", "changed", "superseded", "dropped", "rejected", "proposed", "all"] as Filter[]).filter((f) => f === filter || f === "all" || f === "now" || count(f) > 0).map((f) => ({
                 value: f,
                 label: `${f === "now" ? "In force now" : f[0].toUpperCase() + f.slice(1)} ${count(f)}`,
               }))}
@@ -150,8 +158,11 @@ export function History(_: { go: Go; incoming?: Handoff }) {
           </div>
 
           <ol class="item-rows">
-            {shown.map((i) => (
-              <ItemRow item={i} versions={versionsOf(i.artifact)} multi={h.chains.length > 1} open={open === i.key} toggle={() => setOpen(open === i.key ? null : i.key)} />
+            {shown.map((i, n) => (
+              <>
+                {h.chains.length > 1 && i.artifact !== shown[n - 1]?.artifact && <li class="row-group">{h.chains.find((c) => c.artifact === i.artifact)?.title ?? i.artifact}</li>}
+                <ItemRow item={i} versions={versionsOf(i.artifact)} showState={filter !== "now"} open={open === i.key} toggle={() => setOpen(open === i.key ? null : i.key)} />
+              </>
             ))}
             {!shown.length && <li class="muted pad">No items match.</li>}
           </ol>
@@ -163,7 +174,7 @@ export function History(_: { go: Go; incoming?: Handoff }) {
 
 const refText = (r: ItemRefTo | string) => (typeof r === "string" ? r : `${r.artifact}${r.version ? `@${r.version}` : ""}#${r.item}`);
 
-function ItemRow({ item, versions, multi, open, toggle }: { item: ItemHistory; versions: number[]; multi: boolean; open: boolean; toggle: () => void }) {
+function ItemRow({ item, versions, showState, open, toggle }: { item: ItemHistory; versions: number[]; showState: boolean; open: boolean; toggle: () => void }) {
   const byVersion = new Map(item.steps.map((s) => [s.version, s]));
   return (
     <li class={`item-row state-${item.state} ${open ? "open" : ""}`}>
@@ -178,9 +189,8 @@ function ItemRow({ item, versions, multi, open, toggle }: { item: ItemHistory; v
             return <i class={`tick t-${kind}`} title={`v${v}: ${s ? s.change : present ? "carried over" : "not in this version"}`} />;
           })}
         </span>
-        <span class={`pill state ${item.state}`}>{stateLabel[item.state]}</span>
+        {showState && <span class={`pill state ${item.state}`}>{stateLabel[item.state]}</span>}
       </button>
-      {multi && !open && <div class="item-sub muted">{item.artifact}</div>}
       {open && (
         <div class="story">
           <div class="row wrap">

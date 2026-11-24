@@ -1,10 +1,10 @@
 // Small parts that the tools share.
 import type { ComponentChildren } from "preact";
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { Editor, type EditorHandle } from "./editor";
+import { Editor } from "./editor";
 import { detectFormat, formatLabel, read, type Format, type ReadResult } from "./doc";
 import { examples, type Example } from "./examples";
-import { core, next, type Document } from "./core";
+import { core, next, type Document, type TextSpan } from "./core";
 
 /** State that the browser keeps between visits, in localStorage. */
 export function useStored<T>(key: string, initial: T | (() => T)): [T, (v: T) => void] {
@@ -56,7 +56,8 @@ export function useMedia(query: string): boolean {
 }
 
 let toastTimer: ReturnType<typeof setTimeout> | undefined;
-export function toast(message: string) {
+/** A short message at the bottom of the page, with an optional action such as Undo. */
+export function toast(message: string, action?: { label: string; run: () => void }) {
   let el = document.getElementById("toast");
   if (!el) {
     el = document.createElement("div");
@@ -64,10 +65,20 @@ export function toast(message: string) {
     el.setAttribute("role", "status");
     document.body.append(el);
   }
-  el.textContent = message;
+  el.replaceChildren(message);
+  if (action) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = action.label;
+    b.onclick = () => {
+      action.run();
+      el!.classList.remove("on");
+    };
+    el.append(b);
+  }
   el.classList.add("on");
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => el!.classList.remove("on"), 1800);
+  toastTimer = setTimeout(() => el!.classList.remove("on"), action ? 6000 : 1800);
 }
 
 export async function copy(text: string, what = "Copied") {
@@ -149,7 +160,7 @@ export function Segmented<T extends string>({ value, options, onChange, label }:
   );
 }
 
-export function ExamplePicker({ onPick, label = "Examples", filter }: { onPick: (e: Example) => void; label?: string; filter?: (e: Example) => boolean }) {
+export function ExamplePicker({ onPick, label = "Try an example", filter }: { onPick: (e: Example) => void; label?: string; filter?: (e: Example) => boolean }) {
   const list = filter ? examples.filter(filter) : examples;
   return (
     <label class="btn ghost select">
@@ -194,16 +205,22 @@ export function Status({ verdict, count, version = "0.1" }: { verdict: Verdict; 
 /** The anchor of a rule in section 9 of the specification. */
 export const ruleUrl = "/spec/0.1/#9-rules-that-the-schema-cannot-check";
 
-/** A document slot with a name, a small editor, and its status. For Compare and Agent file. */
+/**
+ * A document slot for Compare, Merge and Agent file. Empty, it shows an
+ * editor to paste into. With a valid document, it folds to one line, so the
+ * result of the tool comes first; Edit opens the text again.
+ */
 export function DocInput({
   title,
+  hint,
   value,
   onChange,
   onRemove,
   result,
-  height = "260px",
+  height = "220px",
 }: {
   title: string;
+  hint?: string;
   value: TextFile;
   onChange: (f: TextFile) => void;
   onRemove?: () => void;
@@ -213,43 +230,68 @@ export function DocInput({
   const format = useMemo(() => detectFormat(value.text, value.name), [value.text, value.name]);
   const verdict = verdictOf(value.text, result);
   const doc = result?.doc;
-  const editor = useRef<EditorHandle | null>(null);
+  const [editing, setEditing] = useState(false);
+  const folded = verdict === "valid" && !editing;
+  const open = async () => {
+    const [f] = await openFiles();
+    if (f) {
+      setEditing(false);
+      onChange(f);
+    }
+  };
   return (
-    <DropArea class="slot" onFiles={(f) => f[0] && onChange(f[0])} hint="Drop to open">
+    <DropArea
+      class={`slot ${folded ? "folded" : ""}`}
+      onFiles={(f) => {
+        if (!f[0]) return;
+        setEditing(false);
+        onChange(f[0]);
+      }}
+      hint="Drop to open"
+    >
       <div class="slot-head">
         <div class="slot-title">
-          <span class="eyebrow">{title}</span>
-          <span class="slot-name" title={value.name}>
-            {doc?.title ? String(doc.title) : value.name || "No document yet"}
-            {doc?.version !== undefined && <span class="muted"> · version {String(doc.version)}</span>}
+          <span class="eyebrow" title={hint}>
+            {title}
           </span>
+          {value.text.trim() ? (
+            <span class="slot-name" title={value.name}>
+              {doc?.title ? String(doc.title) : value.name || "Pasted text"}
+              {doc?.version !== undefined && <span class="muted"> · version {String(doc.version)}</span>}
+            </span>
+          ) : (
+            hint && <span class="slot-hint muted">{hint}</span>
+          )}
         </div>
         <div class="slot-actions">
-          <Status verdict={verdict} count={result?.problems.length} />
-          <button type="button" class="btn ghost" onClick={async () => {
-              const [f] = await openFiles();
-              if (f) onChange(f);
-            }}>
+          {verdict !== "empty" && <Status verdict={verdict} count={result?.problems.length} />}
+          {verdict === "valid" && (
+            <button type="button" class="btn ghost small" aria-expanded={!folded} onClick={() => setEditing(!editing)}>
+              {folded ? "Edit" : "Fold"}
+            </button>
+          )}
+          <button type="button" class="btn ghost small" onClick={open}>
             Open
           </button>
           {onRemove && (
-            <button type="button" class="btn ghost icon" aria-label={`Remove ${title}`} onClick={onRemove}>
+            <button type="button" class="btn ghost icon small" aria-label={`Remove ${title}`} onClick={onRemove}>
               ×
             </button>
           )}
         </div>
       </div>
-      <div class="slot-editor" style={{ height }}>
-        <Editor
-          label={title}
-          value={value.text}
-          format={format}
-          marks={result?.marks}
-          onChange={(text) => onChange({ ...value, text })}
-          placeholder={`Paste, drop or open a document (${formatLabel.json}, ${formatLabel.yaml} or ${formatLabel.markdown})`}
-          handle={(h) => (editor.current = h)}
-        />
-      </div>
+      {!folded && (
+        <div class="slot-editor" style={{ height }}>
+          <Editor
+            label={title}
+            value={value.text}
+            format={format}
+            marks={result?.marks}
+            onChange={(text) => onChange({ ...value, text })}
+            placeholder={`Paste, drop or open a document (${formatLabel.json}, ${formatLabel.yaml} or ${formatLabel.markdown})`}
+          />
+        </div>
+      )}
       {result && result.problems.length + result.readErrors.length > 0 && (
         <div class="slot-problems">
           {[...result.readErrors, ...result.problems.map((p) => p.message)].slice(0, 3).map((m) => (
@@ -261,6 +303,62 @@ export function DocInput({
     </DropArea>
   );
 }
+
+/** The first screen of a tool before it has a document: the same on every tab. */
+export function EmptyState({ title, children, actions }: { title: string; children: ComponentChildren; actions: ComponentChildren }) {
+  return (
+    <div class="blank">
+      <p class="blank-title">{title}</p>
+      <p class="muted">{children}</p>
+      <div class="row center wrap">{actions}</div>
+    </div>
+  );
+}
+
+/** A small menu behind a "⋯" button. Each item closes the menu. */
+export function Menu({ label = "More actions", items }: { label?: string; items: ({ label: string; run: () => void } | { heading: string } | null)[] }) {
+  const ref = useRef<HTMLDetailsElement>(null);
+  useEffect(() => {
+    const close = (e: Event) => {
+      if (ref.current?.open && !ref.current.contains(e.target as Node)) ref.current.open = false;
+    };
+    const esc = (e: KeyboardEvent) => e.key === "Escape" && ref.current && (ref.current.open = false);
+    document.addEventListener("click", close);
+    document.addEventListener("keydown", esc);
+    return () => {
+      document.removeEventListener("click", close);
+      document.removeEventListener("keydown", esc);
+    };
+  }, []);
+  return (
+    <details class="menu" ref={ref}>
+      <summary class="btn ghost icon" aria-label={label} title={label}>
+        ⋯
+      </summary>
+      <div class="menu-list" role="menu">
+        {items.map((it) =>
+          !it ? null : "heading" in it ? (
+            <div class="menu-heading">{it.heading}</div>
+          ) : (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                if (ref.current) ref.current.open = false;
+                it.run();
+              }}
+            >
+              {it.label}
+            </button>
+          ),
+        )}
+      </div>
+    </details>
+  );
+}
+
+/** The line of a place in a text, counting from 1. */
+export const lineOf = (text: string, pos: number) => text.slice(0, pos).split("\n").length;
 
 /** Reads a slot with core, with stable Markdown options for one page visit. */
 export function useRead(file: TextFile, format?: Format): ReadResult | undefined {
@@ -323,3 +421,17 @@ export function Readable({ doc, previous }: { doc: Document; previous?: Document
 }
 
 export const hasReadable = () => !!next.renderHtml;
+
+/** Changed words, as core found them: removed words struck through, new words marked. */
+export function Spans({ spans, side }: { spans: TextSpan[]; side?: "old" | "new" }) {
+  return (
+    <span class="spans">
+      {spans
+        .filter((x) => !side || x.op === "same" || (side === "old" ? x.op === "del" : x.op === "ins"))
+        .map((x, i) => {
+          const sp = i ? " " : "";
+          return x.op === "same" ? sp + x.text : x.op === "del" ? <>{sp}<del>{x.text}</del></> : <>{sp}<ins>{x.text}</ins></>;
+        })}
+    </span>
+  );
+}

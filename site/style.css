@@ -1,4 +1,21 @@
 /* The styles of openskopos.org. Colors and fonts are from brand/BRAND.md. */
+
+/* Inter and JetBrains Mono, Latin only, under the SIL Open Font License
+   (fonts/LICENSE-*.txt). Variable fonts: one file has every weight. */
+@font-face {
+  font-family: Inter;
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url(/fonts/inter.woff2) format("woff2");
+}
+@font-face {
+  font-family: "JetBrains Mono";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url(/fonts/jetbrains-mono.woff2) format("woff2");
+}
 :root {
   --bg: #FFF7EA;
   --ink: #242433;

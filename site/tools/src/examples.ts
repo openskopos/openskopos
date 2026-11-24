@@ -28,7 +28,10 @@ const labels: Record<string, string> = {
 
 /** Valid examples first, then a Markdown file, then invalid examples. */
 export const examples: Example[] = [
-  ...Object.entries(valid).map(([p, text]) => ({ name: base(p), text })),
+  // index.json lists the cases; it is not a document.
+  ...Object.entries(valid)
+    .filter(([p]) => !p.endsWith("/index.json"))
+    .map(([p, text]) => ({ name: base(p), text })),
   { name: "INTENT.md", text: pick(markdown, "INTENT.md") },
   ...Object.entries(invalid).map(([p, text]) => ({ name: base(p), text })),
 ]

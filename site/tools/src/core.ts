@@ -60,11 +60,13 @@ export interface History {
   warnings: { artifact: string | null; message: string }[];
   items: ItemHistory[];
 }
+export interface TextSpan { op: "same" | "del" | "ins"; text: string }
 export interface MergePair { main: string; other: string; by: "id" | "text" | "given"; similarity?: number }
-export interface MergeConflict { kind: "changed" | "removed_in_main" | "removed_in_other"; main: string | null; other: string | null; fields: string[] }
+export interface MergeConflict { kind: "changed" | "removed_in_main" | "removed_in_other"; main: string | null; other: string | null; fields: string[]; text_spans?: TextSpan[]; base_text?: string }
 export interface MergeResult { doc: Document; pairs: MergePair[]; conflicts: MergeConflict[]; renamed: { from: string; to: string }[]; envelope: string[] }
 export interface MergeOptions { base?: Document; pairs?: [string, string][]; now?: string }
 interface Next {
+  wordDiff(oldText: string, newText: string): TextSpan[];
   merge(main: Document, other: Document, options?: MergeOptions): MergeResult;
   mergeText(main: Document, other: Document, options?: MergeOptions): string;
   conflicts(doc: Document): { main: string; other: string; fields: string[] }[];

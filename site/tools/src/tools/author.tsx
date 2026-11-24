@@ -8,7 +8,7 @@ import { detectFormat, fileName, formatLabel, formatMime, formats, itemIndex, it
 import { schemaInfo, type Field, type ItemTypeInfo } from "../schema";
 import { readShared, shareUrl } from "../share";
 import type { Go, Handoff } from "../nav";
-import { copy, download, DropArea, ExamplePicker, hasReadable, openFiles, Readable, ruleUrl, Segmented, Status, mdSession, useMedia, useStored, type TextFile } from "../ui";
+import { copy, download, DropArea, ExamplePicker, hasReadable, Menu, openFiles, Readable, ruleUrl, Segmented, Status, mdSession, toast, useMedia, useStored, type TextFile } from "../ui";
 
 type View = "both" | "cards" | "text";
 
@@ -19,6 +19,24 @@ interface Source {
 }
 
 const kinds = ["intent", "spec", "agent_rules", "critique", "glossary"];
+
+/** The item types that the add bar offers first, by the kind of document. */
+const suggested: Record<string, string[]> = {
+  intent: ["goal", "success_signal", "requirement", "constraint", "decision"],
+  spec: ["requirement", "story", "constraint", "decision", "open_question"],
+  agent_rules: ["constraint", "term", "decision"],
+  critique: ["critique"],
+  glossary: ["term"],
+};
+
+/** A problem message in plain words where the page knows a better one. */
+function friendly(message: string, path?: string) {
+  const field = path?.split("/").pop();
+  if (/is shorter than 1 character/.test(message) && field) return field === "text" ? "Write this item in one sentence." : `Fill in ${field.replace(/_/g, " ")}.`;
+  const req = /^"(\w+)" is a required property$/.exec(message);
+  if (req) return `Add ${req[1].replace(/_/g, " ")}.`;
+  return message.charAt(0).toUpperCase() + message.slice(1);
+}
 
 function blank(kind = "intent"): Document {
   return {
@@ -40,7 +58,13 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
   const [src, setSrc] = useStored<Source>("author:source", { name: "", format: "yaml", text: "" });
   const [doc, setDoc] = useState<Document | undefined>(() => (src.text ? read(src.text, src.format, mdSession()).doc : undefined));
   const [readErrors, setReadErrors] = useState<Mark[]>([]);
-  const [selected, setSelected] = useState<number | null>(null);
+  const [selected, setSelectedRaw] = useState<number | null>(null);
+  /** The item that was just added and not touched yet: no error on it until its card closes. */
+  const [pristine, setPristine] = useState<number | null>(null);
+  const setSelected = (i: number | null) => {
+    if (i !== pristine) setPristine(null);
+    setSelectedRaw(i);
+  };
   const [filter, setFilter] = useState("");
   const [textSide, setTextSide] = useStored<"source" | "readable">("author:text", "source");
   const readable = hasReadable() && textSide === "readable" && !!doc;
@@ -71,7 +95,10 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
   }, [src.text, src.format]);
 
   /** Loads text from a file, an example, another tool or a link. */
-  function load(f: TextFile) {
+  function load(f: TextFile, undoable = false) {
+    const before = src;
+    if (undoable && before.text.trim() && before.text !== f.text)
+      toast(`Opened ${f.name || "the file"}`, { label: "Undo", run: () => load({ name: before.name, text: before.text }) });
     const format = detectFormat(f.text, f.name);
     const r = read(f.text, format, { ...mdSession(), filename: f.name });
     written.current = f.text;
@@ -100,7 +127,8 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
     setSrc({ ...src, format, text });
   }
 
-  const problems = useMemo(() => (doc ? core.check(doc) : []), [doc]);
+  const allProblems = useMemo(() => (doc ? core.check(doc) : []), [doc]);
+  const problems = pristine === null ? allProblems : allProblems.filter((p) => itemIndex(p.path) !== pristine);
   const marks: Mark[] = useMemo(() => {
     if (readErrors.length) return readErrors;
     if (src.text !== written.current && src.format === "markdown") return [];
@@ -122,44 +150,61 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
   if (!doc && !src.text.trim()) return <Start onLoad={load} onNew={(kind) => commit(blank(kind), src.format)} />;
 
   const name = fileName(doc, src.format);
+  function showFirstProblem() {
+    const p = problems[0];
+    if (!p) return;
+    const i = itemIndex(p.path);
+    if (view !== "text" && i !== null) {
+      setFilter("");
+      setSelected(i);
+    }
+    const m = marks.find((x) => x.path === p.path);
+    if (view !== "cards" && m) editor.current?.reveal(m.from, m.to);
+  }
   const viewOptions = narrow
     ? [
         { value: "cards" as View, label: "Cards" },
-        { value: "text" as View, label: "Text" },
+        { value: "text" as View, label: "Source" },
       ]
     : [
-        { value: "both" as View, label: "Cards and text" },
+        { value: "both" as View, label: "Both" },
         { value: "cards" as View, label: "Cards" },
-        { value: "text" as View, label: "Text" },
+        { value: "text" as View, label: "Source" },
       ];
 
   return (
     <DropArea class="author" onFiles={(f) => f[0] && load(f[0])} hint="Drop to open this file">
       <div class="author-bar">
-        <div class="author-title">
-          <span class="t">{typeof doc?.title === "string" && doc.title ? doc.title : "Untitled"}</span>
-          <span class="muted">
-            {[doc?.status, doc?.version !== undefined && `version ${doc.version}`].filter(Boolean).join(", ")}
-          </span>
-        </div>
-        <Status verdict={verdict} count={problems.length} />
+        {view === "text" && <span class="author-name">{typeof doc?.title === "string" && doc.title ? doc.title : "Untitled"}</span>}
+        {problems.length > 0 && !stale ? (
+          <button type="button" class="status-button" onClick={showFirstProblem} title="Show the first problem">
+            <Status verdict={verdict} count={problems.length} />
+          </button>
+        ) : (
+          <Status verdict={verdict} count={problems.length} />
+        )}
         <span class="grow" />
         <Segmented label="Show" value={view} onChange={setView} options={viewOptions} />
-        <div class="row wrap">
-          <button type="button" class="btn ghost" onClick={async () => (await openFiles()).slice(0, 1).forEach(load)}>
-            Open
-          </button>
-          <ExamplePicker onPick={(e) => load({ name: e.name, text: e.text })} filter={(e) => !e.name.startsWith("counter") && !e.name.startsWith("duplicate") && !e.name.startsWith("constraint-")} />
-          <button type="button" class="btn ghost" onClick={() => (confirm("Start a new document? The current one is not saved anywhere else.") ? commit(blank(), src.format) : undefined)}>
-            New
-          </button>
-          <button type="button" class="btn ghost" onClick={async () => copy(await shareUrl({ name, text: src.text }), "Link copied. The document is in the link, not on a server.")}>
-            Share
-          </button>
-          <button type="button" class="btn" onClick={() => download(name, src.text, formatMime[src.format])}>
-            Download
-          </button>
-        </div>
+        <ExamplePicker onPick={(e) => load({ name: e.name, text: e.text }, true)} filter={(e) => !e.label.startsWith("Invalid")} />
+        <Menu
+          items={[
+            { label: "Open a file", run: async () => (await openFiles()).slice(0, 1).forEach((f) => load(f, true)) },
+            {
+              label: "New document",
+              run: () => {
+                const before = src;
+                commit(blank(), src.format);
+                toast("Started a new document", { label: "Undo", run: () => load({ name: before.name, text: before.text }) });
+              },
+            },
+            { label: "Share a link", run: async () => copy(await shareUrl({ name, text: src.text }), "Link copied. The document is in the link, not on a server.") },
+            { label: "Copy the text", run: () => copy(src.text) },
+            { label: "Open in Validate", run: () => go("validate", { name, text: src.text }) },
+          ]}
+        />
+        <button type="button" class="btn" onClick={() => download(name, src.text, formatMime[src.format])}>
+          Download {name.slice(name.indexOf("."))}
+        </button>
       </div>
 
       <div class={`author-body view-${view}`}>
@@ -167,7 +212,7 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
           <div class="pane cards-pane">
             {stale && (
               <div class="stale">
-                The text has an error, so the cards show the last version that core could read. Fix the text, or{" "}
+                The text cannot be read right now, so the cards show the last version that could. Fix the text, or{" "}
                 <button type="button" class="link" onClick={() => doc && commit(doc)}>
                   go back to this version
                 </button>
@@ -178,6 +223,8 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
               <Cards
                 doc={doc}
                 problems={problems}
+                pristine={pristine}
+                setPristine={setPristine}
                 readOnly={stale}
                 selected={selected}
                 select={setSelected}
@@ -202,7 +249,6 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
                   ]}
                 />
               )}
-              {!readable && <span class="file">{name}</span>}
               {!readable && <Segmented
                 label="Text format"
                 value={src.format}
@@ -210,12 +256,6 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
                 options={formats.map((f) => ({ value: f, label: formatLabel[f] }))}
               />}
               <span class="grow" />
-              <button type="button" class="btn ghost small" onClick={() => copy(src.text)}>
-                Copy
-              </button>
-              <button type="button" class="btn ghost small" onClick={() => go("validate", { name, text: src.text })}>
-                Open in Validate
-              </button>
             </div>
             {readable && (
               <div class="pane-body scroll">
@@ -250,7 +290,7 @@ function Start({ onLoad, onNew }: { onLoad: (f: TextFile) => void; onNew: (kind:
   return (
     <DropArea class="start" onFiles={(f) => f[0] && onLoad(f[0])} hint="Drop to open this file">
       <h1>Write an OpenSkopos document</h1>
-      <p class="muted">Add goals, requirements, rules and decisions as cards. The text next to them is the file, in YAML, JSON or Markdown. Core checks the document on every change and gives each item its ID.</p>
+      <p class="muted">Add goals, requirements, rules and decisions as cards. The text next to them is the file, in YAML, JSON or Markdown. The document is checked on every change, and each item gets its ID.</p>
       <div class="start-kinds">
         {kinds.map((k) => (
           <button type="button" class="kind" onClick={() => onNew(k)}>
@@ -281,7 +321,7 @@ function Start({ onLoad, onNew }: { onLoad: (f: TextFile) => void; onNew: (kind:
 }
 
 function ProblemStrip({ marks, doc, reveal }: { marks: Mark[]; doc?: Document; reveal: (m: Mark) => void }) {
-  if (!marks.length) return <div class="strip ok">No problems. Valid OpenSkopos 0.1.</div>;
+  if (!marks.length) return null;
   return (
     <div class="strip">
       {marks.slice(0, 6).map((m) => {
@@ -289,7 +329,7 @@ function ProblemStrip({ marks, doc, reveal }: { marks: Mark[]; doc?: Document; r
         const id = i !== null ? doc?.items?.[i]?.id : undefined;
         return (
           <button type="button" class="strip-row" onClick={() => reveal(m)}>
-            {id && <b>{String(id)}</b>} {m.message}
+            {id && <b>{String(id)}</b>} {friendly(m.message, m.path)}
           </button>
         );
       })}
@@ -303,6 +343,8 @@ function ProblemStrip({ marks, doc, reveal }: { marks: Mark[]; doc?: Document; r
 interface CardsProps {
   doc: Document;
   problems: Problem[];
+  pristine: number | null;
+  setPristine: (i: number | null) => void;
   readOnly: boolean;
   selected: number | null;
   select: (i: number | null) => void;
@@ -311,7 +353,8 @@ interface CardsProps {
   commit: (d: Document) => void;
 }
 
-function Cards({ doc, problems, readOnly, selected, select, filter, setFilter, commit }: CardsProps) {
+function Cards({ doc, problems, pristine, setPristine, readOnly, selected, select, filter, setFilter, commit }: CardsProps) {
+  const [moreTypes, setMoreTypes] = useState(false);
   const info = schemaInfo();
   const items = (Array.isArray(doc.items) ? doc.items : []) as Item[];
   const list = useRef<HTMLDivElement>(null);
@@ -353,6 +396,7 @@ function Cards({ doc, problems, readOnly, selected, select, filter, setFilter, c
       commit(next);
     }
     select(at);
+    setPristine(at);
     setFilter("");
     requestAnimationFrame(() => list.current?.querySelector<HTMLTextAreaElement>(`[data-index="${at}"] textarea`)?.focus());
   }
@@ -418,11 +462,16 @@ function Cards({ doc, problems, readOnly, selected, select, filter, setFilter, c
       {!readOnly && (
         <div class="add-any">
           <span class="muted">Add</span>
-          {info.types.map((t) => (
-            <button type="button" class="chip" onClick={() => add(t)} title={`Add ${t.label.toLowerCase()} (${t.prefix})`}>
-              <span class="prefix">{t.prefix}</span> {t.label}
-            </button>
-          ))}
+          {info.types
+            .filter((t) => moreTypes || (suggested[String(doc.kind)] ?? suggested.intent).includes(t.type))
+            .map((t) => (
+              <button type="button" class="chip" onClick={() => add(t)} title={`Add ${t.label.toLowerCase()} (${t.prefix})`}>
+                {t.label}
+              </button>
+            ))}
+          <button type="button" class="link" onClick={() => setMoreTypes(!moreTypes)}>
+            {moreTypes ? "Fewer" : "More types"}
+          </button>
         </div>
       )}
     </div>
@@ -509,13 +558,20 @@ function Card({ item, index, info, doc, problems, open, readOnly, toggle, change
   const refs = Array.isArray(item.refs) ? (item.refs as { item: string; rel?: string; artifact?: string; version?: number }[]) : [];
   const shown = info.fields.filter((f) => item[f.name] !== undefined && ["enum", "bool", "date", "line"].includes(f.kind) && f.name !== "proposed_by").slice(0, 3);
   const status = String(item.status ?? "");
+  const [extra, setExtra] = useState<string[]>([]);
+  // Fields the editor can show; "other" fields without a value stay in the text.
+  const fields = info.fields.filter((f) => f.name !== "refs" && (f.kind !== "other" || item[f.name] !== undefined));
+  const hidden = [
+    ...fields.filter((f) => !f.required && item[f.name] === undefined && !extra.includes(f.name)),
+    ...(refs.length || extra.includes("refs") ? [] : [{ name: "refs" } as Field]),
+  ];
 
   return (
     <div ref={ref} data-index={index} class={`card ${open ? "open" : ""} ${problems.length ? "err" : ""} st-${status}`}>
       <button type="button" class="card-row" onClick={toggle} aria-expanded={open}>
         <span class="id">{String(item.id ?? "new")}</span>
         <span class={`txt ${item.text && !open ? "" : "muted"}`}>{open ? info.label : item.text ? String(item.text) : `Write the ${info.label.toLowerCase()}`}</span>
-        <span class={`pill ${status}`}>{status || "no status"}</span>
+        {!open && status !== "accepted" && <span class={`pill ${status}`}>{status || "no status"}</span>}
       </button>
       {!open && (shown.length > 0 || refs.length > 0) && (
         <div class="card-meta">
@@ -535,14 +591,22 @@ function Card({ item, index, info, doc, problems, open, readOnly, toggle, change
         <div class="card-problems">
           {problems.map((p) => (
             <div>
-              {p.path.split("/").slice(3).join(" › ") && <span class="where">{p.path.split("/").slice(3).join(" › ")}: </span>}
-              {p.message}
+              {friendly(p.message, p.path)}
             </div>
           ))}
         </div>
       )}
       {open && (
-        <div class="card-edit">
+        <div
+          class="card-edit"
+          onKeyDown={(e) => {
+            if (e.key === "Escape") toggle();
+            else if (e.key === "Enter" && !e.shiftKey && (e.target as HTMLElement).classList.contains("big")) {
+              e.preventDefault();
+              toggle();
+            }
+          }}
+        >
           <AutoText value={String(item.text ?? "")} label={`Text of ${item.id ?? "the item"}`} placeholder="One statement in plain text" disabled={readOnly} onInput={(v) => set("text", v)} big />
           <div class="field-row">
             <Segmented
@@ -553,17 +617,23 @@ function Card({ item, index, info, doc, problems, open, readOnly, toggle, change
             />
           </div>
           <div class="fields">
-            {info.fields
-              .filter((f) => f.name !== "refs")
+            {fields
+              .filter((f) => f.required || item[f.name] !== undefined || extra.includes(f.name))
               .map((f) => (
                 <FieldInput field={f} value={item[f.name]} disabled={readOnly} set={(v) => set(f.name, v)} />
               ))}
           </div>
-          <Refs refs={refs} doc={doc} self={String(item.id ?? "")} disabled={readOnly} set={(v) => set("refs", v)} />
+          {(refs.length > 0 || extra.includes("refs")) && <Refs refs={refs} doc={doc} self={String(item.id ?? "")} disabled={readOnly} set={(v) => set("refs", v)} />}
+          {!readOnly && hidden.length > 0 && (
+            <div class="more-fields">
+              {hidden.map((f) => (
+                <button type="button" class="chip" onClick={() => setExtra([...extra, f.name])}>
+                  + {f.name === "refs" ? "link" : f.name.replace(/_/g, " ")}
+                </button>
+              ))}
+            </div>
+          )}
           <div class="card-foot">
-            <span class="muted">
-              {info.label} · <code>{String(item.id ?? "")}</code>
-            </span>
             <span class="grow" />
             {!readOnly && (
               <button type="button" class={`btn small ${confirmDelete ? "danger" : "ghost"}`} onClick={() => (confirmDelete ? remove() : setConfirmDelete(true))}>

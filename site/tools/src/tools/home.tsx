@@ -9,6 +9,14 @@ export function Home({ go }: { go: Go }) {
         Check, write and compare the documents that record what a team decided before an AI agent builds the work. The tools run the reference implementation in this page, so they give the same results as the{" "}
         <a href="/docs/cli/">skopos command line tool</a>. Your documents never leave your browser.
       </p>
+      <div class="cta">
+        <a class="btn" href="/tools/author/" onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); go("author"); }}>
+          Start a document
+        </a>
+        <a href="/tools/validate/" onClick={(e) => { if (e.metaKey || e.ctrlKey || e.shiftKey) return; e.preventDefault(); go("validate"); }}>
+          or check a file you have
+        </a>
+      </div>
       <ul class="tool-cards">
         {tools.filter((t) => (t.id !== "history" || next.history) && (t.id !== "merge" || next.merge)).map((t) => (
           <li>
