@@ -1,6 +1,6 @@
 [package]
 name = "skopos"
-version = "0.1.0"
+version = "0.2.0"
 description = "Command line tool for OpenSkopos documents: check, fmt, convert, import, ids, export, diff, history, trace, merge and render"
 keywords = ["openskopos", "cli", "specification", "ai-agents"]
 categories = ["command-line-utilities", "development-tools"]
@@ -16,4 +16,4 @@ anstream = "1"
 clap = { version = "4", features = ["derive"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
-skopos-core = { version = "0.1.0", path = "../skopos-core" }
+skopos-core = { version = "0.2.0", path = "../skopos-core" }

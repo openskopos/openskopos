@@ -794,7 +794,7 @@ dependencies = [
 
 [[package]]
 name = "skopos"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "anstream",
  "clap",
@@ -814,7 +814,7 @@ dependencies = [
 
 [[package]]
 name = "skopos-core"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "getrandom",
  "jsonschema",
@@ -826,7 +826,7 @@ dependencies = [
 
 [[package]]
 name = "skopos-wasm"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "getrandom",
  "js-sys",

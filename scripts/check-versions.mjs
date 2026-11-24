@@ -1,4 +1,4 @@
-// Makes sure that every package has the version that the version policy in
+// Makes sure that everything has the one version that "Versions" in
 // CONTRIBUTING.md asks for:
 //
 // - The crates skopos-core, skopos and skopos-wasm and the npm packages
@@ -6,12 +6,17 @@
 // - @openskopos/cli depends on exactly that version of @openskopos/core.
 // - The major and minor numbers of that version are the format version that
 //   skopos-core reads and writes (the version in its SCHEMA_URL). For
-//   example, the packages for format 0.1 are 0.1.0, 0.1.1 and so on.
+//   example, the packages for format 0.2 are 0.2.0, 0.2.1 and so on.
+// - The format version has its specification in spec/x.y/, its schema in
+//   schema/artifact/x.y.json with that URL as $id, the same schema in
+//   skopos-core, and an entry in spec/CHANGELOG.md. The version of the
+//   packages has an entry in RELEASES.md.
 //
 // Run it from anywhere: node scripts/check-versions.mjs
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 
-const read = (path) => readFileSync(new URL(`../${path}`, import.meta.url), "utf8");
+const file = (path) => new URL(`../${path}`, import.meta.url);
+const read = (path) => readFileSync(file(path), "utf8");
 const crateVersion = (name) => read(`crates/${name}/Cargo.toml`).match(/^version = "(.*)"$/m)[1];
 
 const schemaUrl = read("crates/skopos-core/src/schema.rs").match(
@@ -48,6 +53,32 @@ if (!version.startsWith(`${format}.`) || !/^\d+\.\d+\.\d+$/.test(version)) {
       `The version must be ${format}.<patch>, for example ${format}.0.`,
   );
   ok = false;
+}
+
+const fail = (message) => {
+  console.error(message);
+  ok = false;
+};
+const schemaFile = `schema/artifact/${format}.json`;
+if (!existsSync(file(schemaFile))) {
+  fail(`${schemaFile} is missing. Format ${format} needs its schema.`);
+} else {
+  if (JSON.parse(read(schemaFile)).$id !== `https://openskopos.org/schema/artifact/${format}.json`) {
+    fail(`The $id of ${schemaFile} is not the URL of format ${format}.`);
+  }
+  const embedded = `crates/skopos-core/schema/${format}.json`;
+  if (!existsSync(file(embedded)) || read(embedded) !== read(schemaFile)) {
+    fail(`${embedded} must be a copy of ${schemaFile}.`);
+  }
+}
+if (!existsSync(file(`spec/${format}/README.md`)) || !read(`spec/${format}/README.md`).startsWith(`# OpenSkopos ${format}\n`)) {
+  fail(`spec/${format}/README.md is missing or does not start with "# OpenSkopos ${format}".`);
+}
+if (!new RegExp(`^## ${format.replace(".", "\\.")} `, "m").test(read("spec/CHANGELOG.md"))) {
+  fail(`spec/CHANGELOG.md has no section for format ${format}.`);
+}
+if (!read("RELEASES.md").split("\n").includes(`## ${version}`)) {
+  fail(`RELEASES.md has no section "## ${version}".`);
 }
 if (ok) {
   console.log(`All packages have version ${version}, for format ${format}.`);
