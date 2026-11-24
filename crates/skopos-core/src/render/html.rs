@@ -9,7 +9,8 @@ use std::fmt::Write as _;
 
 use serde_json::Value;
 
-use super::{capital, view, Change, Field, ItemView, Line, Part, Span, View};
+use super::{capital, view, Change, Field, ItemView, Line, Part, View};
+use crate::words::{Op, Span};
 
 /// The default stylesheet. Every color and font is a CSS custom property
 /// (`--sk-ink`, `--sk-accent` and so on) with a light and a dark value, and
@@ -390,12 +391,13 @@ fn spans(out: &mut String, spans: &[Span]) {
         if n > 0 {
             out.push(' ');
         }
-        match s {
-            Span::Same(t) => out.push_str(&esc(t)),
-            Span::Del(t) => {
+        let t = &s.text;
+        match s.op {
+            Op::Same => out.push_str(&esc(t)),
+            Op::Del => {
                 let _ = write!(out, "<del>{}</del>", esc(t));
             }
-            Span::Ins(t) => {
+            Op::Ins => {
                 let _ = write!(out, "<ins>{}</ins>", esc(t));
             }
         }

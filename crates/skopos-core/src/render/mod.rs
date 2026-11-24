@@ -37,6 +37,7 @@ use serde_json::{Map, Value};
 use crate::diff;
 use crate::markdown::{item_type, kind, ref_string, Kind};
 use crate::model::ItemType;
+use crate::words::{word_diff, Op, Span};
 use crate::{one_line, whole_number};
 
 mod html;
@@ -173,22 +174,6 @@ pub(crate) enum Part {
         text: String,
         anchor: Option<String>,
     },
-}
-
-/// A piece of text: the same in both versions, removed, or new.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum Span {
-    Same(String),
-    Del(String),
-    Ins(String),
-}
-
-impl Span {
-    pub fn text(&self) -> &str {
-        match self {
-            Span::Same(t) | Span::Del(t) | Span::Ins(t) => t,
-        }
-    }
 }
 
 // ------------------------------------------------------------------ build
@@ -774,7 +759,7 @@ pub(crate) fn view(doc: &Value, previous: Option<&Value>) -> View {
                 })
         });
         let spans = match &change {
-            Some(Change::Added) => vec![Span::Ins(text)],
+            Some(Change::Added) => vec![Span { op: Op::Ins, text }],
             Some(Change::Changed { text: true, .. }) => {
                 let old = old_items
                     .get(id.as_str())
@@ -782,7 +767,7 @@ pub(crate) fn view(doc: &Value, previous: Option<&Value>) -> View {
                     .unwrap_or_default();
                 word_diff(&old, &text)
             }
-            _ => vec![Span::Same(text)],
+            _ => vec![Span { op: Op::Same, text }],
         };
         ItemView {
             item_type: str_of(item, "type").to_string(),
@@ -895,96 +880,5 @@ pub(crate) fn view(doc: &Value, previous: Option<&Value>) -> View {
         sections,
         meta: b.meta(map),
         since,
-    }
-}
-
-// ------------------------------------------------------------------ words
-
-/// The difference between two texts, word by word. Spaces between words
-/// are not compared. Very long texts give the old text as removed and the
-/// new text as new.
-pub(crate) fn word_diff(old: &str, new: &str) -> Vec<Span> {
-    let a: Vec<&str> = old.split_whitespace().collect();
-    let b: Vec<&str> = new.split_whitespace().collect();
-    if a.len().saturating_mul(b.len()) > 250_000 {
-        let mut out = Vec::new();
-        if !a.is_empty() {
-            out.push(Span::Del(a.join(" ")));
-        }
-        if !b.is_empty() {
-            out.push(Span::Ins(b.join(" ")));
-        }
-        return out;
-    }
-    // Longest common subsequence, filled from the end.
-    let (n, m) = (a.len(), b.len());
-    let mut lcs = vec![vec![0u32; m + 1]; n + 1];
-    for i in (0..n).rev() {
-        for j in (0..m).rev() {
-            lcs[i][j] = if a[i] == b[j] {
-                lcs[i + 1][j + 1] + 1
-            } else {
-                lcs[i + 1][j].max(lcs[i][j + 1])
-            };
-        }
-    }
-    let mut out: Vec<Span> = Vec::new();
-    let mut push = |span: Span| {
-        let merged = match (out.last_mut(), &span) {
-            (Some(Span::Same(s)), Span::Same(w))
-            | (Some(Span::Del(s)), Span::Del(w))
-            | (Some(Span::Ins(s)), Span::Ins(w)) => {
-                s.push(' ');
-                s.push_str(w);
-                true
-            }
-            _ => false,
-        };
-        if !merged {
-            out.push(span);
-        }
-    };
-    let (mut i, mut j) = (0, 0);
-    while i < n || j < m {
-        if i < n && j < m && a[i] == b[j] {
-            push(Span::Same(a[i].to_string()));
-            i += 1;
-            j += 1;
-        } else if i < n && (j == m || lcs[i + 1][j] >= lcs[i][j + 1]) {
-            // Removed words come before new words: "[-old-] {+new+}".
-            push(Span::Del(a[i].to_string()));
-            i += 1;
-        } else {
-            push(Span::Ins(b[j].to_string()));
-            j += 1;
-        }
-    }
-    out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::Span::*;
-    use super::*;
-
-    #[test]
-    fn word_diff_marks_changed_words() {
-        assert_eq!(
-            word_diff(
-                "Seats are counted every hour.",
-                "Seats are counted at once."
-            ),
-            vec![
-                Same("Seats are counted".into()),
-                Del("every hour.".into()),
-                Ins("at once.".into()),
-            ]
-        );
-        assert_eq!(word_diff("a b", "a b"), vec![Same("a b".into())]);
-        assert_eq!(word_diff("", "new"), vec![Ins("new".into())]);
-        assert_eq!(
-            word_diff("keep this here", "keep here"),
-            vec![Same("keep".into()), Del("this".into()), Same("here".into())]
-        );
     }
 }

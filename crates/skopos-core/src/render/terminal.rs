@@ -6,7 +6,8 @@
 
 use serde_json::Value;
 
-use super::{capital, view, words, Change, Field, ItemView, Line, Part, Span, View};
+use super::{capital, view, words, Change, Field, ItemView, Line, Part, View};
+use crate::words::{Op, Span};
 
 /// Options for [`terminal`].
 #[derive(Debug, Clone, Copy)]
@@ -113,10 +114,11 @@ impl Term {
     fn spans(&self, spans: &[Span], base: Style) -> Vec<Word> {
         let mut out = Vec::new();
         for s in spans {
-            let (text, style, open, close) = match s {
-                Span::Same(t) => (t, base, "", ""),
-                Span::Del(t) => (t, Style::Del, "[-", "-]"),
-                Span::Ins(t) => (t, Style::Ins, "{+", "+}"),
+            let t = &s.text;
+            let (text, style, open, close) = match s.op {
+                Op::Same => (t, base, "", ""),
+                Op::Del => (t, Style::Del, "[-", "-]"),
+                Op::Ins => (t, Style::Ins, "{+", "+}"),
             };
             let mut ws = Self::split(text, style);
             if !self.color && !ws.is_empty() {
@@ -289,7 +291,7 @@ impl Term {
         // A new item needs no `{+...+}`: the `+` before its ID says it.
         let mut ws = match &item.change {
             Some(Change::Added) => {
-                let text: Vec<&str> = item.text.iter().map(Span::text).collect();
+                let text: Vec<&str> = item.text.iter().map(|s| s.text.as_str()).collect();
                 Self::split(&text.join(" "), Style::Ins)
             }
             _ => self.spans(&item.text, if faded { Style::Dim } else { Style::Plain }),
