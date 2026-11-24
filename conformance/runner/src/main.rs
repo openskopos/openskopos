@@ -9,6 +9,8 @@
 //!   of a stored document names it in the front matter. Reading and writing
 //!   Markdown is for an implementation to test. This runner does not do it.
 //! - The documents of the history cases are valid.
+//! - The documents of the merge cases are valid, and each result is the next
+//!   draft of main with the other document as an input parent.
 //!
 //! Usage: `cargo run --manifest-path conformance/runner/Cargo.toml [repo root]`
 
@@ -89,7 +91,40 @@ fn run(root: &Path) -> Result<Run, String> {
     check_invalid(&mut run, &validator, &conf.join("invalid"))?;
     check_markdown(&mut run, &validator, &conf.join("markdown"))?;
     check_history(&mut run, &validator, &conf.join("history"))?;
+    check_merge(&mut run, &validator, &conf.join("merge"))?;
     Ok(run)
+}
+
+/// Each document of a merge case is valid, and the result is the next
+/// version of main with the other document as an input parent.
+fn check_merge(run: &mut Run, v: &Validator, dir: &Path) -> Result<(), String> {
+    let mut listed = BTreeSet::new();
+    for case in index_cases(dir, "cases")? {
+        let name = str_field(&case, "case")?;
+        listed.insert(name.to_string());
+        let d = dir.join(name);
+        for f in sorted_files(&d)? {
+            let doc = read_doc(&d.join(&f))?;
+            let ok = schema_errors(v, &doc).is_empty() && semantic_errors(&doc).is_empty();
+            run.check(ok, format!("merge/{name}/{f} is valid"));
+        }
+        let main = read_doc(&d.join("main.json"))?;
+        let other = read_doc(&d.join("other.json"))?;
+        let expected = read_doc(&d.join("expected.json"))?;
+        let parents = expected["parents"].as_array().cloned().unwrap_or_default();
+        let has = |rel: &str, doc: &Value| {
+            parents.iter().any(|p| p["rel"] == rel && p["artifact"] == doc["id"] && p["version"] == doc["version"])
+        };
+        run.check(
+            expected["id"] == main["id"]
+                && expected["version"].as_u64() == main["version"].as_u64().map(|n| n + 1)
+                && expected["status"] == "draft"
+                && has("previous_version", &main)
+                && has("input", &other),
+            format!("merge/{name}/expected.json is the next draft of main, with other as an input"),
+        );
+    }
+    check_listed_dirs(run, dir, &listed, "merge")
 }
 
 /// Each document of a history case is valid, and each case has an

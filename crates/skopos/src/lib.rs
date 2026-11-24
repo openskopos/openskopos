@@ -21,7 +21,7 @@ use serde::Serialize;
 use skopos_core::export::{self, Options, Tool};
 use skopos_core::markdown::Fill;
 use skopos_core::{
-    assign_ids, check, diff, history, markdown, parse, write, Format, Problem, Value,
+    assign_ids, check, diff, history, markdown, merge, parse, write, Format, Problem, Value,
 };
 
 /// The file system and the terminal, as the commands see them.
@@ -68,7 +68,7 @@ pub enum Stream {
 #[command(
     name = "skopos",
     version,
-    about = "Check, format, convert, import, export, compare and trace OpenSkopos documents"
+    about = "Check, format, convert, import, export, compare, trace and merge OpenSkopos documents"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -216,6 +216,52 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Merge two documents into the next version of the first one.
+    ///
+    /// The result has the other document as an input parent. A conflict
+    /// keeps both items as proposed, with a contradicts ref between them, so
+    /// the result is always a valid document. Without --base or --pair,
+    /// items of the same type with similar text are paired.
+    Merge {
+        /// The document to continue: the result is its next version
+        main: PathBuf,
+        /// The document to merge into it
+        other: PathBuf,
+        /// The common earlier version. Items then pair by ID, and a change
+        /// that only one side made merges by itself.
+        #[arg(long, value_name = "FILE")]
+        base: Option<PathBuf>,
+        /// Two items that are the same item, as MAIN_ID=OTHER_ID. Give it
+        /// once for each pair. No other items pair.
+        #[arg(long = "pair", value_name = "MAIN_ID=OTHER_ID")]
+        pairs: Vec<String>,
+        /// The file to write. Without it, the document goes to standard
+        /// output in the format of main.
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+        /// Write the whole result as JSON: the document, the pairs, the
+        /// conflicts and the renamed items
+        #[arg(long)]
+        json: bool,
+    },
+    /// List the conflicts of a merged document that are still open.
+    ///
+    /// The exit code is 1 while a conflict is open.
+    Conflicts {
+        /// A merged document
+        file: PathBuf,
+        /// Write the conflicts as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Accept an item of an open conflict and reject the other item of its
+    /// pair. The file is written again.
+    Resolve {
+        /// A merged document, as JSON or YAML
+        file: PathBuf,
+        /// The ID of the item to accept
+        id: String,
+    },
 }
 
 #[derive(Clone, Copy, ValueEnum)]
@@ -327,6 +373,23 @@ where
             files,
             json,
         } => cmd.trace(&reference, &files, json),
+        Command::Merge {
+            main,
+            other,
+            base,
+            pairs,
+            output,
+            json,
+        } => cmd.merge(
+            &main,
+            &other,
+            base.as_deref(),
+            &pairs,
+            output.as_deref(),
+            json,
+        ),
+        Command::Conflicts { file, json } => cmd.conflicts(&file, json),
+        Command::Resolve { file, id } => cmd.resolve(&file, &id),
     };
     if ok {
         0
@@ -993,6 +1056,146 @@ impl Commands<'_> {
             self.out(&text)
         } else {
             self.out(&h.trace_text(item))
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn merge(
+        &mut self,
+        main_path: &Path,
+        other_path: &Path,
+        base_path: Option<&Path>,
+        pair_args: &[String],
+        output: Option<&Path>,
+        json: bool,
+    ) -> bool {
+        let mut pairs = Vec::new();
+        for p in pair_args {
+            match p.split_once('=') {
+                Some((m, o)) if !m.is_empty() && !o.is_empty() => {
+                    pairs.push((m.to_string(), o.to_string()))
+                }
+                _ => {
+                    self.err(&format!("--pair {p}: write the pair as MAIN_ID=OTHER_ID"));
+                    return false;
+                }
+            }
+        }
+        let Some((main, main_format)) = self.read_valid_with_format(main_path) else {
+            return false;
+        };
+        let Some(other) = self.read_valid(other_path) else {
+            return false;
+        };
+        let base = match base_path {
+            Some(path) => match self.read_valid(path) {
+                Some(doc) => Some(doc),
+                None => return false,
+            },
+            None => None,
+        };
+        let format = match output.map(format_of) {
+            Some(Ok(format)) => format,
+            Some(Err(problem)) => {
+                self.report(output.expect("given"), &problem);
+                return false;
+            }
+            None => main_format,
+        };
+        let options = merge::Options {
+            base: base.as_ref(),
+            pairs: (!pairs.is_empty()).then_some(pairs),
+            now: Some(self.host.fill().now),
+        };
+        let result = match merge::merge(&main, &other, &options) {
+            Ok(r) => r,
+            Err(problem) => {
+                self.report(other_path, &problem);
+                return false;
+            }
+        };
+        let problems = check(&result.doc);
+        if !problems.is_empty() {
+            for p in &problems {
+                self.err(&format!("merged document: {p}"));
+            }
+            return false;
+        }
+        if json {
+            let mut text = serde_json::to_string_pretty(&result).expect("a merge serializes");
+            text.push('\n');
+            return match output {
+                Some(path) => self.write_file(path, &text),
+                None => self.out(&text),
+            };
+        }
+        let text = match format {
+            FileFormat::Data(f) => write(&result.doc, f),
+            FileFormat::Markdown => markdown::write(&result.doc, &[]),
+        };
+        let ok = match output {
+            Some(path) => self.write_file(path, &text),
+            None => self.out(&text),
+        };
+        let summary = result.to_text();
+        self.host.stderr(&summary);
+        ok
+    }
+
+    /// [`Self::read_valid`], with the format of the file.
+    fn read_valid_with_format(&mut self, path: &Path) -> Option<(Value, FileFormat)> {
+        let format = format_of(path).ok();
+        let doc = self.read_valid(path)?;
+        Some((doc, format?))
+    }
+
+    fn conflicts(&mut self, file: &Path, json: bool) -> bool {
+        let Some(doc) = self.read_valid(file) else {
+            return false;
+        };
+        let open = merge::conflicts(&doc);
+        if json {
+            let mut text = serde_json::to_string_pretty(&open).expect("conflicts serialize");
+            text.push('\n');
+            self.out(&text);
+        } else {
+            let lines: String = open.iter().map(|c| format!("{c}\n")).collect();
+            self.out(&lines);
+            if open.is_empty() {
+                self.err(&format!("{}: no open conflicts.", file.display()));
+            } else {
+                self.err(&format!(
+                    "{}: {} open. Accept one item of each pair with skopos resolve, or set status in the file.",
+                    file.display(),
+                    plural(open.len(), "conflict")
+                ));
+            }
+        }
+        open.is_empty()
+    }
+
+    fn resolve(&mut self, file: &Path, id: &str) -> bool {
+        let (format, _, mut doc) = match self.read(file) {
+            Ok(r) => r,
+            Err(problem) => {
+                self.report(file, &problem);
+                return false;
+            }
+        };
+        match merge::resolve(&mut doc, id) {
+            Ok(r) => {
+                self.err(&format!(
+                    "{}: accepted {}, rejected {}",
+                    file.display(),
+                    r.accepted,
+                    r.rejected
+                ));
+                self.write_file(file, &write(&doc, format))
+            }
+            Err(problem) => {
+                self.report(file, &problem);
+                false
+            }
         }
     }
 }

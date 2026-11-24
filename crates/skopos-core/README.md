@@ -20,6 +20,7 @@ does not use the network. It builds for `wasm32-unknown-unknown`.
 | `parse_item_id(&str)` | Reads an item ID, for example `CR12`, and returns its type and number. |
 | `diff::diff(&Value, &Value) -> Diff` | Compares two versions by item ID. The result has the items that were added, changed, dropped and superseded. `Diff::to_text` returns one line for each item. |
 | `history::history(&[Value]) -> History` | Reads documents from one or more artifacts, in any order, as one history: the chain of versions of each artifact, what each version changed, and the steps and state of each item (in force, proposed, rejected, superseded or dropped). A missing version is a warning. See section 8.3 of the specification. `History::to_text` and `History::trace_text` write it for people. |
+| `merge::merge(&Value, &Value, &Options) -> Result<Merge, Problem>` | Merges two documents into the next version of the first one (main), with the other as an input parent. The options are a `base` (the common earlier version), confirmed `pairs` and `now`. A conflict keeps both items as `proposed`, with a `contradicts` ref. See section 8.4 of the specification. `merge::conflicts` lists the open conflicts of a merged document, and `merge::resolve` accepts one item of a pair and rejects the other. |
 | `export::export(&Value, Tool, &Options) -> Export` | Makes the files of OpenSpec, Kiro or Spec Kit from a document. The result has the files, and the items that the function did not export. See [docs/exporters.md](../../docs/exporters.md). |
 
 A `Problem` has three fields:

@@ -1,0 +1,34 @@
+{
+  "cases": [
+    {
+      "case": "01-clean-three-way",
+      "description": "Two edits of version 1: main changes the text of FR1 and rejects Q1, the other document changes the priority of FR2 and adds FR3. Each change merges by itself. FR3 keeps its number, because it is the next number of main.",
+      "conflicts": [],
+      "new": [["FR3", "FR3"]]
+    },
+    {
+      "case": "02-edit-edit",
+      "description": "Both documents change the text of FR1 in different ways. Both items stay as proposed: FR1 of main, and the item of the other document as FR3, with derived_from and contradicts refs.",
+      "conflicts": [{"kind": "changed", "main": "FR1", "other": "FR3", "fields": ["text"]}],
+      "new": [["FR1", "FR3"]]
+    },
+    {
+      "case": "03-edit-supersede",
+      "description": "Main changes FR1. The other document removes FR1 and adds FR3, which supersedes it. Both stay as proposed, and FR3 contradicts FR1.",
+      "conflicts": [{"kind": "removed_in_other", "main": "FR1", "other": "FR3", "fields": []}],
+      "new": [["FR3", "FR3"]]
+    },
+    {
+      "case": "04-id-collision",
+      "description": "Both documents add a different FR3. The item of the other document gets FR4, and the ref of its S1 is rewritten to FR4.",
+      "conflicts": [],
+      "new": [["FR3", "FR4"], ["S1", "S1"]]
+    },
+    {
+      "case": "05-two-drafts",
+      "description": "Two drafts from the same input, with no base. Items of the same type with similar text pair: G1 with G1 (the same) and FR1 with FR2 (different, so a conflict). The other FR1 has no pair and comes in as FR2.",
+      "conflicts": [{"kind": "changed", "main": "FR1", "other": "FR3", "fields": ["refs", "text"]}],
+      "new": [["FR1", "FR2"], ["FR2", "FR3"]]
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_5Qk9Ts3Hv7Mw2Zd8",
+  "version": 1,
+  "kind": "spec",
+  "title": "Seat limits",
+  "status": "draft",
+  "parents": [
+    {
+      "rel": "input",
+      "source": {
+        "kind": "pasted",
+        "title": "Support thread about plan downgrades"
+      }
+    }
+  ],
+  "id_counters": {
+    "G": 1,
+    "FR": 1,
+    "C": 1
+  },
+  "items": [
+    {
+      "id": "G1",
+      "type": "goal",
+      "text": "No user loses access by surprise when the org changes plan.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR1",
+      "type": "requirement",
+      "text": "Block a plan change that leaves more seats in use than the new limit.",
+      "status": "accepted",
+      "priority": "must"
+    },
+    {
+      "id": "C1",
+      "type": "constraint",
+      "text": "Always run the billing contract tests before a merge.",
+      "status": "accepted",
+      "modality": "always"
+    }
+  ],
+  "created_at": "2026-11-12T09:00:00Z"
+}

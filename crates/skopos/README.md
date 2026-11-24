@@ -365,6 +365,67 @@ only one artifact has it. If the first version that you give is not
 version 1, its items show as `seen`, because they can be older. The exit code
 is 1 if no file has the item.
 
+### merge
+
+`skopos merge` merges two documents into one. The team picks one document as
+main. The result is the next version of main, as a draft, with the other
+document as an `input` parent. Section 8.4 of the
+[specification](../../spec/0.1/README.md) describes the merge.
+
+```bash
+skopos merge main.skopos.json other.skopos.json --base v1.skopos.json -o merged.skopos.json
+```
+
+The tool writes the merged document, and a summary to standard error:
+
+```
+pa_5Qk9Ts3Hv7Mw2Zd8@2 + pa_8Rc2Nx6Jb4Pf1Lu5@1 -> pa_5Qk9Ts3Hv7Mw2Zd8@3 (draft)
+new        FR3  from FR1 of the other document
+envelope   title (main kept)
+1 conflict:
+  FR1 or FR3: text
+```
+
+- With `--base`, the common earlier version, items with an ID of the base
+  pair by ID. A field that only one document changed merges by itself.
+- Without `--base`, for example for two drafts from the same input, items of
+  the same type with similar text pair. The summary shows each pair, such as
+  `paired     FR1 = FR2 (text, 96%)`. If a pair is wrong, merge again with
+  `--pair MAIN_ID=OTHER_ID` for each pair that is right. Then no other items
+  pair.
+- An item of the other document that is new in the result gets a new ID
+  from the counters of main, and a `derived_from` ref to where it came from.
+  Refs to it are rewritten.
+- A conflict is never a marker in the text. Both items stay as `proposed`,
+  and the item of the other document has a `contradicts` ref to the item of
+  main. So the merged file is always a valid document.
+
+The result is in the format of main, or in the format of the `-o` file. With
+`--json`, the tool writes the whole result as JSON: the document, the pairs,
+the conflicts, the new IDs and the envelope fields that are different.
+
+### conflicts and resolve
+
+`skopos conflicts` lists the conflicts of a merged document that are still
+open. The exit code is 1 while a conflict is open, so CI can stop a merge
+that is not finished.
+
+```bash
+skopos conflicts merged.skopos.json
+```
+
+```
+FR1 or FR3: text
+```
+
+`skopos resolve` accepts one item of a conflict and rejects the other one,
+and writes the file again. The rejected item stays in the record. You can
+also set `status` in any editor.
+
+```bash
+skopos resolve merged.skopos.json FR3
+```
+
 ## License
 
 [Apache License 2.0](../../LICENSE)

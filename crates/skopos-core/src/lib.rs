@@ -49,6 +49,7 @@ pub mod export;
 pub mod history;
 mod ids;
 pub mod markdown;
+pub mod merge;
 pub mod model;
 mod order;
 pub mod rules;
