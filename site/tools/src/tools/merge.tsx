@@ -2,11 +2,11 @@
 // core.merge. Conflicts stay in the document as pairs of proposed items; the
 // page settles each pair with core.resolve, or by setting both to accepted.
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { core, next, type Document, type Item, type MergeConflict, type MergeResult, type TextSpan } from "../core";
+import { core, type Document, type Item, type MergeConflict, type MergeResult, type TextSpan } from "../core";
 import { fileName, formatMime, write } from "../doc";
 import { mergeCases } from "../examples";
 import type { Go, Handoff } from "../nav";
-import { copy, DocInput, download, Menu, Readable, hasReadable, Spans, useRead, useStored, type TextFile } from "../ui";
+import { copy, DocInput, download, Menu, Readable, Spans, useRead, useStored, type TextFile } from "../ui";
 
 const empty: TextFile = { name: "", text: "" };
 const exampleNames: Record<string, string> = {
@@ -36,9 +36,9 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
 
   // First run: core proposes the pairs. Later runs pass the pairs that stay on.
   const first = useMemo((): { r?: MergeResult; error?: string } => {
-    if (!ready || !next.merge) return {};
+    if (!ready) return {};
     try {
-      return { r: next.merge(a!.doc!, b!.doc!, { base: baseDoc }) };
+      return { r: core.merge(a!.doc!, b!.doc!, { base: baseDoc }) };
     } catch (e) {
       return { error: errorText(e) };
     }
@@ -48,7 +48,7 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
     if (!first.r || !unpaired.length || !byText) return first;
     try {
       const pairs = first.r.pairs.filter((p) => !unpaired.includes(`${p.main}=${p.other}`)).map((p) => [p.main, p.other] as [string, string]);
-      return { r: next.merge!(a!.doc!, b!.doc!, { pairs }) };
+      return { r: core.merge(a!.doc!, b!.doc!, { pairs }) };
     } catch (e) {
       return { error: errorText(e) };
     }
@@ -72,7 +72,7 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
         else {
           const id = choice === "main" ? k.main : k.other;
           if (!id) continue;
-          if (k.main && k.other) doc = next.resolve!(doc, id).doc;
+          if (k.main && k.other) doc = core.resolve(doc, id).doc;
           else doc = acceptBoth(doc, k);
         }
       } catch {}
@@ -104,14 +104,6 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
     return () => removeEventListener("keydown", onKey);
   }, [conflicts, at]);
   useEffect(() => document.querySelector(`[data-conflict="${at}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), [at]);
-
-  if (!next.merge)
-    return (
-      <div class="start">
-        <h1>Merge</h1>
-        <p class="muted">Merge needs a newer version of <code>@openskopos/core</code> than this page loads. It comes with the next release.</p>
-      </div>
-    );
 
   const choose = (i: number, c: Choice) => {
     setChoices({ ...choices, [i]: c });
@@ -249,7 +241,7 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
               <span class="grow" />
               <Menu
                 items={[
-                  { label: "Copy summary", run: () => copy(next.mergeText!(a!.doc!, b!.doc!, { base: baseDoc })) },
+                  { label: "Copy summary", run: () => copy(core.mergeText(a!.doc!, b!.doc!, { base: baseDoc })) },
                   { label: "Edit in Author", run: () => go("author", { name, text: write(settled, "yaml") }) },
                 ]}
               />
@@ -257,7 +249,7 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
                 Download
               </button>
             </div>
-            {hasReadable() && <Readable doc={settled} previous={a!.doc!} />}
+            <Readable doc={settled} previous={a!.doc!} />
           </section>
         </>
       )}

@@ -8,7 +8,7 @@ import { detectFormat, fileName, formatLabel, formatMime, formats, itemIndex, it
 import { schemaInfo, type Field, type ItemTypeInfo } from "../schema";
 import { readShared, shareUrl } from "../share";
 import type { Go, Handoff } from "../nav";
-import { copy, download, DropArea, ExamplePicker, FixButton, hasReadable, Menu, openFiles, Readable, Segmented, Status, mdSession, toast, useMedia, useStored, type TextFile } from "../ui";
+import { copy, download, DropArea, ExamplePicker, FixButton, Menu, openFiles, Readable, Segmented, Status, mdSession, toast, useMedia, useStored, type TextFile } from "../ui";
 
 type View = "both" | "cards" | "text";
 
@@ -67,7 +67,7 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
   };
   const [filter, setFilter] = useState("");
   const [textSide, setTextSide] = useStored<"source" | "readable">("author:text", "source");
-  const readable = hasReadable() && textSide === "readable" && !!doc;
+  const readable = textSide === "readable" && !!doc;
   const editor = useRef<EditorHandle | null>(null);
   const written = useRef(src.text);
 
@@ -238,17 +238,15 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
         {view !== "cards" && (
           <div class="pane text-pane">
             <div class="pane-head">
-              {hasReadable() && (
-                <Segmented
-                  label="Text or readable view"
-                  value={textSide}
-                  onChange={setTextSide}
-                  options={[
-                    { value: "source", label: "Source" },
-                    { value: "readable", label: "Readable" },
-                  ]}
-                />
-              )}
+              <Segmented
+                label="Text or readable view"
+                value={textSide}
+                onChange={setTextSide}
+                options={[
+                  { value: "source", label: "Source" },
+                  { value: "readable", label: "Readable" },
+                ]}
+              />
               {!readable && <Segmented
                 label="Text format"
                 value={src.format}

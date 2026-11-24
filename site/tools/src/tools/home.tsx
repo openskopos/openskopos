@@ -1,4 +1,3 @@
-import { next } from "../core";
 import { tools, type Go } from "../nav";
 
 export function Home({ go }: { go: Go }) {
@@ -18,7 +17,7 @@ export function Home({ go }: { go: Go }) {
         </a>
       </div>
       <ul class="tool-cards">
-        {tools.filter((t) => (t.id !== "history" || next.history) && (t.id !== "merge" || next.merge)).map((t) => (
+        {tools.map((t) => (
           <li>
             <a
               href={`/tools/${t.id}/`}
@@ -34,7 +33,6 @@ export function Home({ go }: { go: Go }) {
           </li>
         ))}
       </ul>
-      {!(next.history && next.merge) && <p class="muted">Next: History, to read a chain of versions, and Merge, to combine two drafts into one document.</p>}
     </div>
   );
 }

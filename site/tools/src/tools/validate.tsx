@@ -6,8 +6,8 @@ import { describePath, detectFormat, fileName, formatLabel, formatMime, formats,
 import { readShared, shareUrl } from "../share";
 import { schemaInfo } from "../schema";
 import type { Go, Handoff } from "../nav";
-import { copy, download, DropArea, EmptyState, ExamplePicker, hasReadable, lineOf, FixButton, Menu, openFiles, Readable, Segmented, Status, useRead, useStored, verdictOf, type TextFile } from "../ui";
-import { next, type Document } from "../core";
+import { copy, download, DropArea, EmptyState, ExamplePicker, lineOf, FixButton, Menu, openFiles, Readable, Segmented, Status, useRead, useStored, verdictOf, type TextFile } from "../ui";
+import { core, type Document } from "../core";
 
 type FormatChoice = "auto" | Format;
 type Side = "readable" | "report";
@@ -24,7 +24,7 @@ export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
   const format = choice === "auto" ? detected : choice;
   const result = useRead(file, format);
   const verdict = verdictOf(file.text, result);
-  const readable = hasReadable() && verdict === "valid";
+  const readable = verdict === "valid";
   const side: Side = readable ? (picked ?? "readable") : "report";
 
   const open = (f: TextFile) => {
@@ -120,8 +120,8 @@ export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
               <Section
                 title={verdict === "unreadable" ? "Why the text cannot be read" : "Problems"}
                 action={
-                  fixable > 1 && next.fixAll && result?.doc ? (
-                    <button type="button" class="btn ghost small" onClick={() => apply(next.fixAll!(result.doc!).doc)}>
+                  fixable > 1 && result?.doc ? (
+                    <button type="button" class="btn ghost small" onClick={() => apply(core.fixAll(result.doc!).doc)}>
                       Fix {fixable}
                     </button>
                   ) : null
