@@ -54,4 +54,13 @@ export const historyChain = [
   versionPair.new,
 ];
 
+const merges = import.meta.glob("../../../conformance/merge/*/{main,other,base}.json", { query: "?raw", import: "default", eager: true }) as Record<string, string>;
+/** Merge cases from conformance/merge, when this checkout has them. */
+export const mergeCases = [...new Set(Object.keys(merges).map((p) => p.split("/").at(-2)!))].sort().map((name) => ({
+  name,
+  main: { name: "main.json", text: pick(merges, `${name}/main.json`) },
+  other: { name: "other.json", text: pick(merges, `${name}/other.json`) },
+  base: { name: "base.json", text: pick(merges, `${name}/base.json`) },
+}));
+
 export const exampleByName = (name: string) => examples.find((e) => e.name === name);

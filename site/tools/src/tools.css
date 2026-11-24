@@ -407,3 +407,27 @@ textarea.auto:focus { outline: none; border-color: var(--dot); }
 .step.t-added { border-left-color: var(--good); } .step.t-changed, .step.t-superseded { border-left-color: var(--warn); } .step.t-dropped { border-left-color: var(--bad); }
 .step-text { margin-top: 2px; }
 @media (max-width: 900px) { .timeline { display: none; } }
+
+/* Merge */
+.merge { display: grid; gap: 14px; }
+.lead-small { margin: -4px 0 0; font-size: 14.5px; max-width: 860px; }
+.base-toggle { font-size: 14px; gap: 8px; }
+.pairs { list-style: none; padding: 0; margin: 8px 0 0; display: grid; gap: 4px; font-size: 14px; }
+.pair-text { color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; flex: 1; }
+.merge-progress { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; font-weight: 500; position: sticky; top: 0; z-index: 3; background: var(--bg); padding: 8px 0; }
+.merge-progress .bar { width: 180px; height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.merge-progress .bar i { display: block; height: 100%; background: var(--good); transition: width .2s; }
+.merge-progress .small-text { font-weight: 400; }
+.conflicts { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; }
+.conflict { background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--warn); border-radius: var(--radius); padding: 10px 14px; display: grid; gap: 10px; }
+.conflict.current { border-color: var(--ink); border-left-color: var(--dot); box-shadow: var(--shadow); }
+.conflict.settled { border-left-color: var(--good); }
+.conflict-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; font-size: 14px; }
+.conflict-head .link { margin: 0; font-size: 13px; }
+.sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.side { padding: 8px 10px; border-radius: 6px; background: var(--bg); border: 1px solid var(--line); display: grid; gap: 4px; font-size: 14.5px; }
+.side.picked { border-color: var(--good); background: color-mix(in oklab, var(--good) 8%, var(--bg)); }
+.side.dropped { opacity: .55; }
+.side.dropped div { text-decoration: line-through; text-decoration-color: var(--faint); }
+.merge-result .readable { margin-top: 4px; }
+@media (max-width: 900px) { .sides { grid-template-columns: 1fr; } .keys { display: none; } }

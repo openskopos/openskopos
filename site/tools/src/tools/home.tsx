@@ -10,7 +10,7 @@ export function Home({ go }: { go: Go }) {
         <a href="/docs/cli/">skopos command line tool</a>. Your documents never leave your browser.
       </p>
       <ul class="tool-cards">
-        {tools.filter((t) => t.id !== "history" || next.history).map((t) => (
+        {tools.filter((t) => (t.id !== "history" || next.history) && (t.id !== "merge" || next.merge)).map((t) => (
           <li>
             <a
               href={`/tools/${t.id}/`}
@@ -26,7 +26,7 @@ export function Home({ go }: { go: Go }) {
           </li>
         ))}
       </ul>
-      <p class="muted">Next: {next.history ? "" : "History, to read a chain of versions, and "}Merge, to combine two drafts into one document.</p>
+      {!(next.history && next.merge) && <p class="muted">Next: History, to read a chain of versions, and Merge, to combine two drafts into one document.</p>}
     </div>
   );
 }

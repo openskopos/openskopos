@@ -9,6 +9,7 @@ import { Author } from "./tools/author";
 import { Compare } from "./tools/compare";
 import { AgentFile } from "./tools/agent-file";
 import { History } from "./tools/history";
+import { Merge } from "./tools/merge";
 import { Home } from "./tools/home";
 import "./tools.css";
 
@@ -18,6 +19,7 @@ const titles: Record<ToolId, string> = {
   author: "Write an OpenSkopos document",
   compare: "Compare two OpenSkopos versions",
   history: "The history of OpenSkopos documents",
+  merge: "Merge two OpenSkopos drafts",
   "agent-file": "Make an agent file from OpenSkopos documents",
 };
 
@@ -61,7 +63,7 @@ function App({ initial }: { initial: ToolId }) {
     <div class="workbench">
       <div class="toolbar">
         <nav class="tabs" aria-label="Tools">
-          {tools.filter((t) => t.id !== "history" || next.history || active === "history").map((t) => (
+          {tools.filter((t) => (t.id !== "history" || next.history || active === "history") && (t.id !== "merge" || next.merge || active === "merge")).map((t) => (
             <a
               id={`tab-${t.id}`}
               href={pathOf(t.id)}
@@ -86,6 +88,7 @@ function App({ initial }: { initial: ToolId }) {
       {panel("author", <Author go={go} incoming={incoming("author")} />)}
       {panel("compare", <Compare go={go} incoming={incoming("compare")} />)}
       {panel("history", <History go={go} incoming={incoming("history")} />)}
+      {panel("merge", <Merge go={go} incoming={incoming("merge")} />)}
       {panel("agent-file", <AgentFile go={go} incoming={incoming("agent-file")} />)}
     </div>
   );

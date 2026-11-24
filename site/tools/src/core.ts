@@ -60,7 +60,15 @@ export interface History {
   warnings: { artifact: string | null; message: string }[];
   items: ItemHistory[];
 }
+export interface MergePair { main: string; other: string; by: "id" | "text" | "given"; similarity?: number }
+export interface MergeConflict { kind: "changed" | "removed_in_main" | "removed_in_other"; main: string | null; other: string | null; fields: string[] }
+export interface MergeResult { doc: Document; pairs: MergePair[]; conflicts: MergeConflict[]; renamed: { from: string; to: string }[]; envelope: string[] }
+export interface MergeOptions { base?: Document; pairs?: [string, string][]; now?: string }
 interface Next {
+  merge(main: Document, other: Document, options?: MergeOptions): MergeResult;
+  mergeText(main: Document, other: Document, options?: MergeOptions): string;
+  conflicts(doc: Document): { main: string; other: string; fields: string[] }[];
+  resolve(doc: Document, id: string): { doc: Document; accepted: string; rejected: string };
   renderHtml(doc: Document, options?: { previous?: Document; fragment?: boolean; style?: boolean; css?: string }): string;
   stylesheet(): string;
   history(docs: Document[]): History;
