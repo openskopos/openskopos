@@ -85,6 +85,8 @@ const cases = [
   ["check", "--json", ...valid],
   ["check", ...invalid],
   ["check", "--json", ...invalid],
+  ["check", "--fix", ...invalid],
+  ["check", "--fix", "--json", ...invalid],
   ["check", ...generous],
   ["check", "--json", ...generous],
   ["check", ...badMarkdown],

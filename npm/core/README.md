@@ -88,6 +88,8 @@ worker.
 | Function | What it does |
 |---|---|
 | `check(doc)` | Finds all problems in a document. The schema problems are first, then the problems with the rules in section 9. If the list is empty, the document is valid. |
+| `applyFix(doc, fix)` | Applies the `fix` of a problem and returns the new document. A problem has `path`, `rule`, `message`, `hint` (one plain sentence that says what to do) and, when the fix needs no choice, `fix` (`{ label, patch }`, with JSON Patch operations). |
+| `fixAll(doc)` | Applies every certain fix, checks again after each one, and returns `{ doc, fixed }`. |
 | `checkSchema(doc)`, `checkRules(doc)` | Run only the schema checks, or only the section 9 rules. |
 | `parse(text, format)` | Reads JSON or YAML text. `format` is `"json"` or `"yaml"`. The function does not check the document. |
 | `write(doc, format)` | Writes a document as JSON or YAML with the canonical layout. `toJson(doc)` and `toYaml(doc)` do the same for one format. |

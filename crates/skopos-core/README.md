@@ -12,7 +12,7 @@ does not use the network. It builds for `wasm32-unknown-unknown`.
 
 | Function | What it does |
 |---|---|
-| `check(&Value) -> Vec<Problem>` | Finds all problems in a document. The schema problems are first, then the problems with the rules in section 9 of the specification. If the list is empty, the document is valid. |
+| `check(&Value) -> Vec<Problem>` | Finds all problems in a document, each with a hint, and a fix when the fix is certain. The schema problems are first, then the problems with the rules in section 9 of the specification. If the list is empty, the document is valid. |
 | `check_schema`, `check_rules` | Run only the schema checks, or only the section 9 rules. |
 | `parse(&str, Format) -> Result<Value, Problem>` | Reads JSON or YAML text. |
 | `write(&Value, Format) -> String` | Writes a document as JSON or YAML with the canonical layout. If you parse the text again, you get the same value. |
@@ -32,7 +32,13 @@ A `Problem` has three fields:
 |---|---|
 | `path` | The location of the problem, as a JSON Pointer. An empty string is the full document. `/items/3/id` is the `id` of the fourth item. |
 | `rule` | The name of the rule in section 9, for example `unique-item-ids`. For a schema problem, `rule` is `None`. |
-| `message` | What is wrong, in plain words. |
+| `message` | What is wrong, in the words of the schema or the rule. |
+| `hint` | One plain sentence for people that says what to do, for example `C1 needs a modality: always, never, ask_first, prefer or avoid.` |
+| `fix` | A `Fix` when the fix needs no choice from a person, else `None`. A `Fix` has a `label` and a `patch` of JSON Patch operations (RFC 6902). |
+
+The module `fix` applies fixes: `fix::apply(&Value, &Fix)` applies one, and
+`fix::fix_all(&Value)` applies fixes and checks again until no problem has a
+fix.
 
 The module `model` has serde types for a valid document, for example
 `Document`, `Item` and `ItemType`. Use `check` on the value before you

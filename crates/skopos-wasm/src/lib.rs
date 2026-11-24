@@ -30,6 +30,7 @@ use js_sys::{Array, Reflect, Uint8Array};
 use serde::Serialize;
 use serde_json::Value;
 use skopos_core::export::{self, Options, Tool};
+use skopos_core::fix::Fix;
 use skopos_core::markdown::{self, Fill, Warning};
 use skopos_core::render::{self, HtmlOptions, TerminalOptions};
 use skopos_core::{AssignedId, Format, Problem};
@@ -88,14 +89,40 @@ export interface Document {
   [key: string]: unknown;
 }
 
+/** One JSON Patch operation (RFC 6902). */
+export interface PatchOp {
+  op: "add" | "replace" | "remove";
+  /** A JSON Pointer. */
+  path: string;
+  value?: unknown;
+}
+
+/** A change that fixes a problem and needs no choice from a person. */
+export interface Fix {
+  /** What the fix does, for example "Set the counter for FR to 4". */
+  label: string;
+  patch: PatchOp[];
+}
+
 /** One problem in a document. */
 export interface Problem {
   /** Where the problem is, as a JSON Pointer. "" is the whole document. */
   path: string;
   /** The name of the rule of specification section 9, or null for a schema problem. */
   rule: string | null;
-  /** What is wrong, in words for people. */
+  /** What is wrong, in the words of the schema or the rule. */
   message: string;
+  /** One plain sentence for people that says what to do. */
+  hint: string;
+  /** Present when the problem has a certain fix. Apply it with `applyFix`. */
+  fix?: Fix;
+}
+
+/** The result of `fixAll`. */
+export interface FixAllResult {
+  doc: Document;
+  /** The fixes that were applied, in order. */
+  fixed: Fix[];
 }
 
 /** A thing that the Markdown reader skipped or changed (specification 10.6). */
@@ -562,6 +589,33 @@ pub fn check(
     #[wasm_bindgen(unchecked_param_type = "unknown")] doc: JsValue,
 ) -> Result<JsValue, JsValue> {
     Ok(to_js(&skopos_core::check(&from_js(&doc, "doc")?)))
+}
+
+/// Applies the fix of a problem to a document and returns the new document.
+/// The document that you give does not change. Throws a `SkoposError` if the
+/// fix does not fit the document.
+#[wasm_bindgen(js_name = applyFix, unchecked_return_type = "Document")]
+pub fn apply_fix(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Fix")] fix: JsValue,
+) -> Result<JsValue, JsValue> {
+    let doc = from_js(&doc, "doc")?;
+    let fix: Fix = serde_json::from_value(from_js(&fix, "fix")?)
+        .map_err(|e| type_error(&format!("fix must be {{ label, patch }}: {e}")))?;
+    skopos_core::fix::apply(&doc, &fix)
+        .map(|d| to_js(&d))
+        .map_err(|p| problems_error(&[p]))
+}
+
+/// Applies the fixes of all problems that have one, and checks again after
+/// each fix. Returns `{ doc, fixed }`. The problems that are left need a
+/// person.
+#[wasm_bindgen(js_name = fixAll, unchecked_return_type = "FixAllResult")]
+pub fn fix_all(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+) -> Result<JsValue, JsValue> {
+    let (doc, fixed) = skopos_core::fix::fix_all(&from_js(&doc, "doc")?);
+    Ok(to_js(&serde_json::json!({ "doc": doc, "fixed": fixed })))
 }
 
 /// Finds the problems of a document with the JSON Schema only.

@@ -19,6 +19,7 @@ use std::path::{Path, PathBuf};
 use clap::{Parser, Subcommand, ValueEnum};
 use serde::Serialize;
 use skopos_core::export::{self, Options, Tool};
+use skopos_core::fix::{fix_all, Fix};
 use skopos_core::markdown::Fill;
 use skopos_core::render::{self, HtmlOptions, TerminalOptions};
 use skopos_core::{
@@ -80,7 +81,8 @@ struct Cli {
 enum Command {
     /// Check documents against the schema and the rules of the specification.
     ///
-    /// The exit code is 1 if a document has a problem.
+    /// The exit code is 1 if a document has a problem. With --json, each
+    /// problem has a hint for people, and a fix when the fix needs no choice.
     Check {
         /// JSON, YAML or Markdown files (.json, .yaml, .yml or .md)
         #[arg(required = true)]
@@ -88,6 +90,11 @@ enum Command {
         /// Write the problems as JSON
         #[arg(long)]
         json: bool,
+        /// Apply the fixes that need no choice, such as a counter that is too
+        /// low, and write each JSON or YAML file again. Name each fix. The
+        /// problems that are left need a person.
+        #[arg(long)]
+        fix: bool,
     },
     /// Write documents again in the canonical key order and layout.
     Fmt {
@@ -379,7 +386,7 @@ where
     };
     let mut cmd = Commands { host };
     let ok = match cli.command {
-        Command::Check { files, json } => cmd.check(&files, json),
+        Command::Check { files, json, fix } => cmd.check(&files, json, fix),
         Command::Fmt { files, check } => cmd.fmt(&files, check),
         Command::Convert {
             file,
@@ -547,6 +554,9 @@ fn speckit_folder_number(folder: &str) -> Option<(u32, &str)> {
 #[derive(Serialize)]
 struct FileProblems {
     file: String,
+    /// With --fix: the fixes that the tool applied.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    fixed: Vec<Fix>,
     problems: Vec<Problem>,
 }
 
@@ -667,19 +677,30 @@ impl Commands<'_> {
         None
     }
 
-    fn check(&mut self, files: &[PathBuf], json: bool) -> bool {
-        let results: Vec<FileProblems> = files
-            .iter()
-            .map(|path| FileProblems {
+    fn check(&mut self, files: &[PathBuf], json: bool, fix: bool) -> bool {
+        let mut results = Vec::with_capacity(files.len());
+        for path in files {
+            let mut fixed = vec![];
+            let problems = match self.read_any_with_format(path) {
+                // The Markdown reader already checked the document.
+                Ok((_, FileFormat::Markdown)) => vec![],
+                Ok((doc, FileFormat::Data(format))) if fix => {
+                    let (new_doc, applied) = fix_all(&doc);
+                    if !applied.is_empty() && !self.write_file(path, &write(&new_doc, format)) {
+                        return false;
+                    }
+                    fixed = applied;
+                    check(&new_doc)
+                }
+                Ok((doc, FileFormat::Data(_))) => check(&doc),
+                Err(problems) => problems,
+            };
+            results.push(FileProblems {
                 file: path.display().to_string(),
-                problems: match self.read_any_with_format(path) {
-                    // The Markdown reader already checked the document.
-                    Ok((_, FileFormat::Markdown)) => vec![],
-                    Ok((doc, FileFormat::Data(_))) => check(&doc),
-                    Err(problems) => problems,
-                },
-            })
-            .collect();
+                fixed,
+                problems,
+            });
+        }
         let with_problems = results.iter().filter(|r| !r.problems.is_empty()).count();
 
         if json {
@@ -687,10 +708,19 @@ impl Commands<'_> {
             text.push('\n');
             self.out(&text);
         } else {
-            let lines: String = results
-                .iter()
-                .flat_map(|r| r.problems.iter().map(move |p| format!("{}: {p}\n", r.file)))
-                .collect();
+            let mut lines = String::new();
+            for r in &results {
+                for f in &r.fixed {
+                    lines.push_str(&format!("{}: fixed: {}\n", r.file, f.label));
+                }
+                for p in &r.problems {
+                    lines.push_str(&format!("{}: {p}\n", r.file));
+                    // The hint, when it says more than the message.
+                    if !p.hint.is_empty() && p.hint != Problem::new("", &p.message).hint {
+                        lines.push_str(&format!("  {}\n", p.hint));
+                    }
+                }
+            }
             self.out(&lines);
             let count: usize = results.iter().map(|r| r.problems.len()).sum();
             if count == 0 {
@@ -702,6 +732,21 @@ impl Commands<'_> {
                     with_problems,
                     plural(files.len(), "file")
                 ));
+                let fixable = results
+                    .iter()
+                    .flat_map(|r| &r.problems)
+                    .filter(|p| p.fix.is_some())
+                    .count();
+                if fixable > 0 {
+                    self.err(&format!(
+                        "{} can be fixed with skopos check --fix.",
+                        if fixable == 1 {
+                            "1 problem".to_string()
+                        } else {
+                            format!("{fixable} problems")
+                        }
+                    ));
+                }
             }
         }
         with_problems == 0
