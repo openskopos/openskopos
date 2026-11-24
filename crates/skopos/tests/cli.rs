@@ -634,6 +634,64 @@ fn history_and_trace_read_versions_in_any_order_and_format() {
 }
 
 #[test]
+fn merge_conflicts_and_resolve() {
+    let case = conformance().join("merge/02-edit-edit");
+    let path = |f: &str| case.join(f).display().to_string();
+    let dir = temp_dir("merge");
+    let out_file = dir.join("merged.skopos.yaml").display().to_string();
+
+    let out = skopos(&[
+        "merge",
+        &path("main.json"),
+        &path("other.json"),
+        "--base",
+        &path("base.json"),
+        "-o",
+        &out_file,
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stderr).contains("1 conflict:\n  FR1 or FR3: text\n"));
+    let text = fs::read_to_string(&out_file).unwrap();
+    assert!(
+        text.starts_with("$schema: "),
+        "the -o file decides the format: {text}"
+    );
+    assert!(skopos(&["check", &out_file]).status.success());
+
+    let out = skopos(&["conflicts", &out_file]);
+    assert_eq!(out.status.code(), Some(1));
+    assert_eq!(String::from_utf8_lossy(&out.stdout), "FR1 or FR3: text\n");
+
+    assert_eq!(skopos(&["resolve", &out_file, "G1"]).status.code(), Some(1));
+    let out = skopos(&["resolve", &out_file, "FR1"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(skopos(&["conflicts", &out_file]).status.success());
+    assert!(skopos(&["check", &out_file]).status.success());
+
+    let drafts = conformance().join("merge/05-two-drafts");
+    let (a, b) = (
+        drafts.join("main.json").display().to_string(),
+        drafts.join("other.json").display().to_string(),
+    );
+    let json = stdout_json(&skopos(&["merge", "--json", &a, &b]));
+    assert_eq!(json["pairs"][1]["similarity"], 96);
+    let json = stdout_json(&skopos(&["merge", "--json", "--pair", "G1=G1", &a, &b]));
+    assert_eq!(json["conflicts"], serde_json::json!([]));
+    assert_eq!(
+        skopos(&["merge", "--pair", "G1", &a, &b]).status.code(),
+        Some(1)
+    );
+}
+
+#[test]
 fn export_with_force_removes_files_of_an_earlier_export() {
     let dir = temp_dir("export-stale");
     let root = dir.to_str().unwrap();

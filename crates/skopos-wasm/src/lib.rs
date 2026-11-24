@@ -299,6 +299,63 @@ export interface HistoryTextOptions {
   since?: number;
 }
 
+/** Options for `merge` and `mergeText`. */
+export interface MergeOptions {
+  /** The common earlier version. Items with an ID of the base pair by ID. */
+  base?: Document;
+  /** Pairs that people confirmed, as [main ID, other ID]. No other items pair. */
+  pairs?: [string, string][];
+  /** The time for created_at of the result. Default: now. */
+  now?: string;
+}
+
+/** Two items that are the same item. */
+export interface MergePair {
+  main: string;
+  other: string;
+  by: "id" | "text" | "given";
+  /** For a pair by text: how similar the texts are, from 0 to 100. */
+  similarity?: number;
+}
+
+/** A conflict in the merged document. Its items are proposed. */
+export interface MergeConflict {
+  kind: "changed" | "removed_in_main" | "removed_in_other";
+  /** The ID in `doc` of the item of main, if there is one. */
+  main: string | null;
+  /** The ID in `doc` of the item of the other document, if there is one. */
+  other: string | null;
+  /** For "changed": the fields that are different. */
+  fields: string[];
+}
+
+/** The result of `merge`. */
+export interface MergeResult {
+  /** The next version of main, as a draft. */
+  doc: Document;
+  pairs: MergePair[];
+  conflicts: MergeConflict[];
+  /** Items of the other document with their IDs in `doc`. */
+  renamed: { from: string; to: string }[];
+  /** Envelope fields where the other document is different. `doc` keeps main's values. */
+  envelope: string[];
+}
+
+/** An open conflict of a merged document. */
+export interface OpenConflict {
+  main: string;
+  /** The item from the other document, with the contradicts ref. */
+  other: string;
+  fields: string[];
+}
+
+/** The result of `resolve`. */
+export interface ResolveResult {
+  doc: Document;
+  accepted: string;
+  rejected: string;
+}
+
 /**
  * The file system and terminal for `runCli`. Each method does one simple
  * operation. A method that fails throws, as the `node:fs` functions do.
@@ -817,6 +874,94 @@ pub fn trace_text(
     reference: &str,
 ) -> Result<String, JsValue> {
     traced(&docs, reference, |h, item| h.trace_text(item))
+}
+
+// ------------------------------------------------------------------ merge
+
+fn merge_of(
+    main: &JsValue,
+    other: &JsValue,
+    options: &Option<JsValue>,
+) -> Result<skopos_core::merge::Merge, JsValue> {
+    let main = from_js(main, "main")?;
+    let other = from_js(other, "other")?;
+    let options = from_js_opt(options, "options")?;
+    let base = match options.as_ref().and_then(|o| o.get("base")) {
+        None | Some(Value::Null) => None,
+        Some(b) => Some(b.clone()),
+    };
+    let pairs = match options.as_ref().and_then(|o| o.get("pairs")) {
+        None | Some(Value::Null) => None,
+        Some(p) => Some(
+            serde_json::from_value::<Vec<(String, String)>>(p.clone()).map_err(|e| {
+                type_error(&format!(
+                    "options.pairs must be a list of [mainId, otherId]: {e}"
+                ))
+            })?,
+        ),
+    };
+    let options = skopos_core::merge::Options {
+        base: base.as_ref(),
+        pairs,
+        now: Some(option_string(&options, "now").unwrap_or_else(now)),
+    };
+    skopos_core::merge::merge(&main, &other, &options).map_err(|p| problems_error(&[p]))
+}
+
+/// Merges two documents into the next version of main, with the other
+/// document as an input parent. A conflict keeps both items as proposed,
+/// with a contradicts ref. Does not check the documents: use `check` first.
+#[wasm_bindgen(unchecked_return_type = "MergeResult")]
+pub fn merge(
+    #[wasm_bindgen(unchecked_param_type = "Document")] main: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Document")] other: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "MergeOptions")] options: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&merge_of(&main, &other, &options)?))
+}
+
+/// The summary of `merge(main, other, options)` as text, as `skopos merge`
+/// writes it.
+#[wasm_bindgen(js_name = mergeText)]
+pub fn merge_text(
+    #[wasm_bindgen(unchecked_param_type = "Document")] main: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Document")] other: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "MergeOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    Ok(merge_of(&main, &other, &options)?.to_text())
+}
+
+/// The open conflicts of a merged document.
+#[wasm_bindgen(unchecked_return_type = "OpenConflict[]")]
+pub fn conflicts(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&skopos_core::merge::conflicts(&from_js(
+        &doc, "doc",
+    )?)))
+}
+
+/// Accepts the item with this ID and rejects the other item of its open
+/// conflict. Throws a `SkoposError` if the item is not in an open conflict.
+/// Does not change the document that you give to it.
+#[wasm_bindgen(unchecked_return_type = "ResolveResult")]
+pub fn resolve(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    id: &str,
+) -> Result<JsValue, JsValue> {
+    let mut doc = from_js(&doc, "doc")?;
+    let r = skopos_core::merge::resolve(&mut doc, id).map_err(|p| problems_error(&[p]))?;
+    #[derive(Serialize)]
+    struct ResolveResult<'a> {
+        doc: &'a Value,
+        accepted: &'a str,
+        rejected: &'a str,
+    }
+    Ok(to_js(&ResolveResult {
+        doc: &doc,
+        accepted: &r.accepted,
+        rejected: &r.rejected,
+    }))
 }
 
 // ------------------------------------------------------------------ CLI

@@ -102,6 +102,8 @@ worker.
 | `diff(oldDoc, newDoc)` | Compares two versions by item ID. `diffText(oldDoc, newDoc)` returns the same result as text. |
 | `history(docs)` | Reads documents from one or more artifacts, in any order, as one history. Returns `{ chains, links, items, warnings }`. Each item has a `key` (`<artifact id>#<item id>`), its `reference` string, its `state` now and its `steps` across the versions. `historyText(docs, { since? })` returns it as text. |
 | `trace(docs, reference)` | Returns the history of one item, from a reference string such as `pa_2Xc5Rv8Tn1Mb4Kz7#FR2`. `traceText(docs, reference)` returns it as text, with the items that replace it and why. |
+| `merge(main, other, options?)` | Merges two documents into the next version of main. The options are `base`, `pairs` (a list of `[mainId, otherId]`) and `now`. Returns `{ doc, pairs, conflicts, renamed, envelope }`. Without `base` or `pairs`, items of the same type with similar text pair, and `pairs` returns them for people to confirm. `mergeText(main, other, options?)` returns the summary as text. |
+| `conflicts(doc)` | Lists the open conflicts of a merged document: `{ main, other, fields }`. `resolve(doc, id)` accepts the item and rejects the other item of its pair, and returns `{ doc, accepted, rejected }`. |
 | `newArtifactId()` | Returns a new random artifact ID, for example `pa_7Hk2mQ9xR4tV8wZ1`. |
 | `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.1 as text, and its URL. |
 | `rules()` | Returns the names of the four rules in section 9. |

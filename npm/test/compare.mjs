@@ -155,6 +155,37 @@ const cases = [
   ["diff", valid[0], valid[1]],
   ["diff", valid[0], invalid[0]],
   ["diff", "missing.json", valid[0]],
+
+  // history and trace
+  ...list("history").cases.flatMap(({ case: c }) => {
+    const files = fs
+      .readdirSync(new URL(`history/${c}/`, conformance))
+      .filter((f) => f !== "expected.json")
+      .map((f) => `c/history/${c}/${f}`);
+    return [
+      ["history", ...files],
+      ["history", "--json", ...files],
+      ["history", "--since", "1", ...files],
+    ];
+  }),
+  ["trace", "FR1", "c/history/01-three-versions/v1.json", "c/history/01-three-versions/v3.json"],
+  ["trace", "--json", "pa_4Hs8Lm2Qx6Vr9Tc3#D2", "c/history/02-hand-over/first-team.json", "c/history/02-hand-over/second-team.json"],
+  ["trace", "FR9", "c/history/01-three-versions/v1.json"],
+
+  // merge
+  ...list("merge").cases.flatMap(({ case: c }) => {
+    const d = `c/merge/${c}`;
+    const base = fs.existsSync(new URL(`merge/${c}/base.json`, conformance)) ? ["--base", `${d}/base.json`] : [];
+    return [
+      ["merge", `${d}/main.json`, `${d}/other.json`, ...base],
+      ["merge", "--json", `${d}/main.json`, `${d}/other.json`, ...base],
+      ["merge", `${d}/main.json`, `${d}/other.json`, ...base, "-o", "merged.yaml"],
+      ["conflicts", `${d}/expected.json`],
+    ];
+  }),
+  ["merge", "--pair", "G1=G1", "c/merge/05-two-drafts/main.json", "c/merge/05-two-drafts/other.json"],
+  ["merge", "--pair", "G1", "c/merge/05-two-drafts/main.json", "c/merge/05-two-drafts/other.json"],
+  ["resolve", "c/merge/02-edit-edit/expected.json", "G1"],
 ];
 
 // Commands that run twice in the same folder: the second export finds the
@@ -230,6 +261,12 @@ function compare(sequence) {
 
 for (const args of cases) compare([args]);
 compare(twice);
+// Resolve a conflict, then list the conflicts again.
+compare([
+  ["conflicts", "c/merge/02-edit-edit/expected.json"],
+  ["resolve", "c/merge/02-edit-edit/expected.json", "FR3"],
+  ["conflicts", "c/merge/02-edit-edit/expected.json"],
+]);
 fs.rmSync(work, { recursive: true, force: true });
 
 console.log(`${n - failed} of ${n} comparisons give the same result.`);

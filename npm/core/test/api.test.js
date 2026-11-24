@@ -14,6 +14,10 @@ import init, {
   history,
   historyText,
   markdownRead,
+  merge,
+  mergeText,
+  conflicts,
+  resolve,
   newArtifactId,
   nextVersion,
   parse,
@@ -154,6 +158,35 @@ test("history, historyText, trace and traceText", () => {
   assert.match(traceText(docs, "pa_4Hs8Lm2Qx6Vr9Tc3#D2"), /rationale: The nightly count/);
   assert.throws(() => trace(docs, "D1"), { name: "SkoposError", message: /more than one artifact/ });
   assert.throws(() => history({}), TypeError);
+});
+
+test("merge, mergeText, conflicts and resolve", () => {
+  const dir = "merge/02-edit-edit/";
+  const [main, other, base] = ["main", "other", "base"].map((f) => json(`${dir}${f}.json`));
+  const m = merge(main, other, { base, now: "2026-11-24T12:00:00Z" });
+  assert.equal(m.doc.version, main.version + 1);
+  assert.equal(m.doc.created_at, "2026-11-24T12:00:00Z");
+  assert.deepEqual(m.conflicts, [{ kind: "changed", main: "FR1", other: "FR3", fields: ["text"] }]);
+  assert.deepEqual(check(m.doc), []);
+  assert.match(mergeText(main, other, { base }), /FR1 or FR3: text/);
+  assert.deepEqual(conflicts(m.doc), [{ main: "FR1", other: "FR3", fields: ["text"] }]);
+  const r = resolve(m.doc, "FR3");
+  assert.equal(r.rejected, "FR1");
+  assert.deepEqual(conflicts(r.doc), []);
+  assert.equal(conflicts(m.doc).length, 1, "resolve does not change its input");
+  assert.throws(() => resolve(m.doc, "G1"), { name: "SkoposError" });
+
+  const drafts = "merge/05-two-drafts/";
+  const a = json(`${drafts}main.json`);
+  const b = json(`${drafts}other.json`);
+  const proposed = merge(a, b);
+  assert.deepEqual(
+    proposed.pairs.map((p) => [p.main, p.other, p.by]),
+    [["G1", "G1", "text"], ["FR1", "FR2", "text"]],
+  );
+  const split = merge(a, b, { pairs: [["G1", "G1"]] });
+  assert.deepEqual(split.conflicts, []);
+  assert.throws(() => merge(a, b, { pairs: [["G1", "G9"]] }), { name: "SkoposError" });
 });
 
 // A host with files in memory, for runCli.

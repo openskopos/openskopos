@@ -546,6 +546,42 @@ The state of an item is its state in the latest version of its artifact:
 The cases in `conformance/history/` show a chain of three versions, a
 hand-over to a second artifact and a missing version.
 
+### 8.4 Merging two documents (informative)
+
+This section does not add rules. An artifact has no branches, so two drafts
+of the same work are two documents, for example two sessions or two agent
+runs from the same input. A tool can merge them into one valid document with
+no change to the format:
+
+1. The team picks one document as main. The result is the next version of
+   main, as a draft. It has a `previous_version` parent to main and an
+   `input` parent to the other document.
+2. The tool pairs the items that are the same item. If the team has the
+   common earlier version (the base), an item is the same item in both
+   documents when both have an ID of the base. Without a base, a tool can
+   propose pairs of items of the same type with similar text, and people
+   confirm or split them.
+3. A field that only one document changed since the base merges by itself.
+   Without a base, a paired item merges by itself only if the two items are
+   the same.
+4. An item of the other document that comes into the result as a new item
+   gets a new ID from the counters of main (section 7), so IDs never
+   collide. It gets a `derived_from` ref with `artifact` and `version` to
+   the item that it comes from. Refs to it are rewritten to the new ID.
+5. A conflict is when both documents changed an item in different ways, or
+   when one document changed an item that the other document removed or
+   superseded. Both items stay, as `proposed`. The item of main keeps its
+   ID. The item of the other document has a `contradicts` ref to it.
+6. To resolve a conflict, the team accepts one item and rejects the other.
+   The rejected item stays in the record. A tool should not finalize a
+   version while a pair from a merge is still `proposed`. This is a rule for
+   merge tools, not for documents.
+7. Envelope fields, such as `title` and `summary`, keep the values of main.
+
+The cases in `conformance/merge/` show a clean merge with a base, a conflict
+of two changes, a conflict of a change and a supersede, two documents that
+add the same ID, and two drafts with no base.
+
 ## 9. Rules that the schema cannot check
 
 JSON Schema cannot express these rules. A tool that writes a document must
@@ -943,3 +979,9 @@ and for each item, as `<artifact id>#<item id>`, its state, its changes as
 `[version, change]` pairs, and the items that supersede it. A change is
 `added`, `changed`, `superseded` or `dropped`, or `seen` for an item in the
 first version given of a chain that does not start at version 1.
+
+A tool that merges documents (8.4) can also use the cases in
+`conformance/merge/`. Each case has `main.json`, `other.json`, `base.json`
+if the documents have a base, and `expected.json`, the result. The index
+gives the conflicts and the items of the other document with their new IDs.
+The comparison ignores `created_at`.

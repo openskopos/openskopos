@@ -1,0 +1,75 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_5Qk9Ts3Hv7Mw2Zd8",
+  "version": 3,
+  "kind": "spec",
+  "title": "Seat limits",
+  "status": "draft",
+  "parents": [
+    {
+      "rel": "previous_version",
+      "artifact": "pa_5Qk9Ts3Hv7Mw2Zd8",
+      "version": 2
+    },
+    {
+      "rel": "input",
+      "artifact": "pa_8Rc2Nx6Jb4Pf1Lu5",
+      "version": 1,
+      "kind": "spec",
+      "title": "Seat limits, second session"
+    }
+  ],
+  "id_counters": {
+    "G": 1,
+    "FR": 3,
+    "Q": 1
+  },
+  "items": [
+    {
+      "id": "G1",
+      "type": "goal",
+      "text": "No user loses access by surprise when the org changes plan.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR1",
+      "type": "requirement",
+      "text": "A plan change that leaves too many seats is blocked.",
+      "status": "proposed",
+      "priority": "must"
+    },
+    {
+      "id": "FR3",
+      "type": "requirement",
+      "text": "A plan change that leaves too many seats asks the admin to confirm.",
+      "status": "proposed",
+      "priority": "must",
+      "refs": [
+        {
+          "item": "FR1",
+          "artifact": "pa_8Rc2Nx6Jb4Pf1Lu5",
+          "version": 1,
+          "rel": "derived_from"
+        },
+        {
+          "item": "FR1",
+          "rel": "contradicts"
+        }
+      ]
+    },
+    {
+      "id": "FR2",
+      "type": "requirement",
+      "text": "Admins get an email after each plan change.",
+      "status": "accepted",
+      "priority": "should"
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "Do guests count as seats?",
+      "status": "proposed"
+    }
+  ],
+  "created_at": "2026-11-24T11:58:42Z"
+}

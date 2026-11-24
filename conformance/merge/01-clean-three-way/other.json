@@ -1,0 +1,64 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.1.json",
+  "id": "pa_8Rc2Nx6Jb4Pf1Lu5",
+  "version": 1,
+  "kind": "spec",
+  "title": "Seat limits, second session",
+  "status": "draft",
+  "parents": [
+    {
+      "rel": "input",
+      "artifact": "pa_5Qk9Ts3Hv7Mw2Zd8",
+      "version": 1,
+      "kind": "spec",
+      "title": "Seat limits"
+    }
+  ],
+  "id_counters": {
+    "G": 1,
+    "FR": 3,
+    "Q": 1
+  },
+  "items": [
+    {
+      "id": "G1",
+      "type": "goal",
+      "text": "No user loses access by surprise when the org changes plan.",
+      "status": "accepted"
+    },
+    {
+      "id": "FR1",
+      "type": "requirement",
+      "text": "A plan change that leaves too many seats shows a warning.",
+      "status": "accepted",
+      "priority": "must"
+    },
+    {
+      "id": "FR2",
+      "type": "requirement",
+      "text": "Admins get an email after each plan change.",
+      "status": "accepted",
+      "priority": "could"
+    },
+    {
+      "id": "Q1",
+      "type": "open_question",
+      "text": "Do guests count as seats?",
+      "status": "proposed"
+    },
+    {
+      "id": "FR3",
+      "type": "requirement",
+      "text": "The warning names the members above the new limit.",
+      "status": "proposed",
+      "priority": "should",
+      "refs": [
+        {
+          "item": "FR1",
+          "rel": "refines"
+        }
+      ]
+    }
+  ],
+  "created_at": "2026-11-12T09:00:00Z"
+}

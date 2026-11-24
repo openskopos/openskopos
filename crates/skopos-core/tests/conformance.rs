@@ -7,6 +7,7 @@ use std::path::{Path, PathBuf};
 
 use serde_json::Value;
 use skopos_core::history::history;
+use skopos_core::merge::{self, merge};
 use skopos_core::{check, check_rules, check_schema, model::Document, parse, rules, write, Format};
 
 fn conformance() -> PathBuf {
@@ -288,5 +289,54 @@ fn history_cases_give_the_expected_history() {
                 }
             }
         }
+    }
+}
+
+#[test]
+fn merge_cases_give_the_expected_document() {
+    for case in cases("merge") {
+        let name = case["case"].as_str().unwrap();
+        let dir = conformance().join("merge").join(name);
+        let base = dir.join("base.json");
+        let base = base.exists().then(|| read(&base));
+        let options = merge::Options {
+            base: base.as_ref(),
+            ..Default::default()
+        };
+        let m = merge(
+            &read(&dir.join("main.json")),
+            &read(&dir.join("other.json")),
+            &options,
+        )
+        .unwrap_or_else(|e| panic!("{name}: {e}"));
+        assert!(check(&m.doc).is_empty(), "{name}: {:?}", check(&m.doc));
+        let mut expected = read(&dir.join("expected.json"));
+        let mut doc = m.doc.clone();
+        // The comparison ignores created_at.
+        expected.as_object_mut().unwrap().remove("created_at");
+        doc.as_object_mut().unwrap().remove("created_at");
+        assert_eq!(doc, expected, "{name}: document");
+        assert_eq!(
+            serde_json::to_value(&m.conflicts).unwrap(),
+            case["conflicts"],
+            "{name}: conflicts"
+        );
+        let new: Vec<Value> = m
+            .renamed
+            .iter()
+            .map(|r| serde_json::json!([r.from, r.to]))
+            .collect();
+        assert_eq!(Value::from(new), case["new"], "{name}: new IDs");
+        // The open conflicts of the result are the pairs of the merge.
+        let open: Vec<(String, String)> = merge::conflicts(&m.doc)
+            .into_iter()
+            .map(|c| (c.main, c.other))
+            .collect();
+        let pairs: Vec<(String, String)> = m
+            .conflicts
+            .iter()
+            .filter_map(|c| Some((c.main.clone()?, c.other.clone()?)))
+            .collect();
+        assert_eq!(open, pairs, "{name}: open conflicts");
     }
 }

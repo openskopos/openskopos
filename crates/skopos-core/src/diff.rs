@@ -19,7 +19,7 @@ use serde_json::{Map, Value};
 /// The envelope fields that a diff does not compare. They describe how a
 /// version was made, not what it says (specification 10.8).
 /// `id_counters` changes with every new item, so it is left out too.
-const NOT_CONTENT: [&str; 9] = [
+pub(crate) const NOT_CONTENT: [&str; 9] = [
     "version",
     "id_counters",
     "status",
@@ -234,16 +234,26 @@ fn summary(id: &str, item: &Map<String, Value>) -> ItemSummary {
 
 /// Keys whose values are different in two objects, in alphabetical order.
 /// The order of `refs` does not matter: a change of order is not a change.
-fn different_keys(a: &Map<String, Value>, b: &Map<String, Value>, skip: &[&str]) -> Vec<String> {
+pub(crate) fn different_keys(
+    a: &Map<String, Value>,
+    b: &Map<String, Value>,
+    skip: &[&str],
+) -> Vec<String> {
     let keys: BTreeSet<&String> = a.keys().chain(b.keys()).collect();
     keys.into_iter()
         .filter(|k| !skip.contains(&k.as_str()))
-        .filter(|k| match (k.as_str(), a.get(*k), b.get(*k)) {
-            ("refs", Some(Value::Array(x)), Some(Value::Array(y))) => !same_set(x, y),
-            (_, x, y) => !same(x, y),
-        })
+        .filter(|k| !same_field(k, a.get(*k), b.get(*k)))
         .cloned()
         .collect()
+}
+
+/// Two values of a field of an item are the same. The order of `refs` does
+/// not matter.
+pub(crate) fn same_field(key: &str, a: Option<&Value>, b: Option<&Value>) -> bool {
+    match (key, a, b) {
+        ("refs", Some(Value::Array(x)), Some(Value::Array(y))) => same_set(x, y),
+        (_, x, y) => same(x, y),
+    }
 }
 
 /// Two lists contain the same values, in any order.

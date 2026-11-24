@@ -24,6 +24,9 @@ conformance/
   history/
     index.json
     <case>/              Documents in any order and the history that a tool reads from them
+  merge/
+    index.json
+    <case>/              Two documents, maybe a base, and the merged document
   runner/                A check of the cases themselves (Rust)
 ```
 
@@ -66,6 +69,14 @@ specification says how to read a history, and section 13 describes
 `expected.json`. A tool that reads histories can use the cases. A checker
 does not need them.
 
+### merge/
+
+Each case is a folder with `main.json`, `other.json`, `base.json` if the
+documents have a common earlier version, and `expected.json`, the merged
+document. Section 8.4 of the specification says how a tool merges, and
+section 13 says how to compare. A tool that merges documents can use the
+cases. A checker does not need them.
+
 ## The runner
 
 The runner in `runner/` is a small Rust program. CI uses it on each pull
@@ -81,6 +92,8 @@ request. It does these checks:
 - Each `next-version` case keeps the version number, or makes draft version
   n+1 after a final version n.
 - Each document of the history cases is valid.
+- Each document of the merge cases is valid, and each result is the next
+  draft of main with the other document as an input parent.
 - Each file and folder is in its `index.json`.
 
 The runner does not read or write Markdown. The reference implementation in
