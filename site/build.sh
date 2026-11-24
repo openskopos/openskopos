@@ -3,6 +3,10 @@
 # of the repository. It needs pandoc 3.11 or later, and Node 20 or later for
 # the tools at /tools/.
 #
+# Besides the HTML pages, it writes a Markdown copy of each page made from
+# Markdown (index.md next to index.html), sitemap.xml, llms.txt and
+# llms-full.txt. site/robots.txt allows every crawler.
+#
 # The schema files are not part of this build. The Deploy site workflow adds
 # each tagged schema file to the folder.
 set -eu
@@ -43,10 +47,10 @@ docs/editors.md|docs/editors|Editor support||Validation and completion for .skop
 docs/exporters.md|docs/exporters|Export to OpenSpec, Kiro and Spec Kit|toc|Export an OpenSkopos document to OpenSpec, Kiro or GitHub Spec Kit, and see where each item type goes in each tool.
 docs/render.md|docs/render|Readable views of a document|toc|Show an OpenSkopos document as text in the terminal or as an HTML page, and style the HTML with CSS custom properties.
 crates/skopos/README.md|docs/cli|The skopos command line tool|toc|The skopos commands: check, fmt, convert, import, ids, export, diff, history, trace, merge, conflicts, resolve and render.
-crates/skopos-core/README.md|docs/rust|The skopos-core Rust library||
-npm/core/README.md|docs/javascript|The @openskopos/core npm package||
-npm/cli/README.md|docs/npm-cli|The @openskopos/cli npm package||
-conformance/README.md|docs/conformance|Conformance cases||
+crates/skopos-core/README.md|docs/rust|The skopos-core Rust library||Read, check, write, compare, merge and render OpenSkopos documents in Rust with the reference implementation.
+npm/core/README.md|docs/javascript|The @openskopos/core npm package||Read, check, write, compare, merge and render OpenSkopos documents in Node and in browsers, with the reference implementation built to WebAssembly.
+npm/cli/README.md|docs/npm-cli|The @openskopos/cli npm package||The skopos command line tool for Node on every platform, with the same commands and output as the native tool.
+conformance/README.md|docs/conformance|Conformance cases||The documents that every OpenSkopos implementation must accept or reject, and the cases for Markdown, histories and merges.
 '
 
 # The released versions, newest first, from the headings of RELEASES.md. The
@@ -72,8 +76,106 @@ echo "$pages" | while IFS='|' read -r source folder title toc description; do
     set -- "$@" --toc --toc-depth 3
   fi
   pandoc "$@"
+  # The same page as Markdown, for AI models and other tools, with the links
+  # to the site as full URLs.
+  pandoc "$source" --from gfm --to gfm --wrap none \
+    --lua-filter site/pandoc/links.lua |
+    sed "s|](/|](https://openskopos.org/|g" > "$out/$folder/index.md"
   echo "$source -> /$folder/"
 done
+
+site=https://openskopos.org
+# The format version of the latest release, such as 0.2.
+format=$(echo "$versions" | cut -d' ' -f1 | cut -d. -f1,2)
+
+# The title and description of a page that is not made from Markdown.
+html_title() { sed -n 's|.*<title>\(.*\)</title>.*|\1|p' "$1" | sed 's| · OpenSkopos$||'; }
+html_description() { sed -n 's|.*<meta name="description" content="\([^"]*\)">.*|\1|p' "$1"; }
+
+# sitemap.xml: every page of the site, with the date of the last commit that
+# changed its source.
+lastmod() { git log -1 --format=%cs -- "$@" 2>/dev/null || true; }
+url() {
+  printf '  <url><loc>%s%s</loc>' "$site" "$1"
+  [ -z "$2" ] || printf '<lastmod>%s</lastmod>' "$2"
+  printf '</url>\n'
+}
+{
+  echo '<?xml version="1.0" encoding="UTF-8"?>'
+  echo '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">'
+  url / "$(lastmod site/index.html)"
+  url /tools/ "$(lastmod site/tools)"
+  for page in "$out"/tools/*/index.html; do
+    url "/tools/$(basename "$(dirname "$page")")/" "$(lastmod site/tools)"
+  done
+  echo "$pages" | while IFS='|' read -r source folder title toc description; do
+    [ -n "$source" ] || continue
+    url "/$folder/" "$(lastmod "$source")"
+  done
+  echo '</urlset>'
+} > "$out/sitemap.xml"
+echo "sitemap.xml: $(grep -c '<loc>' "$out/sitemap.xml") pages"
+
+# llms.txt (https://llmstxt.org): a short guide to the site for AI models,
+# with links to the Markdown copy of each page. llms-full.txt has the
+# Markdown of the current specification and every documentation page in one
+# file.
+link() { printf -- '- [%s](%s)' "$1" "$2"; [ -z "${3:-}" ] || printf ': %s' "$3"; printf '\n'; }
+# The pages whose folder matches one of the patterns.
+pages_in() {
+  echo "$pages" | while IFS='|' read -r source folder title toc description; do
+    [ -n "$source" ] || continue
+    for pattern in "$@"; do
+      case "$folder" in $pattern)
+        link "$title" "$site/$folder/index.md" "$description"
+        break
+        ;;
+      esac
+    done
+  done
+}
+{
+  echo "# OpenSkopos"
+  echo
+  echo "> OpenSkopos is an open, vendor-neutral file format for the decisions that a team makes before an AI agent builds the work: goals, requirements, constraints, assumptions, risks, open questions and decisions, each with a stable ID. The skopos command line tool and the skopos-core library check, convert, compare, merge and render documents, and export them to OpenSpec, GitHub Spec Kit and Kiro."
+  echo
+  echo "The current release is $(echo "$versions" | cut -d' ' -f1). It reads and writes format $format. A document names its format version in \`\$schema\`, for example \`$site/schema/artifact/$format.json\`. Files end in \`.skopos.json\`, \`.skopos.yaml\` or \`.skopos.md\`. Everything is under the Apache License 2.0."
+  echo
+  echo "## Specification"
+  echo
+  pages_in "spec/$format"
+  link "JSON Schema $format" "$site/schema/artifact/$format.json" "The JSON Schema of format $format."
+  pages_in "spec/changelog"
+  echo
+  echo "## Documentation"
+  echo
+  pages_in docs "docs/*" changelog
+  echo
+  echo "## Tools"
+  echo
+  for page in "$out"/tools/index.html "$out"/tools/*/index.html; do
+    path=${page#"$out"}
+    link "$(html_title "$page")" "$site${path%index.html}" "$(html_description "$page")"
+  done
+  echo
+  echo "## Optional"
+  echo
+  link "All documentation in one file" "$site/llms-full.txt" "The specification $format and every documentation page as Markdown."
+  echo "$pages" | while IFS='|' read -r source folder title toc description; do
+    case "$folder" in spec/[0-9]*) [ "$folder" = "spec/$format" ] || link "$title" "$site/$folder/index.md" "An earlier format version." ;; esac
+  done
+  link "Source code" "https://github.com/openskopos/openskopos"
+} > "$out/llms.txt"
+{
+  echo "# OpenSkopos"
+  echo "$pages" | while IFS='|' read -r source folder title toc description; do
+    [ -n "$source" ] || continue
+    case "$folder" in spec/[0-9]*) [ "$folder" = "spec/$format" ] || continue ;; esac
+    printf '\n\n<!-- %s/%s/ -->\n\n' "$site" "$folder"
+    cat "$out/$folder/index.md"
+  done
+} > "$out/llms-full.txt"
+echo "llms.txt, llms-full.txt: $(wc -c < "$out/llms-full.txt") bytes"
 
 # Make sure that each link from the root of the site goes to a file of the
 # site. The schema files are left out: the deploy adds them from their tags.
