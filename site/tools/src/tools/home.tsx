@@ -1,3 +1,4 @@
+import { next } from "../core";
 import { tools, type Go } from "../nav";
 
 export function Home({ go }: { go: Go }) {
@@ -9,7 +10,7 @@ export function Home({ go }: { go: Go }) {
         <a href="/docs/cli/">skopos command line tool</a>. Your documents never leave your browser.
       </p>
       <ul class="tool-cards">
-        {tools.map((t) => (
+        {tools.filter((t) => t.id !== "history" || next.history).map((t) => (
           <li>
             <a
               href={`/tools/${t.id}/`}
@@ -25,7 +26,7 @@ export function Home({ go }: { go: Go }) {
           </li>
         ))}
       </ul>
-      <p class="muted">Next: History, to read a chain of versions and see which decisions are in force now, and Merge, to combine two drafts into one document.</p>
+      <p class="muted">Next: {next.history ? "" : "History, to read a chain of versions, and "}Merge, to combine two drafts into one document.</p>
     </div>
   );
 }

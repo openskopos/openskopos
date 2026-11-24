@@ -4,13 +4,14 @@ import { core, type Diff, type Document, type Item } from "../core";
 import { versionPair } from "../examples";
 import type { Go, Handoff } from "../nav";
 import { readShared, shareUrl } from "../share";
-import { copy, DocInput, useRead, useStored, type TextFile } from "../ui";
+import { copy, DocInput, hasReadable, Readable, Segmented, useRead, useStored, type TextFile } from "../ui";
 
 const empty: TextFile = { name: "", text: "" };
 
 export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
   const [older, setOlder] = useStored<TextFile>("compare:old", empty);
   const [newer, setNewer] = useStored<TextFile>("compare:new", empty);
+  const [view, setView] = useStored<"changes" | "readable">("compare:view", "changes");
   const a = useRead(older);
   const b = useRead(newer);
 
@@ -66,7 +67,23 @@ export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
       </div>
       {!result && <p class="muted center-text">Add two versions of one document. Core compares their items by ID, the same as <code>skopos diff</code>.</p>}
       {result && "error" in result && <p class="bad-text">{result.error}</p>}
-      {result && "diff" in result && result.diff && <DiffView diff={result.diff} text={result.text!} oldDoc={a!.doc!} newDoc={b!.doc!} />}
+      {result && "diff" in result && hasReadable() && (
+        <Segmented
+          label="Show"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "changes", label: "List of changes" },
+            { value: "readable", label: "Newer version, with changes marked" },
+          ]}
+        />
+      )}
+      {result && "diff" in result && hasReadable() && view === "readable" && (
+        <div class="diff">
+          <Readable doc={b!.doc!} previous={a!.doc!} />
+        </div>
+      )}
+      {result && "diff" in result && result.diff && !(hasReadable() && view === "readable") && <DiffView diff={result.diff} text={result.text!} oldDoc={a!.doc!} newDoc={b!.doc!} />}
     </div>
   );
 }

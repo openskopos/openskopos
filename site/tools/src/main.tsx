@@ -2,12 +2,13 @@
 // keeps the work of the other tabs.
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { core, ready } from "./core";
+import { core, next, ready } from "./core";
 import { tools, type Go, type Handoff, type ToolId } from "./nav";
 import { Validate } from "./tools/validate";
 import { Author } from "./tools/author";
 import { Compare } from "./tools/compare";
 import { AgentFile } from "./tools/agent-file";
+import { History } from "./tools/history";
 import { Home } from "./tools/home";
 import "./tools.css";
 
@@ -16,6 +17,7 @@ const titles: Record<ToolId, string> = {
   validate: "Validate an OpenSkopos document",
   author: "Write an OpenSkopos document",
   compare: "Compare two OpenSkopos versions",
+  history: "The history of OpenSkopos documents",
   "agent-file": "Make an agent file from OpenSkopos documents",
 };
 
@@ -59,7 +61,7 @@ function App({ initial }: { initial: ToolId }) {
     <div class="workbench">
       <div class="toolbar">
         <nav class="tabs" aria-label="Tools">
-          {tools.map((t) => (
+          {tools.filter((t) => t.id !== "history" || next.history || active === "history").map((t) => (
             <a
               id={`tab-${t.id}`}
               href={pathOf(t.id)}
@@ -83,6 +85,7 @@ function App({ initial }: { initial: ToolId }) {
       {panel("validate", <Validate go={go} incoming={incoming("validate")} />)}
       {panel("author", <Author go={go} incoming={incoming("author")} />)}
       {panel("compare", <Compare go={go} incoming={incoming("compare")} />)}
+      {panel("history", <History go={go} incoming={incoming("history")} />)}
       {panel("agent-file", <AgentFile go={go} incoming={incoming("agent-file")} />)}
     </div>
   );

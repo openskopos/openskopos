@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Editor, type EditorHandle } from "./editor";
 import { detectFormat, formatLabel, read, type Format, type ReadResult } from "./doc";
 import { examples, type Example } from "./examples";
-import { core } from "./core";
+import { core, next, type Document } from "./core";
 
 /** State that the browser keeps between visits, in localStorage. */
 export function useStored<T>(key: string, initial: T | (() => T)): [T, (v: T) => void] {
@@ -270,3 +270,46 @@ export function mdSession() {
   session ??= { now: new Date().toISOString().replace(/\.\d+Z$/, "Z"), artifact_id: core.newArtifactId() };
   return session;
 }
+
+let sheetAdded = false;
+/**
+ * The readable view of a document: the HTML of core's renderer, styled by
+ * core's stylesheet with the brand values from tools.css. Shows nothing if
+ * the loaded core has no renderer.
+ */
+export function Readable({ doc, previous }: { doc: Document; previous?: Document }) {
+  const html = useMemo(() => {
+    if (!next.renderHtml) return "";
+    try {
+      return next.renderHtml(doc, { fragment: true, previous });
+    } catch (e) {
+      return `<p class="bad-text">${String((e as Error).message).replace(/[&<>]/g, "")}</p>`;
+    }
+  }, [doc, previous]);
+  if (!sheetAdded && next.stylesheet) {
+    const style = document.createElement("style");
+    style.textContent = next.stylesheet();
+    document.head.prepend(style);
+    sheetAdded = true;
+  }
+  return (
+    <div
+      class="readable"
+      dangerouslySetInnerHTML={{ __html: html }}
+      onClick={(e) => {
+        // The IDs link to their item. Scroll inside the pane, and keep the URL.
+        const a = (e.target as HTMLElement).closest<HTMLAnchorElement>("a.sk-id, a[href^='#']");
+        if (!a) return;
+        const id = a.getAttribute("href")?.slice(1);
+        const el = id && (e.currentTarget as HTMLElement).querySelector<HTMLElement>(`[data-id="${CSS.escape(id)}"]`);
+        if (!el) return;
+        e.preventDefault();
+        el.scrollIntoView({ block: "center", behavior: "smooth" });
+        el.classList.add("sk-flash");
+        setTimeout(() => el.classList.remove("sk-flash"), 1200);
+      }}
+    />
+  );
+}
+
+export const hasReadable = () => !!next.renderHtml;

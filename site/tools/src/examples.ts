@@ -47,4 +47,11 @@ export const versionPair = {
   new: { name: "intent-v3.skopos.json", text: pick(versions, "expected.json") },
 };
 
+/** A chain for History: the critique that version 2 takes as input, then versions 2 and 3. */
+export const historyChain = [
+  { name: "critique.skopos.json", text: pick(valid, "spec-red-team-critique.json") },
+  versionPair.old,
+  versionPair.new,
+];
+
 export const exampleByName = (name: string) => examples.find((e) => e.name === name);

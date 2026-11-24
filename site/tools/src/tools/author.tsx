@@ -8,7 +8,7 @@ import { detectFormat, fileName, formatLabel, formatMime, formats, itemIndex, it
 import { schemaInfo, type Field, type ItemTypeInfo } from "../schema";
 import { readShared, shareUrl } from "../share";
 import type { Go, Handoff } from "../nav";
-import { copy, download, DropArea, ExamplePicker, openFiles, ruleUrl, Segmented, Status, mdSession, useMedia, useStored, type TextFile } from "../ui";
+import { copy, download, DropArea, ExamplePicker, hasReadable, openFiles, Readable, ruleUrl, Segmented, Status, mdSession, useMedia, useStored, type TextFile } from "../ui";
 
 type View = "both" | "cards" | "text";
 
@@ -42,6 +42,8 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
   const [readErrors, setReadErrors] = useState<Mark[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [filter, setFilter] = useState("");
+  const [textSide, setTextSide] = useStored<"source" | "readable">("author:text", "source");
+  const readable = hasReadable() && textSide === "readable" && !!doc;
   const editor = useRef<EditorHandle | null>(null);
   const written = useRef(src.text);
 
@@ -184,13 +186,24 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
         {view !== "cards" && (
           <div class="pane text-pane">
             <div class="pane-head">
-              <span class="file">{name}</span>
-              <Segmented
+              {hasReadable() && (
+                <Segmented
+                  label="Text or readable view"
+                  value={textSide}
+                  onChange={setTextSide}
+                  options={[
+                    { value: "source", label: "Source" },
+                    { value: "readable", label: "Readable" },
+                  ]}
+                />
+              )}
+              {!readable && <span class="file">{name}</span>}
+              {!readable && <Segmented
                 label="Text format"
                 value={src.format}
                 onChange={(f) => (doc && !stale ? commit(doc, f) : setSrc({ ...src, format: f }))}
                 options={formats.map((f) => ({ value: f, label: formatLabel[f] }))}
-              />
+              />}
               <span class="grow" />
               <button type="button" class="btn ghost small" onClick={() => copy(src.text)}>
                 Copy
@@ -199,7 +212,12 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
                 Validate
               </button>
             </div>
-            <div class="pane-body">
+            {readable && (
+              <div class="pane-body scroll">
+                <Readable doc={doc!} />
+              </div>
+            )}
+            <div class="pane-body" hidden={readable}>
               <Editor
                 label="Document source"
                 value={src.text}
@@ -215,7 +233,7 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
                 complete
               />
             </div>
-            <ProblemStrip marks={marks} doc={doc} reveal={(m) => editor.current?.reveal(m.from, m.to)} />
+            {!readable && <ProblemStrip marks={marks} doc={doc} reveal={(m) => editor.current?.reveal(m.from, m.to)} />}
           </div>
         )}
       </div>

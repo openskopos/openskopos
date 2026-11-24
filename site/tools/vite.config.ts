@@ -6,7 +6,7 @@ import { resolve } from "node:path";
 import { defineConfig, type Plugin } from "vite";
 
 const root = import.meta.dirname;
-const tools = ["validate", "author", "compare", "agent-file"];
+const tools = ["validate", "author", "compare", "history", "agent-file"];
 
 // Replaces <!-- header --> in each page with the header of the site, and
 // links the stylesheet of the site. In development, the server also serves

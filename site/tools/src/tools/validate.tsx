@@ -6,7 +6,7 @@ import { describePath, detectFormat, fileName, formatLabel, formatMime, formats,
 import { readShared, shareUrl } from "../share";
 import { schemaInfo } from "../schema";
 import type { Go, Handoff } from "../nav";
-import { copy, download, DropArea, ExamplePicker, openFiles, ruleUrl, Segmented, Status, useRead, useStored, verdictOf, type TextFile } from "../ui";
+import { copy, download, DropArea, ExamplePicker, hasReadable, openFiles, Readable, ruleUrl, Segmented, Status, useRead, useStored, verdictOf, type TextFile } from "../ui";
 import type { Document } from "../core";
 
 type FormatChoice = "auto" | Format;
@@ -14,6 +14,7 @@ type FormatChoice = "auto" | Format;
 export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
   const [file, setFile] = useStored<TextFile>("validate:file", { name: "", text: "" });
   const [choice, setChoice] = useState<FormatChoice>("auto");
+  const [side, setSide] = useStored<"report" | "readable">("validate:side", "report");
   const editor = useRef<EditorHandle | null>(null);
 
   const detected = useMemo(() => detectFormat(file.text, file.name), [file.text, file.name]);
@@ -78,7 +79,24 @@ export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
       <aside class="pane report" aria-label="Report">
         <div class="pane-head">
           <Status verdict={verdict} count={result?.problems.length} />
+          <span class="grow" />
+          {hasReadable() && result?.doc && (
+            <Segmented
+              label="Show"
+              value={side}
+              onChange={setSide}
+              options={[
+                { value: "report", label: "Report" },
+                { value: "readable", label: "Readable" },
+              ]}
+            />
+          )}
         </div>
+        {hasReadable() && result?.doc && side === "readable" ? (
+          <div class="pane-body scroll">
+            <Readable doc={result.doc} />
+          </div>
+        ) : (
         <div class="pane-body scroll">
           {verdict === "empty" && <p class="muted pad">Paste, drop or open a document. The check runs on every change.</p>}
           {result?.doc && <Summary doc={result.doc} />}
@@ -94,6 +112,7 @@ export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
           )}
           {result?.doc && <Actions doc={result.doc} valid={verdict === "valid"} format={format} file={file} go={go} replace={(f) => open(f)} />}
         </div>
+        )}
       </aside>
     </div>
   );
