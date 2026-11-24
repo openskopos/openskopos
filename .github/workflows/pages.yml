@@ -16,6 +16,7 @@ on:
       - "crates/*/README.md"
       - "npm/*/README.md"
       - "conformance/README.md"
+      - "RELEASES.md"
       - ".github/workflows/pages.yml"
       - "conformance/valid/**"
       - "conformance/invalid/**"

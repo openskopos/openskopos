@@ -7,6 +7,7 @@ the format.
 ## Start here
 
 - [Install the skopos tool](install.md) on macOS, Linux or Windows.
+- [Changelog](../RELEASES.md): what each release added, changed and removed.
 - [Editor support](editors.md): get validation and completion for your
   documents in your editor.
 

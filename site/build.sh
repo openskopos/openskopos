@@ -35,6 +35,7 @@ cp brand/avatar-512-light.png "$out/og.png"
 pages='
 spec/0.2/README.md|spec/0.2|Specification 0.2||The OpenSkopos specification 0.2: the file format for the decisions that a team makes before an AI agent builds the work.
 spec/0.1/README.md|spec/0.1|Specification 0.1||The OpenSkopos specification 0.1: the file format for the decisions that a team makes before an AI agent builds the work.
+RELEASES.md|changelog|Changelog||What each OpenSkopos release added, changed and removed: the format, the skopos command line tool, the Rust crates and the npm packages.
 spec/CHANGELOG.md|spec/changelog|Changelog of the format||The changes to the OpenSkopos format, by format version.
 docs/README.md|docs|Documentation||How to use OpenSkopos documents and the skopos tool for spec-driven development.
 docs/install.md|docs/install|Install the skopos tool||Install the skopos command line tool on macOS, Linux or Windows, with Homebrew, an install script, Cargo or npm.
@@ -48,6 +49,10 @@ npm/cli/README.md|docs/npm-cli|The @openskopos/cli npm package||
 conformance/README.md|docs/conformance|Conformance cases||
 '
 
+# The released versions, newest first, from the headings of RELEASES.md. The
+# install page gets them for its version picker (site/install.js).
+versions=$(sed -n 's/^## \([0-9][0-9.]*\)$/\1/p' RELEASES.md | tr '\n' ' ' | sed 's/ $//')
+
 echo "$pages" | while IFS='|' read -r source folder title toc description; do
   [ -n "$source" ] || continue
   mkdir -p "$out/$folder"
@@ -60,6 +65,9 @@ echo "$pages" | while IFS='|' read -r source folder title toc description; do
     --metadata folder="$folder" \
     --metadata description="$description" \
     --output "$out/$folder/index.html"
+  if [ "$folder" = docs/install ]; then
+    set -- "$@" --metadata versions="$versions"
+  fi
   if [ "$toc" = toc ]; then
     set -- "$@" --toc --toc-depth 3
   fi

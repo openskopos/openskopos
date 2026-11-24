@@ -6,6 +6,10 @@
 --
 -- So the same Markdown files work on GitHub and on the site.
 --
+-- In the changelog (RELEASES.md), it gives each version heading the stable
+-- ID v<version>, such as v0.2.0, and each section under it an ID such as
+-- v0.2.0-added.
+--
 -- It also marks the code in tables that must not break across lines (see
 -- Table at the end of this file).
 
@@ -13,6 +17,7 @@ local pages = {
   ["spec/0.2/README.md"] = "/spec/0.2/",
   ["spec/0.1/README.md"] = "/spec/0.1/",
   ["spec/CHANGELOG.md"] = "/spec/changelog/",
+  ["RELEASES.md"] = "/changelog/",
   ["docs/README.md"] = "/docs/",
   ["docs/install.md"] = "/docs/install/",
   ["docs/editors.md"] = "/docs/editors/",
@@ -73,4 +78,19 @@ function Table(tbl)
       return code
     end,
   })
+end
+
+-- The stable IDs of the changelog headings.
+if source == "RELEASES.md" then
+  local version = nil
+  function Header(h)
+    local text = pandoc.utils.stringify(h.content)
+    if h.level == 2 then
+      version = "v" .. text
+      h.identifier = version
+    elseif h.level == 3 and version then
+      h.identifier = version .. "-" .. text:lower():gsub("%s+", "-")
+    end
+    return h
+  end
 end

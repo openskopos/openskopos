@@ -84,8 +84,10 @@ or [RELEASES.md](RELEASES.md) has no entry for that version.
 1. Change the version of all crates and both `package.json` files, also the
    dependency of `@openskopos/cli` on `@openskopos/core`. Run `cargo update
    --workspace` and `node scripts/check-versions.mjs`.
-2. Add a section for the version to [RELEASES.md](RELEASES.md). The GitHub
-   release uses it as its notes.
+2. Add a section `## x.y.z` for the version to [RELEASES.md](RELEASES.md),
+   with the sections `### Added`, `### Changed` and `### Removed` that have
+   entries. The GitHub release uses it as its notes, and the site shows it
+   at /changelog/ and in the version picker of the install page.
 3. Merge the change, then push the tag, for example `v0.2.1`. The Release
    workflow builds the binaries, makes the GitHub release, updates the
    Homebrew formula, publishes the crates and stages the npm packages. For a
