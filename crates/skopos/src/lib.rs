@@ -67,7 +67,7 @@ pub enum Stream {
 #[command(
     name = "skopos",
     version,
-    about = "Check, format, convert, import, export and compare OpenSkopos documents"
+    about = "Check, format, convert, import, export, compare and render OpenSkopos documents"
 )]
 struct Cli {
     #[command(subcommand)]
@@ -191,7 +191,14 @@ enum Command {
     /// The view has the title and summary, one line for each item with its
     /// ID, and the details of each item. With --previous, it also marks the
     /// items that were added and changed, shows the changed words, and lists
-    /// the items that were removed. See docs/render.md.
+    /// the items that were removed.
+    ///
+    /// The text has colors only in a terminal. In a pipe, a file, or with
+    /// NO_COLOR set, it is plain text: `+` marks an added item, `~` a changed
+    /// item, and changed words are `[-old-]` and `{+new+}`.
+    ///
+    /// The HTML class names and CSS custom properties are at
+    /// https://openskopos.org/docs/render/
     Render {
         /// A JSON, YAML or Markdown file
         file: PathBuf,
