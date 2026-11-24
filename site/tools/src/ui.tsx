@@ -24,13 +24,23 @@ export function useStored<T>(key: string, initial: T | (() => T)): [T, (v: T) =>
   return [value, set];
 }
 
-/** A value that follows another value after a short pause. */
-export function useDebounced<T>(value: T, ms = 120): T {
+/**
+ * A value that follows another value after a short pause, and at least every
+ * maxWait milliseconds while it keeps changing, so a check also runs during
+ * long typing.
+ */
+export function useDebounced<T>(value: T, ms = 150, maxWait = 600): T {
   const [v, setV] = useState(value);
+  const since = useRef<number | null>(null);
   useEffect(() => {
-    const t = setTimeout(() => setV(value), ms);
+    since.current ??= Date.now();
+    const wait = Math.max(0, Math.min(ms, since.current + maxWait - Date.now()));
+    const t = setTimeout(() => {
+      since.current = null;
+      setV(value);
+    }, wait);
     return () => clearTimeout(t);
-  }, [value, ms]);
+  }, [value, ms, maxWait]);
   return v;
 }
 

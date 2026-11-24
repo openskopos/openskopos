@@ -47,10 +47,15 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
   const editor = useRef<EditorHandle | null>(null);
   const written = useRef(src.text);
 
-  // Text typed in the editor: read it after a short pause.
+  // Text typed in the editor: read it after a short pause, and at least
+  // every 600 ms while the person keeps typing.
+  const pendingSince = useRef<number | null>(null);
   useEffect(() => {
     if (src.text === written.current) return;
+    pendingSince.current ??= Date.now();
+    const wait = Math.max(0, Math.min(150, pendingSince.current + 600 - Date.now()));
     const t = setTimeout(() => {
+      pendingSince.current = null;
       if (!src.text.trim()) {
         setDoc(undefined);
         setReadErrors([]);
@@ -61,7 +66,7 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
         setDoc(r.doc);
         setReadErrors([]);
       } else setReadErrors(r.marks);
-    }, 180);
+    }, wait);
     return () => clearTimeout(t);
   }, [src.text, src.format]);
 
@@ -209,7 +214,7 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
                 Copy
               </button>
               <button type="button" class="btn ghost small" onClick={() => go("validate", { name, text: src.text })}>
-                Validate
+                Open in Validate
               </button>
             </div>
             {readable && (

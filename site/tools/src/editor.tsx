@@ -54,6 +54,10 @@ const theme = EditorView.theme({
   ".cm-completionInfo": { fontFamily: "var(--sans)", fontSize: "13px", maxWidth: "320px", padding: "6px 10px" },
   ".cm-foldGutter span": { color: "var(--faint)" },
   ".cm-lint-marker": { width: "0.8em", height: "0.8em" },
+  // CodeMirror parses a long file lazily, so a brace whose partner is not
+  // parsed yet counts as unmatched and turned red on a valid file. Core
+  // reports real syntax errors, so this mark stays neutral.
+  "&.cm-focused .cm-nonmatchingBracket": { backgroundColor: "transparent" },
   ".cm-highlight-flash": { backgroundColor: "color-mix(in oklab, var(--dot) 18%, transparent)", transition: "background-color 1s" },
 });
 
@@ -163,6 +167,9 @@ export function Editor({ value, format, onChange, marks = [], readOnly = false, 
       let end = 0;
       while (end < max - start && old.charCodeAt(old.length - 1 - end) === value.charCodeAt(value.length - 1 - end)) end++;
       v.dispatch({ changes: { from: start, to: old.length - end, insert: value.slice(start, value.length - end) }, annotations: external.of(true) });
+      // Problems of the old text do not belong to the new one. The marks of
+      // the new text follow when core has read it.
+      v.dispatch(setDiagnostics(v.state, []));
     }
   }, [value]);
 
@@ -188,7 +195,9 @@ export function Editor({ value, format, onChange, marks = [], readOnly = false, 
       };
     });
     v.dispatch(setDiagnostics(v.state, diagnostics));
-  }, [marks, value]);
+    // Not on every change of the text: while the person types, CodeMirror
+    // moves the marks with the text until core has read the new text.
+  }, [marks]);
 
   return <div class="editor" ref={host} />;
 }
