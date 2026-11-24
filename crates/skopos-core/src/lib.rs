@@ -52,6 +52,7 @@ pub mod markdown;
 pub mod merge;
 pub mod model;
 mod order;
+pub mod render;
 pub mod rules;
 mod schema;
 mod text;

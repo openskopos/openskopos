@@ -577,6 +577,60 @@ fn diff_names_items_by_id() {
 }
 
 #[test]
+fn render_shows_text_and_html() {
+    let old = fixture("spec-v2.json");
+    let new = valid("spec-all-types-v3.json");
+    let out = skopos(&["render", &new, "--previous", &old, "--width", "60"]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let text = String::from_utf8(out.stdout).unwrap();
+    // Not a terminal: no colors.
+    assert!(!text.contains('\x1b'), "{text}");
+    assert!(
+        text.contains("Since version 2: 6 added, 5 changed, 1 superseded."),
+        "{text}"
+    );
+    assert!(text.lines().all(|l| l.chars().count() <= 60), "{text}");
+
+    let dir = temp_dir("render");
+    let css = dir.join("brand.css");
+    fs::write(&css, ":root { --sk-accent: #e8512f; }").unwrap();
+    let page = dir.join("spec.html");
+    let out = skopos(&[
+        "render",
+        &new,
+        "--html",
+        "--css",
+        css.to_str().unwrap(),
+        "-o",
+        page.to_str().unwrap(),
+    ]);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    let html = fs::read_to_string(&page).unwrap();
+    assert!(html.starts_with("<!doctype html>"));
+    assert!(html.contains("--sk-ink"));
+    assert!(html.contains(":root { --sk-accent: #e8512f; }"));
+    assert!(html.contains("id=\"FR4\""));
+
+    let out = skopos(&["render", &new, "--html", "--fragment"]);
+    let frag = String::from_utf8(out.stdout).unwrap();
+    assert!(frag.starts_with("<article class=\"sk-doc\""), "{frag}");
+
+    // --no-style needs --html.
+    assert_eq!(
+        skopos(&["render", &new, "--no-style"]).status.code(),
+        Some(2)
+    );
+}
+
+#[test]
 fn history_and_trace_read_versions_in_any_order_and_format() {
     let case = conformance().join("history/01-three-versions");
     let dir = temp_dir("history");

@@ -186,6 +186,13 @@ const cases = [
   ["merge", "--pair", "G1=G1", "c/merge/05-two-drafts/main.json", "c/merge/05-two-drafts/other.json"],
   ["merge", "--pair", "G1", "c/merge/05-two-drafts/main.json", "c/merge/05-two-drafts/other.json"],
   ["resolve", "c/merge/02-edit-edit/expected.json", "G1"],
+  // render
+  ...valid.flatMap((f) => [["render", f], ["render", f, "--html"]]),
+  ["render", valid[1], "--previous", valid[0], "--width", "60"],
+  ["render", valid[0], "--html", "--fragment"],
+  ["render", valid[0], "--html", "--no-style", "-o", "page.html"],
+  ["render", invalid[0]],
+  ["render", valid[0], "--fragment"],
 ];
 
 // Commands that run twice in the same folder: the second export finds the

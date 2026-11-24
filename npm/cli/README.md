@@ -41,6 +41,7 @@ The package needs Node 20 or later.
 | `skopos merge MAIN OTHER [--base FILE]` | Merges two documents into the next version of main. |
 | `skopos conflicts FILE` | Lists the open conflicts of a merged document. |
 | `skopos resolve FILE ID` | Accepts an item of a conflict and rejects the other. |
+| `skopos render FILE [--html]` | Shows a document for people, as text or as an HTML page. |
 
 For the flags, run `skopos --help` or `skopos <command> --help`. The
 [README of the native tool](https://github.com/openskopos/openskopos/blob/main/crates/skopos/README.md)

@@ -105,6 +105,9 @@ worker.
 | `merge(main, other, options?)` | Merges two documents into the next version of main. The options are `base`, `pairs` (a list of `[mainId, otherId]`) and `now`. Returns `{ doc, pairs, conflicts, renamed, envelope }`. Without `base` or `pairs`, items of the same type with similar text pair, and `pairs` returns them for people to confirm. `mergeText(main, other, options?)` returns the summary as text. |
 | `conflicts(doc)` | Lists the open conflicts of a merged document: `{ main, other, fields }`. `resolve(doc, id)` accepts the item and rejects the other item of its pair, and returns `{ doc, accepted, rejected }`. |
 | `wordDiff(old, new)` | Compares two texts word by word. Returns a list of `{ op, text }`, where `op` is `"same"`, `"del"` or `"ins"`. Each changed item of `diff` has the same list for its text as `text_spans`, and for its other text fields in `field_spans`. Each conflict of `merge` has `text_spans` from main's text to the other's text, and `base_text` in a merge with a base. |
+| `renderHtml(doc, options?)` | Renders a document as HTML. The options are `previous` (an earlier version, to mark what changed), `fragment` (only the `<article class="sk-doc">` element), `style` (default `true`) and `css`. Each item element has its ID as `id` and `data-id`. See [docs/render.md](https://github.com/openskopos/openskopos/blob/main/docs/render.md). |
+| `stylesheet()` | Returns the default CSS of `renderHtml`. Every color and font is a `--sk-*` custom property. |
+| `renderTerminal(doc, options?)` | Renders a document as text for a terminal. The options are `previous`, `color` (default `false`) and `width` (default 80). |
 | `newArtifactId()` | Returns a new random artifact ID, for example `pa_7Hk2mQ9xR4tV8wZ1`. |
 | `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.1 as text, and its URL. |
 | `rules()` | Returns the names of the four rules in section 9. |

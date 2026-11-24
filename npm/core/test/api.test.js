@@ -22,9 +22,12 @@ import init, {
   nextVersion,
   parse,
   parseItemId,
+  renderHtml,
+  renderTerminal,
   sameContent,
   schema,
   schemaUrl,
+  stylesheet,
   toJson,
   toYaml,
   wordDiff,
@@ -209,6 +212,28 @@ test("merge, mergeText, conflicts and resolve", () => {
   const split = merge(a, b, { pairs: [["G1", "G1"]] });
   assert.deepEqual(split.conflicts, []);
   assert.throws(() => merge(a, b, { pairs: [["G1", "G9"]] }), { name: "SkoposError" });
+});
+
+test("renderHtml, renderTerminal and stylesheet", () => {
+  const dir = "markdown/next-version/01-edit-final-version/";
+  const a = json(`${dir}stored.json`);
+  const b = json(`${dir}expected.json`);
+  const page = renderHtml(b);
+  assert.ok(page.startsWith("<!doctype html>"));
+  assert.ok(page.includes(stylesheet()));
+  const frag = renderHtml(b, { fragment: true, previous: a });
+  assert.ok(frag.startsWith('<article class="sk-doc"'));
+  assert.ok(!frag.includes("<style"));
+  assert.match(frag, /class="sk-since"/);
+  for (const item of b.items) assert.ok(frag.includes(` id="${item.id}" data-id="${item.id}"`));
+  assert.ok(!renderHtml(b, { style: false }).includes("--sk-ink"));
+  assert.ok(renderHtml(b, { style: false, css: ".x{}" }).includes(".x{}"));
+  assert.throws(() => renderHtml(b, { fragment: "yes" }), TypeError);
+  assert.match(stylesheet(), /--sk-accent:/);
+  const text = renderTerminal(b, { previous: a, width: 50 });
+  assert.ok(!text.includes("\x1b"));
+  assert.ok(text.split("\n").every((l) => [...l].length <= 50));
+  assert.ok(renderTerminal(b, { color: true }).includes("\x1b["));
 });
 
 // A host with files in memory, for runCli.

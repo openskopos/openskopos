@@ -426,6 +426,37 @@ also set `status` in any editor.
 skopos resolve merged.skopos.json FR3
 ```
 
+### render
+
+`skopos render` shows a document for people to read: text in the terminal, or
+an HTML page with `--html`. With `--previous`, it marks what changed since an
+earlier version.
+
+```bash
+skopos render spec.skopos.yaml
+skopos render spec-v3.skopos.json --previous spec-v2.skopos.json --html -o spec.html
+```
+
+```
+Σ• Spec · version 3 · draft
+Spec: seat limits on plan changes
+
+17 items: 15 accepted, 1 proposed, 1 rejected.
+Since version 2: 6 added, 5 changed, 1 superseded.
+
+Requirements (2)
++ FR4  A plan change that leaves more seats in use than the new limit is
+       blocked. [must]
+       supersedes: FR2
+  FR3  The seat count never goes below zero. [should]
+```
+
+The text has colors only when the output is a terminal and `NO_COLOR` is not
+set. `--width` sets the width of a line. For HTML, `--no-style` leaves out the
+default stylesheet, `--css FILE` adds your CSS, and `--fragment` writes only
+the document element. See [docs/render.md](../../docs/render.md) for the
+class names and the CSS custom properties.
+
 ## License
 
 [Apache License 2.0](../../LICENSE)

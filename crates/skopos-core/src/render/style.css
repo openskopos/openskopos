@@ -1,0 +1,189 @@
+/* OpenSkopos document view. Every color and font is a custom property.
+   The defaults use :where(), so any rule that sets a property wins. */
+:where(:root) {
+  color-scheme: light dark;
+  --sk-font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --sk-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+  --sk-ink: #242433;
+  --sk-muted: #6b6b7d;
+  --sk-bg: #ffffff;
+  --sk-surface: #f6f5f1;
+  --sk-line: #e3e1da;
+  --sk-accent: #e8512f;
+  --sk-del: #b42318;
+  --sk-del-bg: #fde8e5;
+  --sk-ins: #116329;
+  --sk-ins-bg: #e3f4e7;
+  --sk-proposed: #8a5a00;
+  --sk-proposed-bg: #fff3d6;
+  --sk-width: 46rem;
+  --sk-id-width: 3.25rem;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root) {
+    --sk-ink: #fafafa;
+    --sk-muted: #a1a1aa;
+    --sk-bg: #18181b;
+    --sk-surface: #232327;
+    --sk-line: #34343a;
+    --sk-accent: #ff6848;
+    --sk-del: #ff8a80;
+    --sk-del-bg: #3d1f1c;
+    --sk-ins: #7ee2a0;
+    --sk-ins-bg: #173322;
+    --sk-proposed: #f5c26b;
+    --sk-proposed-bg: #3a2d12;
+  }
+}
+
+.sk-page {
+  margin: 0;
+  background: var(--sk-bg);
+}
+.sk-doc {
+  box-sizing: border-box;
+  max-width: var(--sk-width);
+  margin: 0 auto;
+  padding: 3rem 1.25rem 4rem;
+  color: var(--sk-ink);
+  background: var(--sk-bg);
+  font: 1rem/1.6 var(--sk-font);
+}
+.sk-doc *, .sk-doc *::before, .sk-doc *::after { box-sizing: inherit; }
+.sk-doc a { color: inherit; text-decoration-color: var(--sk-line); text-underline-offset: 0.2em; }
+.sk-doc a:hover { text-decoration-color: var(--sk-accent); }
+.sk-doc code { font-family: var(--sk-mono); font-size: 0.875em; }
+
+/* Header */
+.sk-eyebrow {
+  margin: 0 0 0.5rem;
+  color: var(--sk-muted);
+  font-size: 0.875rem;
+}
+.sk-eyebrow > * + *::before { content: "\00b7"; margin: 0 0.5em; color: var(--sk-line); }
+.sk-kind::before { content: ""; display: inline-block; width: 0.5em; height: 0.5em; margin-right: 0.5em; border-radius: 50%; background: var(--sk-accent); vertical-align: 0.1em; }
+.sk-title { margin: 0 0 1rem; font-size: 2rem; line-height: 1.2; font-weight: 600; letter-spacing: -0.01em; }
+.sk-summary { font-size: 1.125rem; }
+.sk-summary p { margin: 0 0 0.75rem; }
+.sk-overview, .sk-since, .sk-note { margin: 0.25rem 0; color: var(--sk-muted); font-size: 0.875rem; }
+.sk-since { color: var(--sk-ink); }
+.sk-header { padding-bottom: 1.5rem; border-bottom: 1px solid var(--sk-line); }
+
+/* Sections and items */
+.sk-section { margin-top: 2.25rem; }
+.sk-section-title {
+  margin: 0 0 0.75rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sk-muted);
+}
+.sk-count { font-weight: 400; margin-left: 0.25em; }
+.sk-items { list-style: none; margin: 0; padding: 0; }
+.sk-item {
+  position: relative;
+  padding: 0.6rem 0 0.6rem 0.9rem;
+  border-left: 2px solid transparent;
+  scroll-margin-top: 1rem;
+}
+.sk-item + .sk-item { border-top: 1px solid var(--sk-line); }
+.sk-item:target { background: var(--sk-surface); border-left-color: var(--sk-accent); }
+/* A hanging indent: the ID floats in the margin, so wrapped text and the
+   details line up after it. The space after the ID starts the line box and
+   is dropped. */
+.sk-line { margin: 0; padding-left: var(--sk-id-width); }
+.sk-item > :not(.sk-line) { margin-left: var(--sk-id-width); }
+.sk-id {
+  float: left;
+  width: var(--sk-id-width);
+  margin-left: calc(-1 * var(--sk-id-width));
+  font-family: var(--sk-mono);
+  font-size: 0.8125em;
+  line-height: 1.97;
+  color: var(--sk-muted);
+  text-decoration: none;
+  overflow-wrap: anywhere;
+}
+.sk-doc a.sk-id { text-decoration: none; }
+.sk-doc a.sk-id:hover { color: var(--sk-accent); }
+.sk-badges { white-space: nowrap; }
+.sk-badge {
+  display: inline-block;
+  padding: 0 0.45em;
+  border: 1px solid var(--sk-line);
+  border-radius: 0.3em;
+  color: var(--sk-muted);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  vertical-align: 0.1em;
+}
+.sk-badge[data-value="proposed"] { color: var(--sk-proposed); background: var(--sk-proposed-bg); border-color: transparent; }
+.sk-badge[data-value="rejected"] { color: var(--sk-del); border-color: currentColor; }
+.sk-badge[data-field="blocking"], .sk-badge[data-value="blocker"], .sk-badge[data-value="must"] { color: var(--sk-ink); border-color: var(--sk-muted); }
+.sk-item--rejected > .sk-line .sk-text { color: var(--sk-muted); }
+.sk-item--superseded > .sk-line .sk-text { color: var(--sk-muted); text-decoration: line-through; text-decoration-color: var(--sk-muted); }
+.sk-by, .sk-changed { color: var(--sk-muted); font-size: 0.875rem; }
+.sk-changed { margin: 0.15rem 0 0; }
+.sk-ref { font-family: var(--sk-mono); font-size: 0.875em; }
+
+/* Red lines */
+.sk-doc ins { color: var(--sk-ins); background: var(--sk-ins-bg); text-decoration: none; border-radius: 0.2em; }
+.sk-doc del { color: var(--sk-del); background: var(--sk-del-bg); text-decoration: line-through; border-radius: 0.2em; }
+.sk-item--added { border-left-color: var(--sk-ins); }
+.sk-item--changed { border-left-color: var(--sk-accent); }
+.sk-item--dropped, .sk-item--superseded[data-change] { border-left-color: var(--sk-del); }
+
+/* Details */
+.sk-details { margin-top: 0.25rem; }
+.sk-details > summary {
+  width: max-content;
+  color: var(--sk-muted);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.sk-details > summary:hover { color: var(--sk-ink); }
+.sk-details[open] > summary { margin-bottom: 0.4rem; }
+.sk-fields, .sk-meta {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 0.25rem 1rem;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+.sk-fields dt, .sk-meta dt { color: var(--sk-muted); }
+.sk-fields dd, .sk-meta dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.sk-fields ul, .sk-meta ul { margin: 0; padding-left: 1.1em; }
+.sk-detail { margin-top: 0.5rem; padding: 0.5rem 0.75rem; background: var(--sk-surface); border-radius: 0.375rem; font-size: 0.9375rem; }
+.sk-detail p { margin: 0.25rem 0; }
+
+/* Footer */
+.sk-footer { margin-top: 3rem; padding-top: 1.25rem; border-top: 1px solid var(--sk-line); }
+.sk-meta { font-size: 0.8125rem; }
+
+@media (max-width: 32rem) {
+  .sk-doc { padding-top: 1.5rem; }
+  .sk-title { font-size: 1.5rem; }
+  :where(:root) { --sk-id-width: 2.75rem; }
+  .sk-fields, .sk-meta { grid-template-columns: 1fr; gap: 0; }
+  .sk-fields dd, .sk-meta dd { margin-bottom: 0.4rem; }
+}
+
+@media print {
+  :where(:root) {
+    --sk-ink: #000;
+    --sk-muted: #555;
+    --sk-bg: #fff;
+    --sk-surface: #fff;
+    --sk-line: #ccc;
+  }
+  .sk-doc { max-width: none; padding: 0; font-size: 10.5pt; }
+  .sk-details { display: none; }
+  .sk-appendix[hidden] { display: block; }
+  .sk-appendix { break-before: page; }
+  .sk-appendix-item { break-inside: avoid; margin-bottom: 0.75rem; }
+  .sk-appendix-item h3 { margin: 0 0 0.25rem; font-size: 1em; }
+  .sk-item { break-inside: avoid; }
+  .sk-section-title { break-after: avoid; }
+  .sk-doc a { text-decoration: none; }
+}

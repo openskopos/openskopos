@@ -31,6 +31,7 @@ use serde::Serialize;
 use serde_json::Value;
 use skopos_core::export::{self, Options, Tool};
 use skopos_core::markdown::{self, Fill, Warning};
+use skopos_core::render::{self, HtmlOptions, TerminalOptions};
 use skopos_core::{AssignedId, Format, Problem};
 use wasm_bindgen::prelude::*;
 
@@ -365,6 +366,36 @@ export interface ResolveResult {
   doc: Document;
   accepted: string;
   rejected: string;
+}
+
+/** Options for `renderHtml`. */
+export interface RenderHtmlOptions {
+  /**
+   * An earlier version of the artifact. The view then marks the items that
+   * were added and changed, shows the changed words, and lists the items
+   * that were removed.
+   */
+  previous?: Document;
+  /**
+   * Give only the `<article class="sk-doc">` element, to put in a page of
+   * your own: no `<html>`, `<head>` or `<style>`. Use `stylesheet()` for the
+   * CSS. Default: false.
+   */
+  fragment?: boolean;
+  /** Put the default stylesheet in the page. Default: true. */
+  style?: boolean;
+  /** More CSS to put in the page, after the default stylesheet. */
+  css?: string;
+}
+
+/** Options for `renderTerminal`. */
+export interface RenderTerminalOptions {
+  /** An earlier version of the artifact, as for `renderHtml`. */
+  previous?: Document;
+  /** Use ANSI colors. Default: false. */
+  color?: boolean;
+  /** The width of a line, in characters. Default: 80. */
+  width?: number;
 }
 
 /**
@@ -1172,4 +1203,75 @@ pub fn run_cli(args: Vec<String>, host: CliHost) -> u8 {
     let mut host = JsHost { js: host, platform };
     let argv = std::iter::once("skopos".to_string()).chain(args);
     skopos::run(argv, &mut host)
+}
+
+// ------------------------------------------------------------------ render
+
+/// The `previous` document of a render options object, if it is there.
+fn option_previous(options: &Option<Value>) -> Option<&Value> {
+    options.as_ref()?.get("previous").filter(|v| !v.is_null())
+}
+
+fn option_bool(options: &Option<Value>, key: &str) -> Result<Option<bool>, JsValue> {
+    match options.as_ref().and_then(|o| o.get(key)) {
+        None | Some(Value::Null) => Ok(None),
+        Some(Value::Bool(b)) => Ok(Some(*b)),
+        Some(_) => Err(type_error(&format!("options.{key} must be true or false"))),
+    }
+}
+
+/// Renders a document as HTML: one self-contained page, or with
+/// `fragment: true` only the `<article class="sk-doc">` element. Each item
+/// element has the item ID as its `id` and `data-id`. The class names are in
+/// docs/render.md.
+#[wasm_bindgen(js_name = renderHtml)]
+pub fn render_html(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "RenderHtmlOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let doc = from_js(&doc, "doc")?;
+    let options = from_js_opt(&options, "options")?;
+    let css = option_string(&options, "css");
+    Ok(render::html(
+        &doc,
+        &HtmlOptions {
+            previous: option_previous(&options),
+            fragment: option_bool(&options, "fragment")?.unwrap_or(false),
+            style: option_bool(&options, "style")?.unwrap_or(true),
+            css: css.as_deref(),
+        },
+    ))
+}
+
+/// Renders a document as text for a terminal, with ANSI colors if
+/// `color` is true.
+#[wasm_bindgen(js_name = renderTerminal)]
+pub fn render_terminal(
+    #[wasm_bindgen(unchecked_param_type = "Document")] doc: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "RenderTerminalOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    let doc = from_js(&doc, "doc")?;
+    let options = from_js_opt(&options, "options")?;
+    let width = match options.as_ref().and_then(|o| o.get("width")) {
+        None | Some(Value::Null) => 80,
+        Some(n) => n
+            .as_u64()
+            .and_then(|n| usize::try_from(n).ok())
+            .ok_or_else(|| type_error("options.width must be a whole number"))?,
+    };
+    Ok(render::terminal(
+        &doc,
+        &TerminalOptions {
+            previous: option_previous(&options),
+            color: option_bool(&options, "color")?.unwrap_or(false),
+            width,
+        },
+    ))
+}
+
+/// The default stylesheet of `renderHtml`. Every color and font is a
+/// `--sk-*` custom property; set them on `:root` to change them.
+#[wasm_bindgen]
+pub fn stylesheet() -> String {
+    render::STYLESHEET.to_string()
 }
