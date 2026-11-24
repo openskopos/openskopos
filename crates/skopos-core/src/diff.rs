@@ -16,6 +16,8 @@ use std::fmt::{self, Write as _};
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
+use crate::words::{word_diff, Span};
+
 /// The envelope fields that a diff does not compare. They describe how a
 /// version was made, not what it says (specification 10.8).
 /// `id_counters` changes with every new item, so it is left out too.
@@ -63,6 +65,14 @@ pub struct ChangedItem {
     /// The new `status`, if the status changed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status_to: Option<String>,
+    /// If `text` changed: the old and new text, word by word.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_spans: Option<Vec<Span>>,
+    /// Each other changed field with a text value in either version, word
+    /// by word. A field that is in one version only counts as empty text in
+    /// the other. `status` is not here.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub field_spans: BTreeMap<String, Vec<Span>>,
 }
 
 /// An item of the old version that the new version replaces.
@@ -371,6 +381,31 @@ pub fn diff(a: &Value, b: &Value) -> Diff {
                 } else {
                     (None, None)
                 };
+                let mut text_spans = None;
+                let mut field_spans = BTreeMap::new();
+                for f in &fields {
+                    if f == "status" {
+                        continue;
+                    }
+                    let (old, new) = (old_item.get(f), item.get(f));
+                    fn as_text(v: Option<&Value>) -> Option<&str> {
+                        match v {
+                            None => Some(""),
+                            Some(v) => v.as_str(),
+                        }
+                    }
+                    let (Some(o), Some(n)) = (as_text(old), as_text(new)) else {
+                        continue;
+                    };
+                    if old.is_none() && new.is_none() {
+                        continue;
+                    }
+                    if f == "text" {
+                        text_spans = Some(word_diff(o, n));
+                    } else {
+                        field_spans.insert(f.clone(), word_diff(o, n));
+                    }
+                }
                 let s = summary(id, item);
                 changed.push(ChangedItem {
                     id: s.id,
@@ -379,6 +414,8 @@ pub fn diff(a: &Value, b: &Value) -> Diff {
                     fields,
                     status_from,
                     status_to,
+                    text_spans,
+                    field_spans,
                 });
             }
         }
@@ -514,6 +551,27 @@ mod tests {
             refs(json!([{"item": "A1", "rel": "depends_on"}, {"item": "A1", "rel": "depends_on"}]));
         assert!(diff(&a, &b).is_empty());
         assert_eq!(diff(&a, &c).changed[0].fields, vec!["refs"]);
+    }
+
+    #[test]
+    fn changed_text_fields_come_word_by_word() {
+        let a = json!({"id": "pa_1", "items": [
+            {"id": "D1", "type": "decision", "text": "Count seats every hour.", "status": "proposed",
+             "rationale": "Cheap.", "alternatives": ["x"]}
+        ]});
+        let b = json!({"id": "pa_1", "items": [
+            {"id": "D1", "type": "decision", "text": "Count seats at once.", "status": "accepted",
+             "decided_by": "Ana", "alternatives": ["y"]}
+        ]});
+        let c = &diff(&a, &b).changed[0];
+        let spans = c.text_spans.as_ref().unwrap();
+        assert_eq!(spans[1].text, "every hour.");
+        assert_eq!(spans[2].text, "at once.");
+        // Removed and added text fields, but not status or lists.
+        let keys: Vec<&str> = c.field_spans.keys().map(String::as_str).collect();
+        assert_eq!(keys, ["decided_by", "rationale"]);
+        assert_eq!(c.field_spans["rationale"][0].op, crate::words::Op::Del);
+        assert_eq!(c.field_spans["decided_by"][0].op, crate::words::Op::Ins);
     }
 
     #[test]

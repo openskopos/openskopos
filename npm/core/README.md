@@ -104,6 +104,7 @@ worker.
 | `trace(docs, reference)` | Returns the history of one item, from a reference string such as `pa_2Xc5Rv8Tn1Mb4Kz7#FR2`. `traceText(docs, reference)` returns it as text, with the items that replace it and why. |
 | `merge(main, other, options?)` | Merges two documents into the next version of main. The options are `base`, `pairs` (a list of `[mainId, otherId]`) and `now`. Returns `{ doc, pairs, conflicts, renamed, envelope }`. Without `base` or `pairs`, items of the same type with similar text pair, and `pairs` returns them for people to confirm. `mergeText(main, other, options?)` returns the summary as text. |
 | `conflicts(doc)` | Lists the open conflicts of a merged document: `{ main, other, fields }`. `resolve(doc, id)` accepts the item and rejects the other item of its pair, and returns `{ doc, accepted, rejected }`. |
+| `wordDiff(old, new)` | Compares two texts word by word. Returns a list of `{ op, text }`, where `op` is `"same"`, `"del"` or `"ins"`. Each changed item of `diff` has the same list for its text as `text_spans`, and for its other text fields in `field_spans`. Each conflict of `merge` has `text_spans` from main's text to the other's text, and `base_text` in a merge with a base. |
 | `newArtifactId()` | Returns a new random artifact ID, for example `pa_7Hk2mQ9xR4tV8wZ1`. |
 | `schema()`, `schemaUrl()` | Return the JSON Schema of format 0.1 as text, and its URL. |
 | `rules()` | Returns the names of the four rules in section 9. |
