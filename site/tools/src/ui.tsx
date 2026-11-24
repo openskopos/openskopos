@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Editor } from "./editor";
 import { detectFormat, formatLabel, read, type Format, type ReadResult } from "./doc";
 import { examples, type Example } from "./examples";
-import { core, next, type Document, type Fix, type TextSpan } from "./core";
+import { core, type Document, type Fix, type TextSpan } from "./core";
 
 /** State that the browser keeps between visits, in localStorage. */
 export function useStored<T>(key: string, initial: T | (() => T)): [T, (v: T) => void] {
@@ -202,9 +202,9 @@ export function Status({ verdict, count, version = "0.2" }: { verdict: Verdict; 
   );
 }
 
-/** A quiet button that applies core's fix for a problem. Shown only when core has one. */
+/** A quiet button that applies core's fix for a problem. Shown only when the problem has one. */
 export function FixButton({ doc, fix, apply }: { doc?: Document; fix?: Fix; apply: (d: Document) => void }) {
-  if (!doc || !fix || !next.applyFix) return null;
+  if (!doc || !fix) return null;
   return (
     <button
       type="button"
@@ -212,7 +212,7 @@ export function FixButton({ doc, fix, apply }: { doc?: Document; fix?: Fix; appl
       onClick={(e) => {
         e.stopPropagation();
         try {
-          apply(next.applyFix!(doc, fix));
+          apply(core.applyFix(doc, fix));
         } catch (err) {
           toast((err as Error).message);
         }
@@ -403,21 +403,19 @@ export function mdSession() {
 let sheetAdded = false;
 /**
  * The readable view of a document: the HTML of core's renderer, styled by
- * core's stylesheet with the brand values from tools.css. Shows nothing if
- * the loaded core has no renderer.
+ * core's stylesheet with the brand values from tools.css.
  */
 export function Readable({ doc, previous }: { doc: Document; previous?: Document }) {
   const html = useMemo(() => {
-    if (!next.renderHtml) return "";
     try {
-      return next.renderHtml(doc, { fragment: true, previous });
+      return core.renderHtml(doc, { fragment: true, previous });
     } catch (e) {
       return `<p class="bad-text">${String((e as Error).message).replace(/[&<>]/g, "")}</p>`;
     }
   }, [doc, previous]);
-  if (!sheetAdded && next.stylesheet) {
+  if (!sheetAdded) {
     const style = document.createElement("style");
-    style.textContent = next.stylesheet();
+    style.textContent = core.stylesheet();
     document.head.prepend(style);
     sheetAdded = true;
   }
@@ -440,8 +438,6 @@ export function Readable({ doc, previous }: { doc: Document; previous?: Document
     />
   );
 }
-
-export const hasReadable = () => !!next.renderHtml;
 
 /** Changed words, as core found them: removed words struck through, new words marked. */
 export function Spans({ spans, side }: { spans: TextSpan[]; side?: "old" | "new" }) {

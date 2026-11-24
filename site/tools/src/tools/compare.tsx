@@ -4,7 +4,7 @@ import { core, type Diff, type Document, type Item } from "../core";
 import { versionPair } from "../examples";
 import type { Go, Handoff } from "../nav";
 import { readShared, shareUrl } from "../share";
-import { copy, DocInput, hasReadable, Readable, Segmented, Spans, useRead, useStored, type TextFile } from "../ui";
+import { copy, DocInput, Readable, Segmented, Spans, useRead, useStored, type TextFile } from "../ui";
 import type { TextSpan } from "../core";
 
 const empty: TextFile = { name: "", text: "" };
@@ -68,7 +68,7 @@ export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
       </div>
       {!result && <p class="muted center-text">Add two versions of one document. Their items are compared by ID, the same as <code>skopos diff</code>.</p>}
       {result && "error" in result && <p class="bad-text">{result.error}</p>}
-      {result && "diff" in result && hasReadable() && (
+      {result && "diff" in result && (
         <Segmented
           label="Show"
           value={view}
@@ -79,12 +79,12 @@ export function Compare({ incoming }: { go: Go; incoming?: Handoff }) {
           ]}
         />
       )}
-      {result && "diff" in result && hasReadable() && view === "readable" && (
+      {result && "diff" in result && view === "readable" && (
         <div class="diff">
           <Readable doc={b!.doc!} previous={a!.doc!} />
         </div>
       )}
-      {result && "diff" in result && result.diff && !(hasReadable() && view === "readable") && <DiffView diff={result.diff} text={result.text!} oldDoc={a!.doc!} newDoc={b!.doc!} />}
+      {result && "diff" in result && result.diff && view !== "readable" && <DiffView diff={result.diff} text={result.text!} oldDoc={a!.doc!} newDoc={b!.doc!} />}
     </div>
   );
 }

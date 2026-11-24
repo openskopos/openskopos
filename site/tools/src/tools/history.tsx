@@ -2,7 +2,7 @@
 // core.history. Which decisions are in force now, which changed, and which
 // were superseded, dropped or rejected.
 import { useMemo, useState } from "preact/hooks";
-import { next, type Document, type History as HistoryResult, type ItemHistory, type ItemRefTo, type ItemState } from "../core";
+import { core, type Document, type History as HistoryResult, type ItemHistory, type ItemState } from "../core";
 import { detectFormat, read } from "../doc";
 import { historyChain } from "../examples";
 import type { Go, Handoff } from "../nav";
@@ -22,23 +22,15 @@ export function History(_: { go: Go; incoming?: Handoff }) {
   const reads = useMemo(() => files.map((f) => ({ f, r: read(f.text, detectFormat(f.text, f.name), { ...mdSession(), filename: f.name }) })), [files]);
   const docs = reads.filter((x) => x.r.doc).map((x) => x.r.doc!) as Document[];
   const result = useMemo((): { h?: HistoryResult; error?: string } => {
-    if (!docs.length || !next.history) return {};
+    if (!docs.length) return {};
     try {
-      return { h: next.history(docs) };
+      return { h: core.history(docs) };
     } catch (e) {
       const err = e as Error & { problems?: { message: string }[] };
       return { error: err.problems?.map((p) => p.message).join("; ") || err.message };
     }
   }, [reads]);
   const add = (fs: TextFile[]) => setFiles([...files, ...fs]);
-
-  if (!next.history)
-    return (
-      <div class="start">
-        <h1>History</h1>
-        <p class="muted">History needs a newer version of <code>@openskopos/core</code> than this page loads. It comes with the next release.</p>
-      </div>
-    );
 
   const h = result.h;
   const items = h?.items ?? [];
@@ -166,7 +158,6 @@ const stepText = (s: ItemHistory["steps"][number]) => {
   return s.change === "seen" ? "First seen" : "Added";
 };
 
-const refText = (r: ItemRefTo | string) => (typeof r === "string" ? r : `${r.artifact}${r.version ? `@${r.version}` : ""}#${r.item}`);
 
 function ItemRow({ item, versions, showState, open, toggle }: { item: ItemHistory; versions: number[]; showState: boolean; open: boolean; toggle: () => void }) {
   const byVersion = new Map(item.steps.map((s) => [s.version, s]));
@@ -207,7 +198,7 @@ function ItemRow({ item, versions, showState, open, toggle }: { item: ItemHistor
             .filter(([, l]) => (l as unknown[]).length)
             .map(([label, l]) => (
               <div class="muted small-text">
-                {label as string} {(l as (ItemRefTo | string)[]).map((r) => <code>{refText(r)} </code>)}
+                {label as string} {(l as string[]).map((r) => <code>{r} </code>)}
               </div>
             ))}
           <button type="button" class="link small-text" onClick={() => copy(item.reference, "Reference copied")} title={item.reference}>

@@ -2,7 +2,7 @@
 // keeps the work of the other tabs.
 import { render } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { core, next, ready } from "./core";
+import { core, ready } from "./core";
 import { tools, type Go, type Handoff, type ToolId } from "./nav";
 import { Validate } from "./tools/validate";
 import { Author } from "./tools/author";
@@ -63,7 +63,7 @@ function App({ initial }: { initial: ToolId }) {
     <div class="workbench">
       <div class="toolbar">
         <nav class="tabs" aria-label="Tools">
-          {tools.filter((t) => (t.id !== "history" || next.history || active === "history") && (t.id !== "merge" || next.merge || active === "merge")).map((t) => (
+          {tools.map((t) => (
             <a
               id={`tab-${t.id}`}
               href={pathOf(t.id)}
