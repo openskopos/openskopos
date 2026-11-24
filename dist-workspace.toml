@@ -13,6 +13,8 @@ installers = ["shell", "powershell", "homebrew"]
 tap = "openskopos/homebrew-tap"
 # Publish jobs to run in CI
 publish-jobs = ["homebrew", "./publish-crates", "./publish-npm"]
+# Jobs to run after the GitHub release is announced
+post-announce-jobs = ["./release-notes"]
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = ["aarch64-apple-darwin", "aarch64-unknown-linux-gnu", "x86_64-apple-darwin", "x86_64-unknown-linux-gnu", "x86_64-unknown-linux-musl", "x86_64-pc-windows-msvc"]
 # Path that installers should place binaries in
@@ -21,7 +23,8 @@ install-path = "CARGO_HOME"
 install-updater = false
 
 # The custom publish jobs read the repository. The npm job also signs a
-# provenance statement.
+# provenance statement. The release notes job edits the GitHub release.
 [dist.github-custom-job-permissions]
 "publish-crates" = { contents = "read" }
 "publish-npm" = { contents = "read", id-token = "write" }
+"release-notes" = { contents = "write" }

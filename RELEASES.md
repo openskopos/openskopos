@@ -1,16 +1,16 @@
 # Changelog
 
-This changelog lists what each release of OpenSkopos added, changed and removed:
-the format, the `skopos` tool, the Rust crates and the npm packages. They all
-have one version number (see "Versions" in [CONTRIBUTING.md](CONTRIBUTING.md)).
-Release x.y.z reads and writes format x.y. [spec/CHANGELOG.md](spec/CHANGELOG.md)
+This changelog lists what each version of OpenSkopos added, changed and
+removed: the format, the `skopos` tool, the Rust crates and the npm packages.
+They all have one version number (see "Versions" in
+[CONTRIBUTING.md](CONTRIBUTING.md)). [spec/CHANGELOG.md](spec/CHANGELOG.md)
 gives more detail about each format version.
 
 Each version has the sections Added, Changed and Removed. A section with
-nothing in it is left out. The GitHub release of a version uses its section
-as its notes.
+nothing in it is left out. A fix release, such as 0.2.1, adds its changes to
+the section of its version.
 
-## 0.2.0
+## 0.2
 
 The tools read and write format 0.2. They still read documents of format 0.1.
 
@@ -52,9 +52,9 @@ The tools read and write format 0.2. They still read documents of format 0.1.
 
 - `skopos-core`: `Problem` no longer implements `Hash`.
 
-## 0.1.0
+## 0.1
 
-The first release. The tools read and write format 0.1.
+The first version. The tools read and write format 0.1.
 
 ### Added
 

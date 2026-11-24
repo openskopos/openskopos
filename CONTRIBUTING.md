@@ -66,9 +66,10 @@ to know which parts go together.
   specification, the schema and all packages together, with the tags
   `vx.y.0` and `schema-x.y` on the same commit.
 - A bug fix or an addition that breaks nothing, such as a new command, a new
-  exporter or a new library function, can ship as a patch release: 0.2.0,
-  then 0.2.1. A patch release changes all packages together and does not
-  change the format.
+  exporter or a new library function, can ship as a fix release: 0.2.0, then
+  0.2.1. A fix release changes all packages together and does not change the
+  format. The changelog, the site and the documentation name the x.y version
+  only; the full version is only for tags, package files and downloads.
 - A change to the format, or a change that breaks code that uses
   `skopos-core` or `@openskopos/core`, needs the next x.y version.
 - After 1.0, the same rules apply: 1.1.0 has format 1.1, and 2.0.0 has
@@ -77,17 +78,17 @@ to know which parts go together.
 CI runs `node scripts/check-versions.mjs`. It fails if the packages have
 different versions, if their x.y is not the format that `skopos-core` reads
 and writes, or if the specification, the schema, the changelog of the format
-or [RELEASES.md](RELEASES.md) has no entry for that version.
+or [RELEASES.md](RELEASES.md) has no section for that x.y version.
 
 ## Make a release
 
 1. Change the version of all crates and both `package.json` files, also the
    dependency of `@openskopos/cli` on `@openskopos/core`. Run `cargo update
    --workspace` and `node scripts/check-versions.mjs`.
-2. Add a section `## x.y.z` for the version to [RELEASES.md](RELEASES.md),
-   with the sections `### Added`, `### Changed` and `### Removed` that have
-   entries. The GitHub release uses it as its notes, and the site shows it
-   at /changelog/ and in the version picker of the install page.
+2. Add the changes to the section `## x.y` of [RELEASES.md](RELEASES.md),
+   under `### Added`, `### Changed` or `### Removed`. A new x.y version gets a
+   new section. The Release notes workflow puts the section in the GitHub
+   release, and the site shows it at /changelog/.
 3. Merge the change, then push the tag, for example `v0.2.1`. The Release
    workflow builds the binaries, makes the GitHub release, updates the
    Homebrew formula, publishes the crates and stages the npm packages. For a

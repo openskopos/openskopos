@@ -53,9 +53,21 @@ npm/cli/README.md|docs/npm-cli|The @openskopos/cli npm package||The skopos comma
 conformance/README.md|docs/conformance|Conformance cases||The documents that every OpenSkopos implementation must accept or reject, and the cases for Markdown, histories and merges.
 '
 
-# The released versions, newest first, from the headings of RELEASES.md. The
+# The x.y versions, newest first, from the headings of RELEASES.md, each with
+# its latest full version for the download links, such as "0.2=0.2.0 0.1=0.1.0".
+# The newest x.y uses the version of the packages. An older x.y uses its
+# newest tag v<x.y>.<z>, or <x.y>.0 without tags (a shallow checkout). The
 # install page gets them for its version picker (site/install.js).
-versions=$(sed -n 's/^## \([0-9][0-9.]*\)$/\1/p' RELEASES.md | tr '\n' ' ' | sed 's/ $//')
+package=$(sed -n 's/^version = "\(.*\)"$/\1/p' crates/skopos/Cargo.toml)
+versions=$(
+  for minor in $(sed -n 's/^## \([0-9][0-9]*\.[0-9][0-9]*\)$/\1/p' RELEASES.md); do
+    case "$package" in
+      "$minor".*) full=$package ;;
+      *) full=$(git tag --list "v$minor.*" 2>/dev/null | sed 's/^v//' | sort -t. -k3,3n | tail -n 1) ;;
+    esac
+    printf '%s=%s ' "$minor" "${full:-$minor.0}"
+  done | sed 's/ $//'
+)
 
 echo "$pages" | while IFS='|' read -r source folder title toc description; do
   [ -n "$source" ] || continue
@@ -86,7 +98,7 @@ done
 
 site=https://openskopos.org
 # The format version of the latest release, such as 0.2.
-format=$(echo "$versions" | cut -d' ' -f1 | cut -d. -f1,2)
+format=$(echo "$versions" | cut -d' ' -f1 | cut -d= -f1)
 
 # The title and description of a page that is not made from Markdown.
 html_title() { sed -n 's|.*<title>\(.*\)</title>.*|\1|p' "$1" | sed 's| · OpenSkopos$||'; }
@@ -139,7 +151,7 @@ pages_in() {
   echo
   echo "> OpenSkopos is an open, vendor-neutral file format for the decisions that a team makes before an AI agent builds the work: goals, requirements, constraints, assumptions, risks, open questions and decisions, each with a stable ID. The skopos command line tool and the skopos-core library check, convert, compare, merge and render documents, and export them to OpenSpec, GitHub Spec Kit and Kiro."
   echo
-  echo "The current release is $(echo "$versions" | cut -d' ' -f1). It reads and writes format $format. A document names its format version in \`\$schema\`, for example \`$site/schema/artifact/$format.json\`. Files end in \`.skopos.json\`, \`.skopos.yaml\` or \`.skopos.md\`. Everything is under the Apache License 2.0."
+  echo "The current version is $format. The tools read and write format $format. A document names its format version in \`\$schema\`, for example \`$site/schema/artifact/$format.json\`. Files end in \`.skopos.json\`, \`.skopos.yaml\` or \`.skopos.md\`. Everything is under the Apache License 2.0."
   echo
   echo "## Specification"
   echo

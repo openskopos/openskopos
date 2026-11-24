@@ -9,8 +9,7 @@
 //   example, the packages for format 0.2 are 0.2.0, 0.2.1 and so on.
 // - The format version has its specification in spec/x.y/, its schema in
 //   schema/artifact/x.y.json with that URL as $id, the same schema in
-//   skopos-core, and an entry in spec/CHANGELOG.md. The version of the
-//   packages has an entry in RELEASES.md.
+//   skopos-core, and a section in spec/CHANGELOG.md and in RELEASES.md.
 //
 // Run it from anywhere: node scripts/check-versions.mjs
 import { existsSync, readFileSync } from "node:fs";
@@ -77,8 +76,8 @@ if (!existsSync(file(`spec/${format}/README.md`)) || !read(`spec/${format}/READM
 if (!new RegExp(`^## ${format.replace(".", "\\.")} `, "m").test(read("spec/CHANGELOG.md"))) {
   fail(`spec/CHANGELOG.md has no section for format ${format}.`);
 }
-if (!read("RELEASES.md").split("\n").includes(`## ${version}`)) {
-  fail(`RELEASES.md has no section "## ${version}".`);
+if (!read("RELEASES.md").split("\n").includes(`## ${format}`)) {
+  fail(`RELEASES.md has no section "## ${format}".`);
 }
 if (ok) {
   console.log(`All packages have version ${version}, for format ${format}.`);

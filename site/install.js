@@ -1,10 +1,13 @@
 // The version picker of the install page (/docs/install/). The page itself
 // shows the commands for the latest release, so it works without this
 // script. The picker changes the commands to install an earlier release.
-// site/build.sh puts the released versions, newest first, in data-versions.
+// site/build.sh puts the x.y versions, newest first, in data-versions, each
+// with its latest full version for the download links: "0.2=0.2.0 0.1=0.1.0".
+// The picker shows only x.y.
 (() => {
-  const versions = document.currentScript.dataset.versions.split(" ");
-  const latest = versions[0];
+  const versions = document.currentScript.dataset.versions.split(" ").map((p) => p.split("="));
+  const latest = versions[0][0];
+  const full = Object.fromEntries(versions);
   const main = document.querySelector("main");
   const firstSection = main.querySelector("h2");
   if (!firstSection || versions.length < 2) return;
@@ -29,24 +32,25 @@
     '<label>Version <select></select></label> <a href="/changelog/">What changed</a>';
   const select = picker.querySelector("select");
   const changes = picker.querySelector("a");
-  for (const v of versions) {
+  for (const [v] of versions) {
     select.add(new Option(v === latest ? `${v} (latest)` : v, v));
   }
   firstSection.before(picker);
 
   function show(v) {
     const old = v !== latest;
+    const f = full[v];
     for (const { el, text } of codes) {
       el.textContent = !old
         ? text
         : text
-            .replace("/releases/latest/download/", `/releases/download/v${v}/`)
-            .replace(/(cargo install --locked skopos)$/m, `$1 --version ${v}`)
+            .replace("/releases/latest/download/", `/releases/download/v${f}/`)
+            .replace(/(cargo install --locked skopos)$/m, `$1 --version ~${v}`)
             .replace(/@openskopos\/cli\b(?!@)/g, `@openskopos/cli@${v}`);
     }
     for (const a of releaseLinks) {
       a.href = old
-        ? `https://github.com/openskopos/openskopos/releases/tag/v${v}`
+        ? `https://github.com/openskopos/openskopos/releases/tag/v${f}`
         : "https://github.com/openskopos/openskopos/releases";
     }
     brewNote.hidden = !old;
