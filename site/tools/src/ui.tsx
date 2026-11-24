@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { Editor } from "./editor";
 import { detectFormat, formatLabel, read, type Format, type ReadResult } from "./doc";
 import { examples, type Example } from "./examples";
-import { core, next, type Document, type TextSpan } from "./core";
+import { core, next, type Document, type Fix, type TextSpan } from "./core";
 
 /** State that the browser keeps between visits, in localStorage. */
 export function useStored<T>(key: string, initial: T | (() => T)): [T, (v: T) => void] {
@@ -202,6 +202,27 @@ export function Status({ verdict, count, version = "0.1" }: { verdict: Verdict; 
   );
 }
 
+/** A quiet button that applies core's fix for a problem. Shown only when core has one. */
+export function FixButton({ doc, fix, apply }: { doc?: Document; fix?: Fix; apply: (d: Document) => void }) {
+  if (!doc || !fix || !next.applyFix) return null;
+  return (
+    <button
+      type="button"
+      class="btn ghost small fix"
+      onClick={(e) => {
+        e.stopPropagation();
+        try {
+          apply(next.applyFix!(doc, fix));
+        } catch (err) {
+          toast((err as Error).message);
+        }
+      }}
+    >
+      {fix.label}
+    </button>
+  );
+}
+
 /** The anchor of a rule in section 9 of the specification. */
 export const ruleUrl = "/spec/0.1/#9-rules-that-the-schema-cannot-check";
 
@@ -264,7 +285,7 @@ export function DocInput({
           )}
         </div>
         <div class="slot-actions">
-          {verdict !== "empty" && <Status verdict={verdict} count={result?.problems.length} />}
+          {verdict === "valid" ? <span class="status valid" title="Valid OpenSkopos 0.1" aria-label="Valid"><i /></span> : verdict !== "empty" && <Status verdict={verdict} count={result?.problems.length} />}
           {verdict === "valid" && (
             <button type="button" class="btn ghost small" aria-expanded={!folded} onClick={() => setEditing(!editing)}>
               {folded ? "Edit" : "Fold"}

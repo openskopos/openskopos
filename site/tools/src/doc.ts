@@ -3,7 +3,7 @@
 // this file only chooses the core function and maps a JSON Pointer to a place
 // in the text for the editor.
 import { isMap, isSeq, isScalar, parseDocument, type Node } from "yaml";
-import { core, type Document, type Problem, type Warning } from "./core";
+import { core, type Document, type Fix, type Problem, type Warning } from "./core";
 
 export type Format = "json" | "yaml" | "markdown";
 
@@ -52,6 +52,9 @@ export interface Mark {
   severity: "error" | "warning";
   rule?: string | null;
   path?: string;
+  /** Core's plain sentence that says what to do. */
+  hint?: string;
+  fix?: Fix;
 }
 
 export interface ReadResult {
@@ -106,11 +109,11 @@ export function read(text: string, format: Format, md: MarkdownOptions = {}): Re
     }
     return result;
   }
-  result.problems = core.check(result.doc);
+  result.problems = core.check(result.doc) as Problem[];
   if (format !== "markdown") {
     const places = locate(text, result.problems.map((p) => p.path));
     result.problems.forEach((p, i) => {
-      result.marks.push({ ...places[i], message: p.message, severity: "error", rule: p.rule, path: p.path });
+      result.marks.push({ ...places[i], message: p.message, severity: "error", rule: p.rule, path: p.path, hint: p.hint, fix: p.fix });
     });
   }
   return result;

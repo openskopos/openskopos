@@ -6,7 +6,7 @@ import { core, next, type Document, type Item, type MergeConflict, type MergeRes
 import { fileName, formatMime, write } from "../doc";
 import { mergeCases } from "../examples";
 import type { Go, Handoff } from "../nav";
-import { copy, DocInput, download, Readable, hasReadable, Spans, useRead, useStored, type TextFile } from "../ui";
+import { copy, DocInput, download, Menu, Readable, hasReadable, Spans, useRead, useStored, type TextFile } from "../ui";
 
 const empty: TextFile = { name: "", text: "" };
 const exampleNames: Record<string, string> = {
@@ -118,7 +118,6 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
     const nextOpen = conflicts.findIndex((_, k) => k > i && !choices[k]);
     if (nextOpen >= 0) setAt(nextOpen);
   };
-  const renamedFrom = (id: string) => result.r?.renamed.find((r) => r.to === id && r.from !== id)?.from;
   const items = (d: Document | undefined) => ((d?.items ?? []) as Item[]);
   const find = (d: Document | undefined, id: string | null) => (id ? items(d).find((i) => i.id === id) : undefined);
   const name = fileName(settled, "json");
@@ -126,7 +125,7 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
   return (
     <div class="merge">
       <div class="compare-bar">
-        <h1>Merge two drafts</h1>
+        <h1>Merge</h1>
         <span class="grow" />
         {mergeCases.length > 0 && (
           <label class="btn ghost select">
@@ -163,20 +162,17 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
           Swap
         </button>
       </div>
-      <p class="muted lead-small">
-        The result is the next version of the main document, with the other document as an input. Items that only one side changed merge by themselves. A conflict stays in the file as two proposed items, so the file is always valid.
-      </p>
       <div class="compare-inputs">
         <DocInput title="Main" hint="The result becomes its next version" value={main} onChange={setMain} result={a} height="180px" />
         <DocInput title="Other" hint="The draft to bring in" value={other} onChange={setOther} result={b} height="180px" />
       </div>
       <label class="row base-toggle">
         <input type="checkbox" checked={useBase} onChange={(e) => setUseBase(e.currentTarget.checked)} />
-        <span>Both are edits of one earlier version (a three-way merge by item ID)</span>
+        <span title="Both drafts started from one earlier version. Items then pair by ID.">Use a common base</span>
       </label>
       {useBase && <DocInput title="Base" hint="The earlier version both drafts started from" value={base} onChange={setBase} result={c} height="140px" />}
 
-      {!ready && <p class="muted center-text">Add two valid drafts. Their items are merged the same way as <code>skopos merge</code>.</p>}
+      {!ready && <p class="muted center-text">Add two drafts to merge.</p>}
       {result.error && <p class="bad-text">{result.error}</p>}
 
       {result.r && settled && (
@@ -184,9 +180,8 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
           {byText && (
             <details class="diff pairs-box">
               <summary>
-                {first.r!.pairs.length} {first.r!.pairs.length === 1 ? "pair" : "pairs"} found by similar text <span class="muted">· review</span>
+                {first.r!.pairs.length} {first.r!.pairs.length === 1 ? "item" : "items"} matched by similar text
               </summary>
-              <p class="muted small-text">With no base, items of the same type with similar text are paired. Turn off a pair that is really two different items.</p>
               <ul class="pairs">
                 {first.r!.pairs.map((p) => {
                   const key = `${p.main}=${p.other}`;
@@ -196,7 +191,6 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
                       <label class="row">
                         <input type="checkbox" checked={on} onChange={() => setUnpaired(on ? [...unpaired, key] : unpaired.filter((x) => x !== key))} />
                         <b class="mono">{p.main}</b> <span class="muted">and other's</span> <b class="mono">{p.other}</b>
-                        <span class="muted">{p.by === "text" ? `${p.similarity}% similar` : p.by}</span>
                         <span class="pair-text">{String(find(a!.doc, p.main)?.text ?? "")}</span>
                       </label>
                     </li>
@@ -210,17 +204,7 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
             <div class="bar" role="progressbar" aria-valuemin={0} aria-valuemax={conflicts.length} aria-valuenow={conflicts.length - left}>
               <i style={{ width: conflicts.length ? `${(100 * (conflicts.length - left)) / conflicts.length}%` : "100%" }} />
             </div>
-            <span>{conflicts.length ? (left ? `${left} of ${conflicts.length} ${conflicts.length === 1 ? "conflict" : "conflicts"} left` : "All conflicts settled") : "No conflicts"}</span>
-            <span class="muted small-text">
-              {result.r.pairs.length} paired · {result.r.renamed.length} new from other
-              {result.r.envelope.length > 0 && <> · kept main's {result.r.envelope.join(", ")}</>}
-            </span>
-            <span class="grow" />
-            {conflicts.length > 0 && (
-              <span class="muted small-text keys">
-                <kbd>j</kbd> <kbd>k</kbd> to move
-              </span>
-            )}
+            <span>{conflicts.length ? (left ? `${left} ${left === 1 ? "conflict" : "conflicts"} left` : "All settled") : "No conflicts"}</span>
           </div>
 
           <ol class="conflicts">
@@ -231,36 +215,25 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
               return (
                 <li class={`conflict ${i === at ? "current" : ""} ${choice ? "settled" : ""}`} data-conflict={i} onClick={() => setAt(i)}>
                   <div class="conflict-head">
-                    <b class="mono">{k.main ?? "–"}</b> <span class="muted">or</span> <b class="mono">{k.other ?? "–"}</b>
-                    {k.other && renamedFrom(k.other) && <span class="muted small-text">(other's {renamedFrom(k.other)}, renumbered)</span>}
-                    <span class="muted">{k.kind === "changed" ? `both changed: ${k.fields.join(", ")}` : k.kind === "removed_in_other" ? "other removed or superseded it, main changed it" : "main removed or superseded it, other changed it"}</span>
+                    <span class="muted">{kindText(k)}</span>
                     <span class="grow" />
-                    {choice && (
+                    {choice ? (
                       <button type="button" class="link" onClick={() => setChoices(omit(choices, i))}>
                         Undo
                       </button>
+                    ) : (
+                      m &&
+                      o && (
+                        <button type="button" class="link" title="Keep both (3)" onClick={() => choose(i, "both")}>
+                          Keep both
+                        </button>
+                      )
                     )}
                   </div>
-                  {k.base_text !== undefined && (
-                    <div class="was">
-                      <span class="muted small-text">Was</span> {k.base_text}
-                    </div>
-                  )}
+                  {k.base_text !== undefined && <div class="was"><span class="eyebrow">Base</span> {k.base_text}</div>}
                   <div class="sides">
-                    <Side label="Main" item={m} spans={k.text_spans} side="old" picked={choice === "main" || choice === "both"} dropped={choice === "other"} />
-                    <Side label="Other" item={o} spans={k.text_spans} side="new" picked={choice === "other" || choice === "both"} dropped={choice === "main"} />
-                  </div>
-                  <div class="row wrap">
-                    <button type="button" class={`btn small ${choice === "main" ? "" : "ghost"}`} disabled={!m} onClick={() => choose(i, "main")}>
-                      <kbd>1</kbd> Keep main
-                    </button>
-                    <button type="button" class={`btn small ${choice === "other" ? "" : "ghost"}`} disabled={!o} onClick={() => choose(i, "other")}>
-                      <kbd>2</kbd> Keep other
-                    </button>
-                    <button type="button" class={`btn small ${choice === "both" ? "" : "ghost"}`} disabled={!m || !o} onClick={() => choose(i, "both")}>
-                      <kbd>3</kbd> Keep both
-                    </button>
-                    <span class="muted small-text">The item you do not keep stays in the record as rejected.</span>
+                    <Side label="Main" item={m} spans={k.text_spans} side="old" picked={choice === "main" || choice === "both"} dropped={choice === "other"} keep={() => choose(i, "main")} keyHint="1" />
+                    <Side label="Other" item={o} spans={k.text_spans} side="new" picked={choice === "other" || choice === "both"} dropped={choice === "main"} keep={() => choose(i, "other")} keyHint="2" />
                   </div>
                 </li>
               );
@@ -269,19 +242,19 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
 
           <section class="diff merge-result">
             <div class="diff-head">
-              <span class={`status ${done ? "valid" : "invalid"}`}>
+              <span class={`status ${done ? "valid" : problems.length ? "invalid" : "empty"}`}>
                 <i />
-                {done ? `Ready: ${settled.id}@${settled.version}` : problems.length ? `${problems.length} problems` : "Settle the conflicts to finish"}
+                {done ? "Ready" : problems.length ? `${problems.length} problems` : "Pick a side for each conflict"}
               </span>
               <span class="grow" />
-              <button type="button" class="btn ghost small" onClick={() => copy(next.mergeText!(a!.doc!, b!.doc!, { base: baseDoc }))}>
-                Copy summary
-              </button>
-              <button type="button" class="btn ghost small" onClick={() => go("author", { name, text: write(settled, "yaml") })}>
-                Edit in Author
-              </button>
-              <button type="button" class="btn small" disabled={!done} onClick={() => download(name, write(settled, "json"), formatMime.json)} title={done ? undefined : "Download is ready when no conflicts are left and the document is valid"}>
-                Download {name}
+              <Menu
+                items={[
+                  { label: "Copy summary", run: () => copy(next.mergeText!(a!.doc!, b!.doc!, { base: baseDoc })) },
+                  { label: "Edit in Author", run: () => go("author", { name, text: write(settled, "yaml") }) },
+                ]}
+              />
+              <button type="button" class="btn small" disabled={!done} onClick={() => download(name, write(settled, "json"), formatMime.json)}>
+                Download
               </button>
             </div>
             {hasReadable() && <Readable doc={settled} previous={a!.doc!} />}
@@ -292,16 +265,23 @@ export function Merge({ go }: { go: Go; incoming?: Handoff }) {
   );
 }
 
-function Side({ label, item, spans, side, picked, dropped }: { label: string; item?: Item; spans?: TextSpan[]; side: "old" | "new"; picked: boolean; dropped: boolean }) {
+function Side({ label, item, spans, side, picked, dropped, keep, keyHint }: { label: string; item?: Item; spans?: TextSpan[]; side: "old" | "new"; picked: boolean; dropped: boolean; keep: () => void; keyHint: string }) {
   return (
-    <div class={`side ${picked ? "picked" : ""} ${dropped ? "dropped" : ""}`}>
+    <button type="button" class={`side ${picked ? "picked" : ""} ${dropped ? "dropped" : ""}`} disabled={!item} onClick={keep} title={item ? `Keep ${label.toLowerCase()} (${keyHint})` : undefined}>
       <span class="eyebrow">
         {label} {item?.id && <span class="mono">{String(item.id)}</span>}
       </span>
-      {item ? <div>{spans ? <Spans spans={spans} side={side} /> : String(item.text ?? "")}</div> : <div class="muted">Not in this document</div>}
-    </div>
+      {item ? <span>{spans ? <Spans spans={spans} side={side} /> : String(item.text ?? "")}</span> : <span class="muted">Removed</span>}
+    </button>
   );
 }
+
+const kindText = (k: MergeConflict) => {
+  if (k.kind === "removed_in_other") return "Other removed it, main changed it";
+  if (k.kind === "removed_in_main") return "Main removed it, other changed it";
+  const fields = k.fields.filter((f) => f !== "text");
+  return fields.length ? `Both changed ${[...(k.fields.includes("text") ? ["text"] : []), ...fields].join(", ").replace(/_/g, " ")}` : "Both changed the text";
+};
 
 /** Settles a pair by keeping both items: sets their status to accepted. */
 function acceptBoth(doc: Document, k: MergeConflict): Document {

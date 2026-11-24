@@ -57,7 +57,6 @@ export function History(_: { go: Go; incoming?: Handoff }) {
     <DropArea class="history" onFiles={add} hint="Drop to add these versions">
       <div class="compare-bar">
         <h1>History</h1>
-        <span class="muted">{files.length ? `${files.length} ${files.length === 1 ? "file" : "files"}` : ""}</span>
         <span class="grow" />
         <button type="button" class="btn ghost" onClick={() => setFiles(historyChain)}>
           Try an example
@@ -75,7 +74,7 @@ export function History(_: { go: Go; incoming?: Handoff }) {
       {!files.length && (
         <div class="blank inline">
           <p class="blank-title">Drop several versions of a document here</p>
-          <p class="muted">In any order, and from more than one document. They are sorted into versions, linked to the documents they took as input, and every item gets its story.</p>
+          <p class="muted">In any order. Each item gets its story.</p>
           <div class="row center wrap">
             <button type="button" class="btn" onClick={async () => add(await openFiles(true))}>
               Open files
@@ -101,13 +100,11 @@ export function History(_: { go: Go; incoming?: Handoff }) {
               <div class="chain">
                 <div class="chain-head">
                   <span class="chain-title" title={c.artifact}>{c.title}</span>
-                  <span class="muted small-text">{c.kind.replace(/_/g, " ")}</span>
                 </div>
                 <ol class="versions">
                   {c.versions.map((v) => (
                     <li class={`version st-${v.status}`}>
                       <span class="vnum">v{v.version}</span>
-                      <span class="muted">{v.status}</span>
                       <span class="vcounts">
                         {v.diff ? (
                           <>
@@ -115,10 +112,9 @@ export function History(_: { go: Go; incoming?: Handoff }) {
                             {v.diff.changed.length > 0 && <span class="c-changed">~{v.diff.changed.length}</span>}
                             {v.diff.superseded.length > 0 && <span class="c-superseded">⇢{v.diff.superseded.length}</span>}
                             {v.diff.dropped.length > 0 && <span class="c-dropped">−{v.diff.dropped.length}</span>}
-                            {!v.diff.added.length && !v.diff.changed.length && !v.diff.superseded.length && !v.diff.dropped.length && <span class="muted">no change</span>}
                           </>
                         ) : (
-                          <span class="muted">{v.items} items</span>
+                          <span class="muted">{v.items}</span>
                         )}
                       </span>
                     </li>
@@ -127,25 +123,14 @@ export function History(_: { go: Go; incoming?: Handoff }) {
               </div>
             ))}
           </div>
-          <p class="muted small-text legend">● final version · ○ draft · +added ~changed −dropped</p>
-          {h.warnings.length > 0 && (
-            <div class="warnings muted small-text">
-              {h.warnings.map((w) => (
-                <div>{w.message}</div>
-              ))}
-            </div>
-          )}
-
           <div class="history-filters">
             <Segmented
               label="Items"
               value={filter}
               onChange={setFilter}
-              options={(["now", "changed", "superseded", "dropped", "rejected", "proposed", "all"] as Filter[]).filter((f) => f === filter || f === "all" || f === "now" || count(f) > 0).map((f) => ({
-                value: f,
-                label: `${f === "now" ? "In force now" : f[0].toUpperCase() + f.slice(1)} ${count(f)}`,
-              }))}
+              options={(["now", "changed", "all"] as Filter[]).map((f) => ({ value: f, label: f === "now" ? "In force" : f === "changed" ? "Changed" : "All" }))}
             />
+            <span class="grow" />
             <select aria-label="Item type" value={type} onChange={(e) => setType(e.currentTarget.value)}>
               <option value="">All types</option>
               {info.types
@@ -154,9 +139,10 @@ export function History(_: { go: Go; incoming?: Handoff }) {
                   <option value={t.type}>{t.plural}</option>
                 ))}
             </select>
-            <input type="search" class="filter" placeholder="Filter by ID or text" value={q} onInput={(e) => setQ(e.currentTarget.value)} aria-label="Filter items" />
+            <input type="search" class="filter" placeholder="Filter" value={q} onInput={(e) => setQ(e.currentTarget.value)} aria-label="Filter items" />
           </div>
 
+          {h.warnings.length > 0 && <p class="muted small-text warnings">{h.warnings.map((w) => w.message.charAt(0).toUpperCase() + w.message.slice(1)).join(" · ")}</p>}
           <ol class="item-rows">
             {shown.map((i, n) => (
               <>
@@ -171,6 +157,14 @@ export function History(_: { go: Go; incoming?: Handoff }) {
     </DropArea>
   );
 }
+
+const stepText = (s: ItemHistory["steps"][number]) => {
+  if (s.status_from && s.status_to) return `${s.status_from} → ${s.status_to}`;
+  if (s.change === "changed") return `Changed ${s.fields?.join(", ").replace(/_/g, " ") ?? ""}`.trim();
+  if (s.change === "superseded") return s.by?.length ? `Superseded by ${s.by.join(", ")}` : "Superseded";
+  if (s.change === "dropped") return "Dropped";
+  return s.change === "seen" ? "First seen" : "Added";
+};
 
 const refText = (r: ItemRefTo | string) => (typeof r === "string" ? r : `${r.artifact}${r.version ? `@${r.version}` : ""}#${r.item}`);
 
@@ -193,27 +187,13 @@ function ItemRow({ item, versions, showState, open, toggle }: { item: ItemHistor
       </button>
       {open && (
         <div class="story">
-          <div class="row wrap">
-            <code>{item.reference}</code>
-            <button type="button" class="btn ghost small" onClick={() => copy(item.reference, "Reference copied")}>
-              Copy reference
-            </button>
-          </div>
           <ol class="steps">
             {item.steps.map((s) => (
               <li class={`step t-${s.change}`}>
                 <span class="vnum">v{s.version}</span>
                 <div>
-                  <b>{s.change === "seen" ? "first seen" : s.change}</b>
-                  {s.fields && s.fields.length > 0 && <span class="muted"> {s.fields.join(", ")}</span>}
-                  {s.status_from && s.status_to && (
-                    <span class="muted">
-                      {" "}
-                      · status {s.status_from} → {s.status_to}
-                    </span>
-                  )}
-                  {s.by && s.by.length > 0 && <span class="muted"> by {s.by.join(", ")}</span>}
-                  {s.item && typeof s.item.text === "string" && <div class="step-text">{s.item.text}</div>}
+                  {s.item && typeof s.item.text === "string" ? <div>{s.item.text}</div> : <div class="muted">{stepText(s)}</div>}
+                  {s.item && typeof s.item.text === "string" && s.change !== "seen" && s.change !== "added" && <div class="muted small-text">{stepText(s)}</div>}
                 </div>
               </li>
             ))}
@@ -226,10 +206,13 @@ function ItemRow({ item, versions, showState, open, toggle }: { item: ItemHistor
           ]
             .filter(([, l]) => (l as unknown[]).length)
             .map(([label, l]) => (
-              <div class="muted">
-                {label as string}: {(l as (ItemRefTo | string)[]).map((r) => <code>{refText(r)} </code>)}
+              <div class="muted small-text">
+                {label as string} {(l as (ItemRefTo | string)[]).map((r) => <code>{refText(r)} </code>)}
               </div>
             ))}
+          <button type="button" class="link small-text" onClick={() => copy(item.reference, "Reference copied")} title={item.reference}>
+            Copy reference
+          </button>
         </div>
       )}
     </li>

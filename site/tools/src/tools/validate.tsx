@@ -6,8 +6,8 @@ import { describePath, detectFormat, fileName, formatLabel, formatMime, formats,
 import { readShared, shareUrl } from "../share";
 import { schemaInfo } from "../schema";
 import type { Go, Handoff } from "../nav";
-import { copy, download, DropArea, EmptyState, ExamplePicker, hasReadable, lineOf, Menu, openFiles, Readable, ruleUrl, Segmented, Status, useRead, useStored, verdictOf, type TextFile } from "../ui";
-import type { Document } from "../core";
+import { copy, download, DropArea, EmptyState, ExamplePicker, hasReadable, lineOf, FixButton, Menu, openFiles, Readable, Segmented, Status, useRead, useStored, verdictOf, type TextFile } from "../ui";
+import { next, type Document } from "../core";
 
 type FormatChoice = "auto" | Format;
 type Side = "readable" | "report";
@@ -42,6 +42,9 @@ export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
   const warnings = marks.filter((m) => m.severity === "warning");
   const reveal = (m: Mark) => editor.current?.reveal(m.from, m.to);
   const empty = !file.text;
+  /** A fixed document goes back into the editor, in the same format. */
+  const apply = (d: Document) => setFile({ ...file, text: write(d, format) });
+  const fixable = errors.filter((m) => m.fix).length;
 
   return (
     <div class="split-2 validate">
@@ -114,13 +117,22 @@ export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
         ) : (
           <div class="pane-body scroll">
             {errors.length > 0 && (
-              <Section title={verdict === "unreadable" ? "Why the text cannot be read" : "Problems"}>
-                <ProblemList marks={errors} doc={result?.doc} text={file.text} reveal={reveal} />
+              <Section
+                title={verdict === "unreadable" ? "Why the text cannot be read" : "Problems"}
+                action={
+                  fixable > 1 && next.fixAll && result?.doc ? (
+                    <button type="button" class="btn ghost small" onClick={() => apply(next.fixAll!(result.doc!).doc)}>
+                      Fix {fixable}
+                    </button>
+                  ) : null
+                }
+              >
+                <ProblemList marks={errors} doc={result?.doc} text={file.text} reveal={reveal} apply={apply} />
               </Section>
             )}
             {warnings.length > 0 && (
               <Section title="Notes from the Markdown reader">
-                <ProblemList marks={warnings} doc={result?.doc} text={file.text} reveal={reveal} />
+                <ProblemList marks={warnings} doc={result?.doc} text={file.text} reveal={reveal} apply={apply} />
               </Section>
             )}
             {result?.doc && <Summary doc={result.doc} />}
@@ -139,10 +151,13 @@ export function Validate({ go, incoming }: { go: Go; incoming?: Handoff }) {
   );
 }
 
-function Section({ title, children }: { title: string; children: preact.ComponentChildren }) {
+function Section({ title, action, children }: { title: string; action?: preact.ComponentChildren; children: preact.ComponentChildren }) {
   return (
     <section class="section">
-      <h2>{title}</h2>
+      <h2 class="row">
+        <span class="grow">{title}</span>
+        {action}
+      </h2>
       {children}
     </section>
   );
@@ -165,23 +180,19 @@ function Summary({ doc }: { doc: Document }) {
 
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-function ProblemList({ marks, doc, text, reveal }: { marks: Mark[]; doc?: Document; text: string; reveal: (m: Mark) => void }) {
+function ProblemList({ marks, doc, text, reveal, apply }: { marks: Mark[]; doc?: Document; text: string; reveal: (m: Mark) => void; apply: (d: Document) => void }) {
   return (
     <ol class="problems">
       {marks.map((m) => (
         <li class={m.severity}>
-          <button type="button" class="problem" onClick={() => reveal(m)}>
+          <button type="button" class="problem" onClick={() => reveal(m)} title={m.rule ? `Rule ${m.rule}` : undefined}>
+            <span class="msg">{m.hint ?? sentence(m.message)}</span>
             <span class="where">
               Line {lineOf(text, m.from)}
               {m.path ? ` · ${describePath(doc, m.path)}` : ""}
             </span>
-            <span class="msg">{sentence(m.message)}</span>
           </button>
-          {m.rule && (
-            <a class="rule" href={ruleUrl} target="_blank" rel="noopener" title="The rule in section 9 of the specification">
-              {m.rule}
-            </a>
-          )}
+          <FixButton doc={doc} fix={m.fix} apply={apply} />
         </li>
       ))}
     </ol>

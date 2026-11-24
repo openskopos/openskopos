@@ -8,7 +8,7 @@ import { detectFormat, fileName, formatLabel, formatMime, formats, itemIndex, it
 import { schemaInfo, type Field, type ItemTypeInfo } from "../schema";
 import { readShared, shareUrl } from "../share";
 import type { Go, Handoff } from "../nav";
-import { copy, download, DropArea, ExamplePicker, hasReadable, Menu, openFiles, Readable, ruleUrl, Segmented, Status, mdSession, toast, useMedia, useStored, type TextFile } from "../ui";
+import { copy, download, DropArea, ExamplePicker, FixButton, hasReadable, Menu, openFiles, Readable, Segmented, Status, mdSession, toast, useMedia, useStored, type TextFile } from "../ui";
 
 type View = "both" | "cards" | "text";
 
@@ -127,7 +127,7 @@ export function Author({ go, incoming }: { go: Go; incoming?: Handoff }) {
     setSrc({ ...src, format, text });
   }
 
-  const allProblems = useMemo(() => (doc ? core.check(doc) : []), [doc]);
+  const allProblems = useMemo(() => (doc ? (core.check(doc) as Problem[]) : []), [doc]);
   const problems = pristine === null ? allProblems : allProblems.filter((p) => itemIndex(p.path) !== pristine);
   const marks: Mark[] = useMemo(() => {
     if (readErrors.length) return readErrors;
@@ -329,7 +329,7 @@ function ProblemStrip({ marks, doc, reveal }: { marks: Mark[]; doc?: Document; r
         const id = i !== null ? doc?.items?.[i]?.id : undefined;
         return (
           <button type="button" class="strip-row" onClick={() => reveal(m)}>
-            {id && <b>{String(id)}</b>} {friendly(m.message, m.path)}
+            {id && <b>{String(id)}</b>} {m.hint ?? friendly(m.message, m.path)}
           </button>
         );
       })}
@@ -406,7 +406,7 @@ function Cards({ doc, problems, pristine, setPristine, readOnly, selected, selec
 
   return (
     <div class="cards" ref={list}>
-      <Envelope doc={doc} problems={envelope} readOnly={readOnly} change={change} />
+      <Envelope doc={doc} problems={envelope} readOnly={readOnly} change={change} commit={commit} />
       {items.length > 6 && (
         <input class="filter" type="search" placeholder={`Filter ${items.length} items by ID or text`} value={filter} onInput={(e) => setFilter(e.currentTarget.value)} aria-label="Filter items" />
       )}
@@ -431,6 +431,7 @@ function Cards({ doc, problems, pristine, setPristine, readOnly, selected, selec
                 info={t}
                 doc={doc}
                 problems={byItem.get(i) ?? []}
+                commit={commit}
                 open={selected === i}
                 readOnly={readOnly}
                 toggle={() => select(selected === i ? null : i)}
@@ -454,7 +455,7 @@ function Cards({ doc, problems, pristine, setPristine, readOnly, selected, selec
                 <span class="id">{String(it.id ?? "?")}</span>
                 <span class="txt">{String(it.text ?? "")}</span>
               </div>
-              <div class="card-problems">{(byItem.get(i) ?? []).map((p) => <div>{p.message}</div>)}</div>
+              <div class="card-problems">{(byItem.get(i) ?? []).map((p) => <div>{p.hint ?? p.message}</div>)}</div>
             </div>
           ))}
         </section>
@@ -478,7 +479,7 @@ function Cards({ doc, problems, pristine, setPristine, readOnly, selected, selec
   );
 }
 
-function Envelope({ doc, problems, readOnly, change }: { doc: Document; problems: Problem[]; readOnly: boolean; change: (fn: (d: Document) => void) => void }) {
+function Envelope({ doc, problems, readOnly, change, commit }: { doc: Document; problems: Problem[]; readOnly: boolean; change: (fn: (d: Document) => void) => void; commit: (d: Document) => void }) {
   const set = (key: string, value: string) =>
     change((d) => {
       if (value === "") delete d[key];
@@ -512,16 +513,9 @@ function Envelope({ doc, problems, readOnly, change }: { doc: Document; problems
       {problems.length > 0 && (
         <div class="card-problems">
           {problems.map((p) => (
-            <div>
-              {p.message}
-              {p.rule && (
-                <>
-                  {" "}
-                  <a href={ruleUrl} target="_blank" rel="noopener" class="rule">
-                    {p.rule}
-                  </a>
-                </>
-              )}
+            <div class="row">
+              <span class="grow">{p.hint ?? p.message}</span>
+              <FixButton doc={doc} fix={p.fix} apply={commit} />
             </div>
           ))}
         </div>
@@ -541,9 +535,10 @@ interface CardProps {
   toggle: () => void;
   change: (fn: (it: Item) => void) => void;
   remove: () => void;
+  commit: (d: Document) => void;
 }
 
-function Card({ item, index, info, doc, problems, open, readOnly, toggle, change, remove }: CardProps) {
+function Card({ item, index, info, doc, problems, open, readOnly, toggle, change, remove, commit }: CardProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -590,8 +585,9 @@ function Card({ item, index, info, doc, problems, open, readOnly, toggle, change
       {problems.length > 0 && (
         <div class="card-problems">
           {problems.map((p) => (
-            <div>
-              {friendly(p.message, p.path)}
+            <div class="row">
+              <span class="grow">{p.hint ?? friendly(p.message, p.path)}</span>
+              <FixButton doc={doc} fix={p.fix} apply={commit} />
             </div>
           ))}
         </div>

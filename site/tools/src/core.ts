@@ -3,10 +3,10 @@
 // The pages never reimplement the format in JavaScript, so they give the same
 // results as the skopos command line tool.
 import init, * as all from "@openskopos/core";
-import type { Diff, Document } from "@openskopos/core";
+import type { Diff, Document, Problem as BaseProblem } from "@openskopos/core";
 
 export const core = all;
-export type { Document, Item, Problem, Warning, MarkdownError, Diff, Export, ExportFile } from "@openskopos/core";
+export type { Document, Item, Warning, MarkdownError, Diff, Export, ExportFile } from "@openskopos/core";
 
 export const ready: Promise<unknown> = init();
 
@@ -65,7 +65,13 @@ export interface MergePair { main: string; other: string; by: "id" | "text" | "g
 export interface MergeConflict { kind: "changed" | "removed_in_main" | "removed_in_other"; main: string | null; other: string | null; fields: string[]; text_spans?: TextSpan[]; base_text?: string }
 export interface MergeResult { doc: Document; pairs: MergePair[]; conflicts: MergeConflict[]; renamed: { from: string; to: string }[]; envelope: string[] }
 export interface MergeOptions { base?: Document; pairs?: [string, string][]; now?: string }
+/** A change that core can make to fix a problem. */
+export interface Fix { label: string; patch: unknown[] }
+/** A problem, with the plain hint and the fix of the next release. */
+export type Problem = BaseProblem & { hint?: string; fix?: Fix };
 interface Next {
+  applyFix(doc: Document, fix: Fix): Document;
+  fixAll(doc: Document): { doc: Document; fixed: Fix[] };
   wordDiff(oldText: string, newText: string): TextSpan[];
   merge(main: Document, other: Document, options?: MergeOptions): MergeResult;
   mergeText(main: Document, other: Document, options?: MergeOptions): string;
