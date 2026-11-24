@@ -81,6 +81,14 @@ echo "$pages" | while IFS='|' read -r source folder title toc description; do
     --metadata folder="$folder" \
     --metadata description="$description" \
     --output "$out/$folder/index.html"
+  # schema.org breadcrumbs: Home, then Documentation for the pages under
+  # docs/, then the page.
+  crumb() { printf '{"@type":"ListItem","position":%s,"name":"%s","item":"https://openskopos.org%s"}' "$1" "$2" "$3"; }
+  case "$folder" in
+    docs/*) crumbs="$(crumb 1 OpenSkopos /),$(crumb 2 Documentation /docs/),$(crumb 3 "$title" "/$folder/")" ;;
+    *) crumbs="$(crumb 1 OpenSkopos /),$(crumb 2 "$title" "/$folder/")" ;;
+  esac
+  set -- "$@" --variable breadcrumbs="{\"@context\":\"https://schema.org\",\"@type\":\"BreadcrumbList\",\"itemListElement\":[$crumbs]}"
   if [ "$folder" = docs/install ]; then
     set -- "$@" --metadata versions="$versions"
   fi

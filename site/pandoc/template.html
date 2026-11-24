@@ -10,6 +10,9 @@ $if(description)$
 $endif$
 <link rel="canonical" href="https://openskopos.org/$folder$/">
 <link rel="alternate" type="text/markdown" href="/$folder$/index.md">
+$if(breadcrumbs)$
+<script type="application/ld+json">$breadcrumbs$</script>
+$endif$
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="OpenSkopos">
 <meta property="og:title" content="$pagetitle$ · OpenSkopos">
