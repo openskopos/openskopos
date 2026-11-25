@@ -30,6 +30,10 @@ abs_out=$(cd "$out" && pwd)
 )
 echo "site/tools -> /tools/"
 
+# The agent skill, for download at /skills/openskopos/SKILL.md. The page
+# /docs/skill/ shows its text.
+cp -R skills "$out/skills"
+
 # The image for links on social sites.
 cp brand/avatar-512-light.png "$out/og.png"
 
@@ -46,6 +50,7 @@ docs/install.md|docs/install|Install the skopos tool||Install the skopos command
 docs/editors.md|docs/editors|Editor support||Validation and completion for .skopos.json and .skopos.yaml files in VS Code and other editors.
 docs/exporters.md|docs/exporters|Export to OpenSpec, Kiro and Spec Kit|toc|Export an OpenSkopos document to OpenSpec, Kiro or GitHub Spec Kit, and see where each item type goes in each tool.
 docs/render.md|docs/render|Readable views of a document|toc|Show an OpenSkopos document as text in the terminal or as an HTML page, and style the HTML with CSS custom properties.
+docs/skill.md|docs/skill|Agent skill||An agent skill that teaches Claude Code, Codex, Amp, Cursor and other AI coding agents to record decisions in the OpenSkopos format, and to check, version and merge them with the skopos tool.
 crates/skopos/README.md|docs/cli|The skopos command line tool|toc|The skopos commands: check, fmt, convert, import, ids, export, diff, history, trace, merge, conflicts, resolve and render.
 crates/skopos-core/README.md|docs/rust|The skopos-core Rust library||Read, check, write, compare, merge and render OpenSkopos documents in Rust with the reference implementation.
 npm/core/README.md|docs/javascript|The @openskopos/core npm package||Read, check, write, compare, merge and render OpenSkopos documents in Node and in browsers, with the reference implementation built to WebAssembly.
@@ -92,6 +97,9 @@ echo "$pages" | while IFS='|' read -r source folder title toc description; do
   if [ "$folder" = docs/install ]; then
     set -- "$@" --metadata versions="$versions"
   fi
+  if [ "$folder" = docs/skill ]; then
+    set -- "$@" --metadata copy=true
+  fi
   if [ "$toc" = toc ]; then
     set -- "$@" --toc --toc-depth 3
   fi
@@ -132,6 +140,7 @@ url() {
     [ -n "$source" ] || continue
     url "/$folder/" "$(lastmod "$source")"
   done
+  url /skills/openskopos/SKILL.md "$(lastmod skills/openskopos/SKILL.md)"
   echo '</urlset>'
 } > "$out/sitemap.xml"
 echo "sitemap.xml: $(grep -c '<loc>' "$out/sitemap.xml") pages"
@@ -170,6 +179,7 @@ pages_in() {
   echo "## Documentation"
   echo
   pages_in docs "docs/*" changelog
+  link "SKILL.md" "$site/skills/openskopos/SKILL.md" "The agent skill itself: how an AI coding agent records decisions in the OpenSkopos format and checks, versions and merges them with the skopos tool."
   echo
   echo "## Tools"
   echo

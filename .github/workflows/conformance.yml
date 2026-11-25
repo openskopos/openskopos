@@ -11,7 +11,7 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 
-# A pull request that changes only site/ or docs/ runs the versions and site
+# A pull request that changes only site/, docs/ or skills/ runs the versions and site
 # jobs. The Rust and npm jobs then report as skipped, which counts as passed.
 # A push to main always runs every job. The npm CLI runs on macOS only on
 # pushes to main, because a macOS runner often takes minutes to start.
@@ -36,6 +36,7 @@ jobs:
               - "**"
               - "!site/**"
               - "!docs/**"
+              - "!skills/**"
 
   # All packages have one version, and its major and minor numbers are the
   # format version. See "Versions" in CONTRIBUTING.md.

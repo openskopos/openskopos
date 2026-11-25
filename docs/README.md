@@ -10,6 +10,8 @@ the format.
 - [Changelog](../RELEASES.md): what each release added, changed and removed.
 - [Editor support](editors.md): get validation and completion for your
   documents in your editor.
+- [Agent skill](skill.md): teach your AI coding agent to record decisions in
+  the OpenSkopos format.
 
 ## Tools
 
