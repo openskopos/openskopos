@@ -11,7 +11,32 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
 
+# A pull request that changes only site/ or docs/ runs the versions and site
+# jobs. The Rust and npm jobs then report as skipped, which counts as passed.
+# A push to main always runs every job. The npm CLI runs on macOS only on
+# pushes to main, because a macOS runner often takes minutes to start.
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      code: ${{ github.event_name == 'push' || steps.filter.outputs.code == 'true' }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@v3
+        with:
+          predicate-quantifier: every
+          filters: |
+            code:
+              - "**"
+              - "!site/**"
+              - "!docs/**"
+
   # All packages have one version, and its major and minor numbers are the
   # format version. See "Versions" in CONTRIBUTING.md.
   versions:
@@ -22,11 +47,14 @@ jobs:
         run: node scripts/check-versions.mjs
 
   conformance:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - uses: Swatinem/rust-cache@v2
       # A schema file is published when its schema-<version> tag exists.
       # A published file never changes.
       - name: Check that published schema files did not change
@@ -45,9 +73,12 @@ jobs:
         run: cargo run --locked --manifest-path conformance/runner/Cargo.toml
 
   test:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: Check the layout of the Rust code
         run: cargo fmt --check -p skopos-core -p skopos -p skopos-wasm
       - name: Run clippy
@@ -58,9 +89,12 @@ jobs:
         run: cargo test --workspace --locked
 
   wasm:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - run: rustup target add wasm32-unknown-unknown
       # .cargo/config.toml sets the getrandom backend for this target.
       - name: Build skopos-core for WebAssembly
@@ -72,9 +106,12 @@ jobs:
   # OpenSpec CLI on each: validate, then archive. The archived specs must be
   # the fixtures that the golden tests read.
   openspec:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -86,9 +123,12 @@ jobs:
         run: sh crates/skopos/tests/openspec_roundtrip.sh
 
   install:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - name: Install the skopos CLI
         run: cargo install --locked --path crates/skopos
       - name: Run the conformance cases with the installed CLI
@@ -106,9 +146,12 @@ jobs:
   # Builds the npm packages @openskopos/core and @openskopos/cli, and runs
   # the conformance cases through @openskopos/core.
   npm:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: Swatinem/rust-cache@v2
       - uses: actions/setup-node@v4
         with:
           node-version: 22
@@ -143,10 +186,11 @@ jobs:
   # the files that they write.
   npm-cli:
     needs: npm
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: ${{ fromJSON(github.event_name == 'push' && '["ubuntu-latest", "macos-latest", "windows-latest"]' || '["ubuntu-latest", "windows-latest"]') }}
         node: [22]
         include:
           - os: ubuntu-latest
@@ -172,6 +216,7 @@ jobs:
           cd "$RUNNER_TEMP/project"
           npm init --yes > /dev/null
           npm install --no-audit --no-fund "$GITHUB_WORKSPACE"/packs/*.tgz
+      - uses: Swatinem/rust-cache@v2
       - name: Build the native skopos
         run: cargo build -p skopos --release --locked
       # On Windows, the WebAssembly build joins paths with / and takes the
@@ -223,3 +268,8 @@ jobs:
           PANDOC_SHA256: 89d4c9d97818c62a97157f0072844e4602c6cee795bf84abd1aee7273abcda99
       - name: Build the site
         run: site/build.sh _site
+      # site/build.sh installs the packages of the tools and checks their
+      # types. These are the unit tests of the tools.
+      - name: Test the tools
+        run: npx vitest run
+        working-directory: site/tools
