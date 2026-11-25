@@ -1,0 +1,38 @@
+name: Deploy MCP server
+
+# Builds the MCP server (mcp/), runs its tests, and uploads and publishes
+# dist/bunny.js to its Bunny Edge Script. It runs only when a maintainer
+# starts it from the Actions tab. It needs two repository secrets, from the
+# script's Deployments > Settings page in the Bunny dashboard:
+# BUNNY_MCP_SCRIPT_ID and BUNNY_MCP_DEPLOY_KEY.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-mcp
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm test
+      - name: Upload and publish the script
+        uses: BunnyWay/actions/deploy-script@931a74b9c45ea9f9f01435fbbf1649830e67d3b3 # main on 2026-10-12
+        with:
+          script_id: ${{ secrets.BUNNY_MCP_SCRIPT_ID }}
+          deploy_key: ${{ secrets.BUNNY_MCP_DEPLOY_KEY }}
+          file: mcp/dist/bunny.js

@@ -273,3 +273,21 @@ jobs:
       - name: Test the tools
         run: npx vitest run
         working-directory: site/tools
+
+  # Builds the MCP server (mcp/) for Bunny Edge Scripting and Node, and runs
+  # its tests: the protocol, the limits, the kill switch and the log.
+  mcp:
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mcp
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build
+      - run: npm test
