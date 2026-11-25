@@ -61,9 +61,10 @@ in it. Upload it as a standalone Bunny Edge Script.
 2. In the script's environment, add the secret `MCP_LOG_SALT` (any long random
    string). The other settings below have defaults.
 3. Add the repository secrets `BUNNY_MCP_SCRIPT_ID` and `BUNNY_MCP_DEPLOY_KEY`
-   from the script's Deployments > Settings page. Then run the
-   "Deploy MCP server" workflow from the Actions tab. It builds, tests,
-   uploads and publishes `dist/bunny.js`.
+   from the script's Deployments > Settings page. The "Deploy MCP server"
+   workflow then builds, tests, uploads and publishes `dist/bunny.js` on
+   each push to main that changes `mcp/`, the specification 0.2 or the logo
+   files. Run it from the Actions tab for the first deploy.
 4. On the pull zone, turn on Bunny Shield and add a rate limit rule for
    `/mcp`, for example 120 requests a minute for one IP address.
 5. Add the hostname `mcp.openskopos.org` to the pull zone, and a CNAME record

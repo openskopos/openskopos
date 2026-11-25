@@ -1,17 +1,28 @@
 name: Deploy MCP server
 
 # Builds the MCP server (mcp/), runs its tests, and uploads and publishes
-# dist/bunny.js to its Bunny Edge Script. It runs only when a maintainer
-# starts it from the Actions tab. It needs two repository secrets, from the
-# script's Deployments > Settings page in the Bunny dashboard:
-# BUNNY_MCP_SCRIPT_ID and BUNNY_MCP_DEPLOY_KEY.
+# dist/bunny.js to its Bunny Edge Script with the Bunny API. It runs on a
+# push to main that changes a file in the bundle, and from the Actions tab.
+# It needs two repository secrets, from the script's Deployments > Settings
+# page in the Bunny dashboard: BUNNY_MCP_SCRIPT_ID and BUNNY_MCP_DEPLOY_KEY.
+# The deploy key can publish this one script and nothing else.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "mcp/**"
+      # The bundle also contains the specification and the logo.
+      - "spec/0.2/README.md"
+      - "brand/avatar-512-*.png"
+      - "brand/favicon.svg"
+      - ".github/workflows/deploy-mcp.yml"
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push waits for the deploy before it, so the last push wins.
 concurrency:
   group: deploy-mcp
   cancel-in-progress: false
@@ -30,7 +41,19 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run build
       - run: npm test
+      # Until the secrets are set, the workflow builds and tests only.
+      - name: Check for the Bunny secrets
+        id: bunny
+        env:
+          SCRIPT_ID: ${{ secrets.BUNNY_MCP_SCRIPT_ID }}
+        run: |
+          if [ -n "$SCRIPT_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::BUNNY_MCP_SCRIPT_ID is not set, so the script is not deployed."
+          fi
       - name: Upload and publish the script
+        if: steps.bunny.outputs.configured == 'true'
         uses: BunnyWay/actions/deploy-script@931a74b9c45ea9f9f01435fbbf1649830e67d3b3 # main on 2026-10-12
         with:
           script_id: ${{ secrets.BUNNY_MCP_SCRIPT_ID }}
