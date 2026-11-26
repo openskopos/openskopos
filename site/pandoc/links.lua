@@ -20,6 +20,7 @@ local pages = {
   ["RELEASES.md"] = "/changelog/",
   ["docs/README.md"] = "/docs/",
   ["docs/install.md"] = "/docs/install/",
+  ["docs/mcp.md"] = "/docs/mcp/",
   ["docs/editors.md"] = "/docs/editors/",
   ["docs/exporters.md"] = "/docs/exporters/",
   ["crates/skopos/README.md"] = "/docs/cli/",

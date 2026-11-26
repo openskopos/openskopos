@@ -8,6 +8,9 @@ documents with the reference implementation, the WebAssembly build of
 The server is stateless. A document is in the request and in the response
 only. The server keeps no documents, needs no account, and has tight limits.
 
+The public server is at `https://mcp.openskopos.org/mcp`. To connect an agent
+to it, see [Use OpenSkopos from an agent](../docs/mcp.md).
+
 ## Tools
 
 | Tool | What it does |
@@ -66,7 +69,8 @@ in it. Upload it as a standalone Bunny Edge Script.
    each push to main that changes `mcp/`, the specification 0.2 or the logo
    files. Run it from the Actions tab for the first deploy.
 4. On the pull zone, turn on Bunny Shield and add a rate limit rule for
-   `/mcp`, for example 120 requests a minute for one IP address.
+   `/mcp`. The public server allows 20 requests in 10 seconds for one IP
+   address, then blocks that address for one minute.
 5. Add the hostname `mcp.openskopos.org` to the pull zone, and a CNAME record
    for `mcp` to the pull zone's hostname.
 
