@@ -13,6 +13,7 @@ on:
       - "site/**"
       - "spec/**"
       - "docs/**"
+      - "skills/**"
       - "crates/*/README.md"
       - "npm/*/README.md"
       - "conformance/README.md"

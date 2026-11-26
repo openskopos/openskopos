@@ -23,6 +23,8 @@ local pages = {
   ["docs/mcp.md"] = "/docs/mcp/",
   ["docs/editors.md"] = "/docs/editors/",
   ["docs/exporters.md"] = "/docs/exporters/",
+  ["docs/skill.md"] = "/docs/skill/",
+  ["skills/openskopos/SKILL.md"] = "/skills/openskopos/SKILL.md",
   ["crates/skopos/README.md"] = "/docs/cli/",
   ["crates/skopos-core/README.md"] = "/docs/rust/",
   ["npm/core/README.md"] = "/docs/javascript/",
@@ -79,6 +81,17 @@ function Table(tbl)
       return code
     end,
   })
+end
+
+-- The page of the agent skill ends with the whole text of the skill, so
+-- people can read and copy it on the site.
+if source == "docs/skill.md" then
+  function Pandoc(doc)
+    local file = assert(io.open("skills/openskopos/SKILL.md"))
+    doc.blocks:insert(pandoc.CodeBlock(file:read("a"):gsub("\n$", ""), pandoc.Attr("", { "markdown" })))
+    file:close()
+    return doc
+  end
 end
 
 -- The stable IDs of the changelog headings.
