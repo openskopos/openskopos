@@ -81,3 +81,9 @@ skopos --version
 
 It prints the version number. For all commands, see
 [the skopos command line tool](../crates/skopos/README.md).
+
+## Use it from an agent
+
+An agent that can run commands can use `skopos` directly. For an agent that
+cannot, connect it to the [OpenSkopos MCP server](mcp.md). It has the same
+checks and needs no install.

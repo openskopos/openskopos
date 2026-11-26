@@ -1,0 +1,19 @@
+{
+  "name": "openskopos-mcp",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@bunny.net/edgescript-sdk": "0.13.0",
+    "@openskopos/core": "0.2.0"
+  },
+  "devDependencies": {
+    "esbuild": "0.28.2"
+  },
+  "scripts": {
+    "build": "npm run build:bunny && npm run build:node",
+    "build:bunny": "esbuild src/main.js --bundle --format=esm --platform=neutral --main-fields=module,main --loader:.wasm=base64 --loader:.md=text --loader:.png=binary --loader:.ico=binary --loader:.svg=text --external:node:* --log-level=warning --outfile=dist/bunny.js",
+    "build:node": "esbuild src/main.js --bundle --format=esm --platform=neutral --main-fields=module,main --loader:.wasm=base64 --loader:.md=text --loader:.png=binary --loader:.ico=binary --loader:.svg=text --external:node:* --log-level=warning --alias:@bunny.net/edgescript-sdk=./node_modules/@bunny.net/edgescript-sdk/esm-node/lib.mjs --external:http --external:https --external:http2 --external:stream --external:crypto --external:url --external:net --external:fs --external:path --external:buffer --external:events --external:util --external:zlib --outfile=dist/node.js",
+    "start": "node dist/node.js",
+    "test": "node --test"
+  }
+}

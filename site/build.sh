@@ -43,6 +43,7 @@ RELEASES.md|changelog|Changelog||What each OpenSkopos release added, changed and
 spec/CHANGELOG.md|spec/changelog|Changelog of the format||The changes to the OpenSkopos format, by format version.
 docs/README.md|docs|Documentation||How to use OpenSkopos documents and the skopos tool for spec-driven development.
 docs/install.md|docs/install|Install the skopos tool||Install the skopos command line tool on macOS, Linux or Windows, with Homebrew, an install script, Cargo or npm.
+docs/mcp.md|docs/mcp|Use OpenSkopos from an agent|toc|Connect Claude Code, Codex, Cursor, VS Code or another AI agent to the free OpenSkopos MCP server to check, fix, convert and merge documents.
 docs/editors.md|docs/editors|Editor support||Validation and completion for .skopos.json and .skopos.yaml files in VS Code and other editors.
 docs/exporters.md|docs/exporters|Export to OpenSpec, Kiro and Spec Kit|toc|Export an OpenSkopos document to OpenSpec, Kiro or GitHub Spec Kit, and see where each item type goes in each tool.
 docs/render.md|docs/render|Readable views of a document|toc|Show an OpenSkopos document as text in the terminal or as an HTML page, and style the HTML with CSS custom properties.

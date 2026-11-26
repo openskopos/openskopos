@@ -7,6 +7,8 @@ the format.
 ## Start here
 
 - [Install the skopos tool](install.md) on macOS, Linux or Windows.
+- [Use OpenSkopos from an agent](mcp.md): connect Claude Code, Codex,
+  Cursor or another agent to the OpenSkopos MCP server.
 - [Changelog](../RELEASES.md): what each release added, changed and removed.
 - [Editor support](editors.md): get validation and completion for your
   documents in your editor.
