@@ -333,17 +333,43 @@ pub fn history(docs: &[Value]) -> History {
             (artifact.as_str(), set)
         })
         .collect();
+    // Kahn's algorithm: each step takes the smallest artifact ID whose
+    // inputs are all placed, as the loop it replaces did.
+    let mut waiting: BTreeMap<&str, usize> =
+        inputs.iter().map(|(a, ins)| (*a, ins.len())).collect();
+    let mut users: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (a, ins) in &inputs {
+        for i in ins {
+            users.entry(*i).or_default().push(*a);
+        }
+    }
+    let mut ready: BTreeSet<&str> = waiting
+        .iter()
+        .filter(|(_, n)| **n == 0)
+        .map(|(a, _)| *a)
+        .collect();
+    let mut placed: BTreeSet<&str> = BTreeSet::new();
     let mut order: Vec<&str> = Vec::new();
     while order.len() < inputs.len() {
-        let open = |a: &&str| !order.contains(a);
-        let next = inputs
-            .iter()
-            .find(|(a, ins)| open(a) && ins.iter().all(|i| order.contains(i)))
-            .map(|(a, _)| *a)
+        let next = match ready.pop_first() {
+            Some(a) => a,
             // A loop of inputs: take the first artifact that is left.
-            .or_else(|| inputs.keys().copied().find(open))
-            .expect("an artifact is left");
+            None => *inputs
+                .keys()
+                .find(|a| !placed.contains(*a))
+                .expect("an artifact is left"),
+        };
+        if !placed.insert(next) {
+            continue;
+        }
         order.push(next);
+        for u in users.get(next).into_iter().flatten() {
+            let n = waiting.get_mut(u).expect("a user waits");
+            *n = n.saturating_sub(1);
+            if *n == 0 && !placed.contains(u) {
+                ready.insert(*u);
+            }
+        }
     }
 
     let mut chains = Vec::new();
