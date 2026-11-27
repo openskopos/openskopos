@@ -365,6 +365,26 @@ export interface Compaction {
   warnings: HistoryWarning[];
 }
 
+/** One item that `searchArchive` found, from the newest version that matches. */
+export interface SearchHit {
+  reference: string;
+  artifact: string;
+  item: string;
+  type: string;
+  status: string;
+  version: number;
+  versions_matched: number;
+  text: string;
+}
+
+/** The result of `searchArchive`. */
+export interface SearchResult {
+  documents: number;
+  documents_parsed: number;
+  items_scanned: number;
+  hits: SearchHit[];
+}
+
 /** Options for `compact` and `compactText`. */
 export interface CompactOptions {
   /** The time for created_at of each draft. Default: now. */
@@ -1405,7 +1425,7 @@ pub fn stylesheet() -> String {
 /// Searches a `.skopos.jsonl.zst` archive, given as bytes, for a word or
 /// phrase. Each matching item appears once, from its newest version.
 /// Prototype for the 0.3 compaction plan.
-#[wasm_bindgen(js_name = searchArchive)]
+#[wasm_bindgen(js_name = searchArchive, unchecked_return_type = "SearchResult")]
 pub fn search_archive(bytes: &[u8], query: &str) -> Result<JsValue, JsValue> {
     skopos_core::search::search_archive(bytes, query)
         .map(|r| to_js(&r))

@@ -31,3 +31,26 @@ fn finds_each_item_once_from_its_newest_version() {
         ]
     );
 }
+
+#[test]
+fn reads_every_frame_escaped_text_and_refuses_an_empty_query() {
+    let a = doc(
+        "pa_0000000000000001",
+        1,
+        r#"{"id":"T1","type":"term","text":"Caf\u00e9"}"#,
+    );
+    let b = doc(
+        "pa_0000000000000002",
+        1,
+        r#"{"id":"T1","type":"term","text":"caf\u00e9 menu"}"#,
+    );
+    let mut archive = compress_to_vec(a.as_bytes(), CompressionLevel::Fastest);
+    archive.extend(compress_to_vec(
+        format!("\n{b}\n").as_bytes(),
+        CompressionLevel::Fastest,
+    ));
+    let r = search_archive(archive.as_slice(), "CAFÉ").unwrap();
+    assert_eq!(r.documents, 2, "the second frame is read");
+    assert_eq!(r.hits.len(), 2, "the escaped \\u00e9 matches too");
+    assert!(search_archive(archive.as_slice(), "  ").is_err());
+}

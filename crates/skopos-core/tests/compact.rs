@@ -251,3 +251,116 @@ fn a_draft_stops_the_compaction() {
     let e = compact(&[d], &Options::default(), &mut || unreachable!()).unwrap_err();
     assert!(e.message.contains("is a draft"), "{}", e.message);
 }
+
+#[test]
+fn refs_into_unchanged_artifacts_stay_and_open_critiques_stay() {
+    let intent = doc(
+        "pa_i000000000000001",
+        1,
+        "intent",
+        json!([
+            {"id": "G1", "type": "goal", "text": "Fair bills.", "status": "accepted"}
+        ]),
+    );
+    let spec = doc(
+        "pa_a000000000000001",
+        1,
+        "spec",
+        json!([
+            {"id": "FR1", "type": "requirement", "text": "Count seats.", "status": "accepted",
+             "refs": [{"item": "G1", "artifact": "pa_i000000000000001", "version": 1, "rel": "derived_from"}]},
+            {"id": "FR2", "type": "requirement", "text": "Old.", "status": "rejected"},
+            {"id": "CR1", "type": "critique", "text": "Counts can lag.", "status": "proposed",
+             "severity": "major", "category": "gap", "evidence": [{"kind": "quote", "text": "lag"}], "resolution": {"outcome": "open"}},
+            {"id": "Q1", "type": "open_question", "text": "Which plans?", "status": "accepted", "answer": " "}
+        ]),
+    );
+    let c = run(&[intent, spec]);
+    let d = &c.drafts[0].doc;
+    assert_eq!(
+        ids(d),
+        ["FR1", "CR1", "Q1"],
+        "an open critique and a blank answer are not settled"
+    );
+    assert_eq!(
+        d["items"][0]["refs"],
+        json!([
+            {"item": "G1", "artifact": "pa_i000000000000001", "version": 1, "rel": "derived_from"}
+        ]),
+        "a ref into the unchanged intent stays"
+    );
+    assert_eq!(c.unchanged, ["pa_i000000000000001@1"]);
+}
+
+#[test]
+fn the_glossary_keeps_its_ids_and_only_terms_are_paired() {
+    let rules = doc(
+        "pa_a000000000000001",
+        1,
+        "agent_rules",
+        json!([
+            {"id": "T1", "type": "term", "text": "Seat", "definition": "A user who can sign in.", "status": "accepted"},
+            {"id": "T2", "type": "term", "text": "Plan", "definition": "A price list.", "status": "accepted"}
+        ]),
+    );
+    let mut glossary = doc(
+        "pa_g000000000000001",
+        1,
+        "glossary",
+        json!([
+            {"id": "T1", "type": "term", "text": "Seat", "definition": "A user who can sign in.", "status": "accepted"},
+            {"id": "T2", "type": "term", "text": "Plan", "definition": "What the customer pays for.", "status": "accepted"},
+            {"id": "D1", "type": "decision", "text": "Seat", "status": "accepted"}
+        ]),
+    );
+    glossary["id_counters"] = json!({"T": 2, "D": 1});
+    let c = run(&[rules, glossary]);
+    let g = &c.drafts.iter().find(|d| d.kind == "glossary").unwrap().doc;
+    assert_eq!(g["id"], "pa_g000000000000001");
+    assert_eq!(
+        ids(g),
+        ["T1", "T2", "D1", "T3"],
+        "the glossary's own terms keep their IDs"
+    );
+    assert_eq!(
+        g["items"][2]["status"], "accepted",
+        "a decision is never a term conflict"
+    );
+    assert_eq!(
+        g["items"][3]["refs"][1],
+        json!({"item": "T2", "rel": "contradicts"})
+    );
+    // merge::conflicts reads the pair, so skopos conflicts and resolve work on it.
+    let open = skopos_core::merge::conflicts(g);
+    assert_eq!(open.len(), 1, "{open:?}");
+    let dup = c
+        .left_out
+        .iter()
+        .find(|l| l.reason == Reason::Duplicate)
+        .unwrap();
+    assert_eq!(dup.reference, "pa_a000000000000001@1#T1");
+}
+
+#[test]
+fn a_new_glossary_without_now_is_valid() {
+    let spec = doc(
+        "pa_a000000000000001",
+        1,
+        "spec",
+        json!([
+            {"id": "T1", "type": "term", "text": "Seat", "definition": "A user.", "status": "accepted"}
+        ]),
+    );
+    let mut n = 0;
+    let c = compact(&[spec], &Options::default(), &mut || {
+        n += 1;
+        format!("pa_new000000000000{n:02}")
+    })
+    .unwrap();
+    for d in &c.drafts {
+        assert_eq!(skopos_core::check(&d.doc), vec![], "{} draft", d.kind);
+    }
+    let g = c.drafts.iter().find(|d| d.kind == "glossary").unwrap();
+    assert_eq!(g.doc["title"], "Glossary");
+    assert_eq!(g.doc["created_at"], "2026-11-01T00:00:00Z");
+}

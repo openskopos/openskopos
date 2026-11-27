@@ -137,10 +137,18 @@ fn reason(item: &Value, state: ItemState) -> Option<Reason> {
         ItemState::InForce | ItemState::Proposed => {}
     }
     match s(item, "type") {
-        "open_question" if item.get("answer").is_some() && s(item, "status") == "accepted" => {
+        "open_question"
+            if !s(item, "answer").trim().is_empty() && s(item, "status") == "accepted" =>
+        {
             Some(Reason::Answered)
         }
-        "critique" if item.get("resolution").is_some() => Some(Reason::Resolved),
+        "critique"
+            if item
+                .get("resolution")
+                .is_some_and(|r| !matches!(s(r, "outcome"), "" | "open")) =>
+        {
+            Some(Reason::Resolved)
+        }
         "assumption" if s(item, "confirmation") == "refuted" => Some(Reason::Refuted),
         _ => None,
     }
@@ -208,6 +216,9 @@ pub fn compact(
     // Phase 1: choose what each draft holds and give each carried item its
     // ID in the draft.
     let mut left_out = Vec::new();
+    // Items left out, as (artifact, item ID). A ref to one of them is removed
+    // unless it is `supersedes`; a ref to any other item stays as it is.
+    let mut removed: BTreeSet<(String, String)> = BTreeSet::new();
     let mut members: BTreeMap<&str, Vec<(&Value, &Value)>> = BTreeMap::new();
     let mut changed: BTreeSet<&str> = BTreeSet::new();
     for (kind, sources) in &kinds {
@@ -230,6 +241,7 @@ pub fn compact(
                         reason: r,
                         kept: None,
                     });
+                    removed.insert((s(doc, "id").to_string(), s(item, "id").to_string()));
                     changed.insert(kind);
                     continue;
                 }
@@ -252,9 +264,16 @@ pub fn compact(
     let mut conflict_names: BTreeMap<String, Vec<usize>> = BTreeMap::new();
     let mut duplicate_of: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
     if let Some(terms) = members.get_mut("glossary") {
+        // Items of the glossary itself come first, so its terms keep their
+        // IDs and the terms from other kinds are the ones that move.
+        terms.sort_by_key(|(d, _)| s(d, "kind") != "glossary");
         let mut first: BTreeMap<(String, String), (String, String)> = BTreeMap::new();
         let mut kept = Vec::new();
         for (doc, item) in terms.drain(..) {
+            if s(item, "type") != "term" {
+                kept.push((doc, item));
+                continue;
+            }
             let name = s(item, "text").trim().to_lowercase();
             let def = s(item, "definition").trim().to_string();
             let me = (s(doc, "id").to_string(), s(item, "id").to_string());
@@ -358,7 +377,6 @@ pub fn compact(
             dest.insert(dup, d);
         }
     }
-    let in_set: BTreeSet<&str> = latest.keys().copied().collect();
 
     // Phase 2: write the drafts.
     let mut drafts = Vec::new();
@@ -384,6 +402,10 @@ pub fn compact(
                 let target = (target_artifact.to_string(), s(r, "item").to_string());
                 let mut nr = r.as_object().cloned().unwrap_or_default();
                 if let Some((di, did)) = dest.get(&target) {
+                    if *di == index && did == id {
+                        // A duplicate term that folded into this one.
+                        continue;
+                    }
                     nr.insert("item".into(), Value::String(did.clone()));
                     nr.remove("version");
                     if *di == index {
@@ -394,7 +416,7 @@ pub fn compact(
                             Value::String(plans[*di].artifact.clone()),
                         );
                     }
-                } else if s(r, "rel") == "supersedes" || !in_set.contains(target_artifact) {
+                } else if s(r, "rel") == "supersedes" || !removed.contains(&target) {
                     // The old item stays in the record; point to it where it is.
                     if target_artifact != plan.artifact {
                         nr.insert(
@@ -474,6 +496,9 @@ fn write_draft(plan: &Plan, items: Vec<Value>, options: &Options) -> Draft {
             let o = d.as_object_mut().expect("a document is an object");
             o.insert("version".into(), Value::from(version_of(prev) + 1));
             o.remove("finalized_at");
+            // The compaction is a new step, not part of the old session.
+            o.remove("method");
+            o.remove("session");
             let mut parents = vec![
                 json!({"rel": "previous_version", "artifact": plan.artifact, "version": version_of(prev)}),
             ];
@@ -506,18 +531,32 @@ fn write_draft(plan: &Plan, items: Vec<Value>, options: &Options) -> Draft {
                     )
                 })
                 .copied();
-            let title = main
-                .map(|d| s(d, "title"))
-                .filter(|t| !t.is_empty())
-                .unwrap_or(&plan.kind);
-            let created = plan
-                .sources
-                .iter()
-                .map(|d| s(d, "created_at"))
+            // A kind with no source, such as a new glossary, gets its name
+            // as title, and its time and schema from the items' documents.
+            let title = match main.map(|d| s(d, "title")).filter(|t| !t.is_empty()) {
+                Some(t) => t.to_string(),
+                None => {
+                    let mut c = plan.kind.replace('_', " ").chars().collect::<Vec<_>>();
+                    if let Some(f) = c.first_mut() {
+                        *f = f.to_ascii_uppercase();
+                    }
+                    c.into_iter().collect()
+                }
+            };
+            let pool = || {
+                plan.sources
+                    .iter()
+                    .copied()
+                    .chain(plan.carried.iter().map(|(d, _)| *d))
+            };
+            let created = pool().map(|d| s(d, "created_at")).max().unwrap_or("");
+            let schema = pool()
+                .map(|d| s(d, "$schema"))
+                .filter(|x| !x.is_empty())
                 .max()
-                .unwrap_or("");
+                .unwrap_or(crate::SCHEMA_URL);
             json!({
-                "$schema": main.map(|d| s(d, "$schema")).filter(|x| !x.is_empty()).unwrap_or(crate::SCHEMA_URL),
+                "$schema": schema,
                 "id": plan.artifact,
                 "version": 1,
                 "kind": plan.kind,

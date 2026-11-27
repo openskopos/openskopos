@@ -64,19 +64,100 @@ fn contains(hay: &str, needle_lower: &str) -> bool {
     hay.to_lowercase().contains(needle_lower)
 }
 
+/// The largest Zstandard window an archive may use, so that any reader, a
+/// browser included, decodes it with little memory.
+pub const MAX_WINDOW: u64 = 8 << 20;
+
+/// Decodes concatenated Zstandard frames (RFC 8878 allows several in a file),
+/// and refuses a frame whose window is larger than [`MAX_WINDOW`].
+struct Frames<R: BufRead> {
+    decoder: Option<ruzstd::decoding::StreamingDecoder<R, ruzstd::decoding::FrameDecoder>>,
+}
+
+impl<R: BufRead> Frames<R> {
+    fn start(
+        mut source: R,
+    ) -> std::io::Result<
+        Option<ruzstd::decoding::StreamingDecoder<R, ruzstd::decoding::FrameDecoder>>,
+    > {
+        let head = source.fill_buf()?;
+        if head.is_empty() {
+            return Ok(None);
+        }
+        let window = window_size(head)
+            .ok_or_else(|| std::io::Error::other("the archive is not a Zstandard frame"))?;
+        if window > MAX_WINDOW {
+            return Err(std::io::Error::other(format!(
+                "the archive uses a Zstandard window of {window} bytes; the limit is {MAX_WINDOW}"
+            )));
+        }
+        let d = ruzstd::decoding::StreamingDecoder::new(source).map_err(std::io::Error::other)?;
+        Ok(Some(d))
+    }
+}
+
+/// The window size of a Zstandard frame, from its header (RFC 8878, 3.1.1.1).
+/// A single-segment frame needs its whole content as the window.
+fn window_size(h: &[u8]) -> Option<u64> {
+    if h.len() < 6 || h[..4] != [0x28, 0xB5, 0x2F, 0xFD] {
+        return None;
+    }
+    let fhd = h[4];
+    if fhd & 0x20 == 0 {
+        let wd = h[5];
+        let log = 10 + u32::from(wd >> 3);
+        let base = 1u64 << log;
+        return Some(base + (base / 8) * u64::from(wd & 7));
+    }
+    let dict = [0, 1, 2, 4][usize::from(fhd & 3)];
+    let at = 5 + dict;
+    let fcs = match fhd >> 6 {
+        0 => u64::from(*h.get(at)?),
+        1 => u64::from(u16::from_le_bytes(h.get(at..at + 2)?.try_into().ok()?)) + 256,
+        2 => u64::from(u32::from_le_bytes(h.get(at..at + 4)?.try_into().ok()?)),
+        _ => u64::from_le_bytes(h.get(at..at + 8)?.try_into().ok()?),
+    };
+    Some(fcs)
+}
+
+impl<R: BufRead> Read for Frames<R> {
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        while let Some(d) = self.decoder.as_mut() {
+            let n = d.read(buf)?;
+            if n > 0 || buf.is_empty() {
+                return Ok(n);
+            }
+            let source = self.decoder.take().expect("a decoder").into_inner();
+            self.decoder = Self::start(source)?;
+        }
+        Ok(0)
+    }
+}
+
 /// Search the items of every document in a `.skopos.jsonl.zst` archive for a
-/// word or phrase, ignoring case. Each item appears once, from its newest version.
+/// word or phrase, ignoring case. Each item appears once, from the newest
+/// version that matches. The search reads the text of each archived version;
+/// it does not say whether a later version changed the item.
 pub fn search_archive<R: Read>(archive: R, query: &str) -> Result<SearchResult, String> {
-    let decoder = ruzstd::decoding::StreamingDecoder::new(archive).map_err(|e| e.to_string())?;
-    search_lines(BufReader::with_capacity(1 << 20, decoder), query)
+    let frames = Frames {
+        decoder: Frames::start(BufReader::new(archive)).map_err(|e| e.to_string())?,
+    };
+    search_lines(BufReader::with_capacity(1 << 20, frames), query)
 }
 
 /// The same search on plain JSON Lines.
 pub fn search_lines<R: BufRead>(lines: R, query: &str) -> Result<SearchResult, String> {
-    let q = query.to_lowercase();
+    let q = query.trim().to_lowercase();
+    if q.is_empty() {
+        return Err("the query is empty".into());
+    }
     // A line that does not contain the query cannot have a matching item, unless
-    // JSON escaping changed the query's characters. Skip parsing those lines.
-    let prefilter = !q.chars().any(|c| c == '"' || c == '\\' || c.is_control());
+    // JSON escaping changed the query's characters, as it can for quotes,
+    // backslashes, control characters and any non-ASCII character (\u00e9).
+    // Skip parsing those lines only when no escaping is possible.
+    let prefilter = q
+        .chars()
+        .all(|c| c.is_ascii() && c != '"' && c != '\\' && !c.is_control());
     let mut result = SearchResult::default();
     let mut found: HashMap<(String, String), Hit> = HashMap::new();
     for line in lines.lines() {
