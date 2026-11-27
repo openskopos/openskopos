@@ -44,6 +44,7 @@ use std::fmt;
 use serde::{Deserialize, Serialize};
 pub use serde_json::Value;
 
+pub mod compact;
 pub mod diff;
 pub mod export;
 pub mod fix;

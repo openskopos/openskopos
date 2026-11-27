@@ -459,6 +459,35 @@ also set `status` in any editor.
 skopos resolve merged.skopos.json FR3
 ```
 
+### compact
+
+`skopos compact` folds the documents of one area into their current state.
+Give it every version of each artifact. It is a prototype for format 0.3, and
+works with the refs of 0.2.
+
+```bash
+skopos compact billing/*.skopos.json --out compacted
+```
+
+```
+glossary: next version pa_9Lp4Wd7Ks2Hq6Nb3@2 (draft), 2 items, from pa_9Lp4Wd7Ks2Hq6Nb3@1
+spec: new artifact pa_5Cb8Nw2Rt6Lk9Qm3@1 (draft), 3 items, from pa_4Hs8Lm2Qx6Vr9Tc3@1, pa_7Wn3Kd5Pz1Gy8Fb2@1
+left out: 2 (rejected 1, superseded 1)
+```
+
+- Items in force or proposed are carried. Rejected and superseded items,
+  answered questions, critiques with a resolution and refuted assumptions
+  are left out and listed with `--json`.
+- When a kind has one artifact, the draft is its next version and the items
+  keep their IDs. When it has several, the draft is a new artifact: each item
+  gets a new ID and a `derived_from` ref to its source, and each source is an
+  `input` parent. `skopos trace` follows an old reference to the new item.
+- Terms go to the glossary draft. Two terms with one name and different
+  definitions both stay as `proposed`, with a `contradicts` ref.
+- The command writes the drafts with `--out`, one `<kind>.skopos.json` each.
+  It does not move or delete files. It stops if the latest version of an
+  artifact is a draft.
+
 ### render
 
 `skopos render` shows a document for people to read: text in the terminal, or

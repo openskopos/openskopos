@@ -334,6 +334,43 @@ export interface HistoryTextOptions {
   since?: number;
 }
 
+/** One draft of `compact`. */
+export interface CompactDraft {
+  kind: string;
+  /** True for a new artifact, false for the next version of its only source. */
+  new_artifact: boolean;
+  /** The latest version of each source, as `<artifact>@<version>`. */
+  sources: string[];
+  items: number;
+  doc: Document;
+}
+
+/** An item that `compact` left out, and why. */
+export interface CompactLeftOut {
+  reference: string;
+  type: string;
+  reason: "rejected" | "superseded" | "answered" | "resolved" | "refuted" | "duplicate";
+  /** For a duplicate term: the term that is kept. */
+  kept?: string;
+}
+
+/** The result of `compact`. */
+export interface Compaction {
+  drafts: CompactDraft[];
+  /** Kinds that need no draft, as `<artifact>@<version>`. */
+  unchanged: string[];
+  left_out: CompactLeftOut[];
+  /** Terms with one name and two definitions, as IDs in the glossary draft. */
+  conflicts: { term: string; items: string[] }[];
+  warnings: HistoryWarning[];
+}
+
+/** Options for `compact` and `compactText`. */
+export interface CompactOptions {
+  /** The time for created_at of each draft. Default: now. */
+  now?: string;
+}
+
 /** Options for `merge` and `mergeText`. */
 export interface MergeOptions {
   /** The common earlier version. Items with an ID of the base pair by ID. */
@@ -1034,6 +1071,41 @@ pub fn merge_text(
     #[wasm_bindgen(unchecked_param_type = "MergeOptions")] options: Option<JsValue>,
 ) -> Result<String, JsValue> {
     Ok(merge_of(&main, &other, &options)?.to_text())
+}
+
+fn compact_of(
+    docs: &JsValue,
+    options: &Option<JsValue>,
+) -> Result<skopos_core::compact::Compaction, JsValue> {
+    let docs = from_js(docs, "docs")?;
+    let docs = docs
+        .as_array()
+        .ok_or_else(|| type_error("docs must be a list of documents"))?;
+    let options = from_js_opt(options, "options")?;
+    let now = option_string(&options, "now").unwrap_or_else(now);
+    let options = skopos_core::compact::Options { now: Some(now) };
+    skopos_core::compact::compact(docs, &options, &mut new_artifact_id)
+        .map_err(|p| problems_error(&[p]))
+}
+
+/// Compacts the documents of one area: every version of each artifact. The
+/// current items go into one draft per kind, and terms into the glossary
+/// draft. Returns the drafts, the items left out and the term conflicts.
+#[wasm_bindgen(unchecked_return_type = "Compaction")]
+pub fn compact(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "CompactOptions")] options: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&compact_of(&docs, &options)?))
+}
+
+/// `compact(docs, options)` as text, as `skopos compact` writes it.
+#[wasm_bindgen(js_name = compactText)]
+pub fn compact_text(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "CompactOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    Ok(compact_of(&docs, &options)?.to_text())
 }
 
 /// The open conflicts of a merged document.

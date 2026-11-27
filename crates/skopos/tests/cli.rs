@@ -1012,3 +1012,31 @@ fn export_to_openspec_warns_about_a_hand_edit() {
         "{stderr}"
     );
 }
+
+#[test]
+fn compact_writes_valid_drafts() {
+    let case = conformance().join("history/02-hand-over");
+    let dir = temp_dir("compact");
+    let files = [
+        case.join("first-team.json"),
+        case.join("second-team.json"),
+        conformance().join("valid/glossary-v1.json"),
+    ];
+    let mut args: Vec<String> = vec!["compact".into(), "--out".into(), dir.display().to_string()];
+    args.extend(files.iter().map(|f| f.display().to_string()));
+    let args: Vec<&str> = args.iter().map(String::as_str).collect();
+    let out = skopos(&args);
+    assert!(
+        out.status.success(),
+        "{}",
+        String::from_utf8_lossy(&out.stderr)
+    );
+    assert!(String::from_utf8_lossy(&out.stdout).contains("left out: 2 (rejected 1, superseded 1)"));
+    for kind in ["spec", "glossary"] {
+        let path = dir
+            .join(format!("{kind}.skopos.json"))
+            .display()
+            .to_string();
+        assert!(skopos(&["check", &path]).status.success(), "{kind} draft");
+    }
+}
