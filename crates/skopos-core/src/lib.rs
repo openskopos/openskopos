@@ -56,6 +56,7 @@ mod order;
 pub mod render;
 pub mod rules;
 mod schema;
+pub mod search;
 mod text;
 pub mod words;
 mod yaml;

@@ -1329,3 +1329,13 @@ pub fn render_terminal(
 pub fn stylesheet() -> String {
     render::STYLESHEET.to_string()
 }
+
+/// Searches a `.skopos.jsonl.zst` archive, given as bytes, for a word or
+/// phrase. Each matching item appears once, from its newest version.
+/// Prototype for the 0.3 compaction plan.
+#[wasm_bindgen(js_name = searchArchive)]
+pub fn search_archive(bytes: &[u8], query: &str) -> Result<JsValue, JsValue> {
+    skopos_core::search::search_archive(bytes, query)
+        .map(|r| to_js(&r))
+        .map_err(|e| type_error(&e))
+}
