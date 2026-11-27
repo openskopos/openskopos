@@ -15,9 +15,10 @@ out="${1:-_site}"
 rm -rf "$out"
 mkdir -p "$out"
 
-# The static files. The pandoc folder and this script are build files only.
+# The static files. The pandoc folder, this script, the tools source and the
+# edge script (site/edge, which runs on the CDN) are not part of the site.
 cp -R site/. "$out/"
-rm -rf "$out/pandoc" "$out/build.sh" "$out/tools"
+rm -rf "$out/pandoc" "$out/build.sh" "$out/tools" "$out/edge"
 
 # The tools at /tools/ are a Vite app in site/tools. It runs the WebAssembly
 # build of skopos-core from the @openskopos/core package.
