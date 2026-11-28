@@ -19,6 +19,8 @@ the format.
 
 - [The skopos command line tool](../crates/skopos/README.md): all commands
   and their options.
+- [Compaction](compaction.md): fold versions and parallel documents into clean
+  current drafts while keeping old decisions traceable and searchable.
 - [Readable views](render.md): show a document as text in the terminal or
   as an HTML page.
 - [Exporters](exporters.md): write a document as an OpenSpec, Kiro or Spec Kit
