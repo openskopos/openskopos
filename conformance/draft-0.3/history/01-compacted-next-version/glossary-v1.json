@@ -1,0 +1,39 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.2.json",
+  "id": "pa_9Lp4Wd7Ks2Hq6Nb3",
+  "version": 1,
+  "kind": "glossary",
+  "title": "Glossary",
+  "status": "final",
+  "parents": [
+    {
+      "rel": "input",
+      "artifact": "pa_4Hs8Lm2Qx6Vr9Tc3",
+      "version": 1,
+      "kind": "spec",
+      "title": "Seat limits"
+    }
+  ],
+  "id_counters": {
+    "T": 1
+  },
+  "items": [
+    {
+      "id": "T1",
+      "type": "term",
+      "text": "Seat",
+      "definition": "A user who can sign in.",
+      "status": "accepted",
+      "refs": [
+        {
+          "item": "T1",
+          "artifact": "pa_4Hs8Lm2Qx6Vr9Tc3",
+          "version": 1,
+          "rel": "derived_from"
+        }
+      ]
+    }
+  ],
+  "created_at": "2026-11-27T09:00:00Z",
+  "finalized_at": "2026-11-27T10:00:00Z"
+}

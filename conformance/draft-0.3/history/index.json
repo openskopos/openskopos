@@ -1,0 +1,12 @@
+{
+  "cases": [
+    {
+      "case": "01-compacted-next-version",
+      "description": "A continuing artifact compacted into its next version with a self-replaces parent. Rejected and settled items keep their prior state, a term moved to the glossary becomes carried, and an ordinary removal stays dropped."
+    },
+    {
+      "case": "02-repeated-compaction",
+      "description": "Two specs fold into C with replaces parents, then D supersedes C#D1 and C+D fold into E. A#D1 and C#D1 are both superseded by D#D1, while A#D2 and C#D2 are carried through to E."
+    }
+  ]
+}

@@ -1,0 +1,177 @@
+{
+  "chains": [
+    {
+      "artifact": "pa_a000000000000001",
+      "versions": [
+        1
+      ]
+    },
+    {
+      "artifact": "pa_b000000000000001",
+      "versions": [
+        1
+      ]
+    },
+    {
+      "artifact": "pa_c000000000000001",
+      "versions": [
+        1
+      ]
+    },
+    {
+      "artifact": "pa_d000000000000001",
+      "versions": [
+        1
+      ]
+    },
+    {
+      "artifact": "pa_e000000000000001",
+      "versions": [
+        1
+      ]
+    }
+  ],
+  "warnings": 0,
+  "items": {
+    "pa_a000000000000001#D1": {
+      "state": "superseded",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": [
+        "pa_d000000000000001@1#D1",
+        "pa_e000000000000001@1#D3"
+      ],
+      "derived_into": [
+        "pa_c000000000000001@1#D1"
+      ]
+    },
+    "pa_a000000000000001#D2": {
+      "state": "carried",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "derived_into": [
+        "pa_c000000000000001@1#D2"
+      ]
+    },
+    "pa_b000000000000001#D1": {
+      "state": "carried",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "derived_into": [
+        "pa_c000000000000001@1#D3"
+      ]
+    },
+    "pa_c000000000000001#D1": {
+      "state": "superseded",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": [
+        "pa_d000000000000001@1#D1",
+        "pa_e000000000000001@1#D3"
+      ],
+      "derived_from": [
+        "pa_a000000000000001@1#D1"
+      ]
+    },
+    "pa_c000000000000001#D2": {
+      "state": "carried",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "derived_from": [
+        "pa_a000000000000001@1#D2"
+      ],
+      "derived_into": [
+        "pa_e000000000000001@1#D1"
+      ]
+    },
+    "pa_c000000000000001#D3": {
+      "state": "carried",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "derived_from": [
+        "pa_b000000000000001@1#D1"
+      ],
+      "derived_into": [
+        "pa_e000000000000001@1#D2"
+      ]
+    },
+    "pa_d000000000000001#D1": {
+      "state": "carried",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "supersedes": [
+        "pa_c000000000000001@1#D1"
+      ],
+      "derived_into": [
+        "pa_e000000000000001@1#D3"
+      ]
+    },
+    "pa_e000000000000001#D1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "derived_from": [
+        "pa_c000000000000001@1#D2"
+      ]
+    },
+    "pa_e000000000000001#D2": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "derived_from": [
+        "pa_c000000000000001@1#D3"
+      ]
+    },
+    "pa_e000000000000001#D3": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "supersedes": [
+        "pa_c000000000000001@1#D1"
+      ],
+      "derived_from": [
+        "pa_d000000000000001@1#D1"
+      ]
+    }
+  }
+}

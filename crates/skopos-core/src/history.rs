@@ -110,9 +110,11 @@ pub enum ItemState {
     /// Rejected in the latest version. It stays in the record.
     Rejected,
     /// An item that is not rejected replaces it with `supersedes`, in this
-    /// artifact or in another one.
+    /// artifact or in another one (directly or through a carried item).
     Superseded,
-    /// Removed, and no item replaces it.
+    /// Carried into another artifact by compaction via `derived_from` (0.3).
+    Carried,
+    /// Removed, and no item replaces or carries it.
     Dropped,
 }
 
@@ -124,6 +126,7 @@ impl ItemState {
             ItemState::Proposed => "proposed",
             ItemState::Rejected => "rejected",
             ItemState::Superseded => "superseded",
+            ItemState::Carried => "carried",
             ItemState::Dropped => "dropped",
         }
     }
@@ -240,19 +243,73 @@ fn push_new(list: &mut Vec<String>, value: String) {
     }
 }
 
-/// The artifact versions that a document has as `input` parents.
+/// The artifact versions that a document has as `input` or `replaces` parents.
 fn input_parents(doc: &Value) -> Vec<(String, u64)> {
     doc.get("parents")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter(|p| str_of(p, "rel") == "input")
+        .filter(|p| matches!(str_of(p, "rel"), "input" | "replaces"))
         .filter_map(|p| {
             let artifact = p.get("artifact")?.as_str()?;
             let version = p.get("version").and_then(crate::whole_number)?;
             Some((artifact.to_string(), version))
         })
         .collect()
+}
+
+/// The artifact versions that a document has as `replaces` parents.
+fn replaces_parents(doc: &Value) -> Vec<(String, u64)> {
+    doc.get("parents")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|p| str_of(p, "rel") == "replaces")
+        .filter_map(|p| {
+            let artifact = p.get("artifact")?.as_str()?;
+            let version = p.get("version").and_then(crate::whole_number)?;
+            Some((artifact.to_string(), version))
+        })
+        .collect()
+}
+
+/// True if an item was already settled in its last version (an accepted
+/// answered question, a critique with a non-open resolution, or a refuted
+/// assumption), so removing it in a compacted next version is not a drop.
+fn is_settled(item: &Value) -> bool {
+    match str_of(item, "type") {
+        "open_question" => {
+            !str_of(item, "answer").trim().is_empty() && str_of(item, "status") == "accepted"
+        }
+        "critique" => item
+            .get("resolution")
+            .is_some_and(|r| !matches!(str_of(r, "outcome"), "" | "open")),
+        "assumption" => str_of(item, "confirmation") == "refuted",
+        _ => false,
+    }
+}
+
+/// True if a `derived_from` edge from `source` to `target` carries the item
+/// across a compaction (rather than an ordinary derivation such as a
+/// requirement derived from a decision):
+/// - `target`'s artifact has a `replaces` parent naming `source`'s artifact, or
+/// - `source` is a `term` carried into another `term` (in a glossary) after
+///   `source`'s artifact was replaced or compacted.
+fn is_carrying_link(
+    source: &ItemHistory,
+    target: &ItemHistory,
+    replaced_by: &BTreeMap<&str, BTreeSet<&str>>,
+    removed_by_compaction: bool,
+) -> bool {
+    if replaced_by
+        .get(source.artifact.as_str())
+        .is_some_and(|replacers| replacers.contains(target.artifact.as_str()))
+    {
+        return true;
+    }
+    let source_compacted =
+        removed_by_compaction || replaced_by.contains_key(source.artifact.as_str());
+    source_compacted && source.item_type == "term" && target.item_type == "term"
 }
 
 fn versions_words(artifact: &str, from: u64, to: u64) -> String {
@@ -546,6 +603,31 @@ pub fn history(docs: &[Value]) -> History {
         }
     };
 
+    // Track which artifacts are replaced by which other artifacts (via a
+    // cross-artifact `replaces` parent), and which specific `(artifact, version)`
+    // pairs were compacted into their own next version (a self-`replaces` parent).
+    let mut replaced_by: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut compacted_versions: BTreeSet<(&str, u64)> = BTreeSet::new();
+    for (artifact, versions) in &by_artifact {
+        for (&version, &doc) in versions {
+            for (rep_art, rep_ver) in replaces_parents(doc) {
+                if rep_art == *artifact && rep_ver < version {
+                    compacted_versions.insert((artifact.as_str(), version));
+                } else if let Some((k, _)) = by_artifact.get_key_value(&rep_art) {
+                    if rep_art != *artifact {
+                        replaced_by
+                            .entry(k.as_str())
+                            .or_default()
+                            .insert(artifact.as_str());
+                    }
+                }
+            }
+        }
+    }
+
+    // Track `derived_from` edges between artifacts so we can identify carried
+    // items and propagate supersession backward across repeated compactions.
+    let mut derived_edges: Vec<Vec<usize>> = vec![Vec::new(); items.len()];
     for i in 0..items.len() {
         let artifact = items[i].artifact.clone();
         let in_latest = items[i].last_version == latest_version[artifact.as_str()];
@@ -566,11 +648,16 @@ pub fn history(docs: &[Value]) -> History {
                 if let Some(t) = t {
                     let into = items[i].reference.clone();
                     push_new(&mut items[t].derived_into, into);
+                    if !derived_edges[t].contains(&i) {
+                        derived_edges[t].push(i);
+                    }
                 }
             }
         }
     }
 
+    // Add same-artifact supersession recorded on removal steps before
+    // propagating supersession backward across carried items.
     for i in 0..items.len() {
         let latest_v = latest_version[items[i].artifact.as_str()];
         let item = &items[i];
@@ -590,16 +677,83 @@ pub fn history(docs: &[Value]) -> History {
         for by in removed_by {
             push_new(&mut item.superseded_by, by);
         }
-        item.state = if item.last_version < latest_v {
-            if item.superseded_by.is_empty() {
-                ItemState::Dropped
+    }
+
+    // Precompute which items were removed by a compacted next version and
+    // which outgoing `derived_from` edges actually carry an item across a
+    // compaction (rather than an ordinary `derived_from` link such as FR1
+    // derived from D1).
+    let removed_by_compaction: Vec<bool> = (0..items.len())
+        .map(|i| {
+            let art = items[i].artifact.as_str();
+            let latest_v = latest_version[art];
+            items[i].last_version < latest_v
+                && items[i].steps.last().is_some_and(|s| {
+                    s.change == Change::Dropped && compacted_versions.contains(&(art, s.version))
+                })
+        })
+        .collect();
+    let carried_edges: Vec<Vec<usize>> = (0..items.len())
+        .map(|i| {
+            derived_edges[i]
+                .iter()
+                .copied()
+                .filter(|&j| {
+                    is_carrying_link(&items[i], &items[j], &replaced_by, removed_by_compaction[i])
+                })
+                .collect()
+        })
+        .collect();
+
+    // Propagate supersession backward across repeated compactions: if an item
+    // was carried into a downstream item that is superseded (directly or
+    // transitively), record those same superseders on the carried item.
+    loop {
+        let mut changed = false;
+        for i in 0..items.len() {
+            if carried_edges[i].is_empty() {
+                continue;
+            }
+            let downstream: Vec<String> = carried_edges[i]
+                .iter()
+                .flat_map(|&j| items[j].superseded_by.iter().cloned())
+                .collect();
+            for by in downstream {
+                if !items[i].superseded_by.contains(&by) {
+                    items[i].superseded_by.push(by);
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    for i in 0..items.len() {
+        let latest_v = latest_version[items[i].artifact.as_str()];
+        let carried = !carried_edges[i].is_empty();
+        let compacted = removed_by_compaction[i];
+        let settled = is_settled(&latest[i]);
+        let item = &mut items[i];
+        item.state = if !item.superseded_by.is_empty() {
+            ItemState::Superseded
+        } else if carried {
+            ItemState::Carried
+        } else if item.last_version < latest_v {
+            if compacted && item.status == "rejected" {
+                ItemState::Rejected
+            } else if compacted && settled {
+                if item.status == "accepted" {
+                    ItemState::InForce
+                } else {
+                    ItemState::Proposed
+                }
             } else {
-                ItemState::Superseded
+                ItemState::Dropped
             }
         } else if item.status == "rejected" {
             ItemState::Rejected
-        } else if !item.superseded_by.is_empty() {
-            ItemState::Superseded
         } else if item.status == "accepted" {
             ItemState::InForce
         } else {

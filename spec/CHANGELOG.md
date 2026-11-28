@@ -4,6 +4,22 @@ This file lists the changes to the OpenSkopos format, by format version. While
 the format is at 0.x, each 0.y version can have breaking changes. Each entry
 lists every breaking change, so that tools can migrate documents.
 
+## 0.3 (draft)
+
+Breaking change: adds the `replaces` parent `rel` for compaction and merge.
+A 0.2 validator rejects a document that uses `replaces`. A 0.2 document is a
+valid 0.3 document when its `$schema` is the URL of 0.3.
+
+- Section 8.2: adds the `replaces` artifact parent `rel`. A `replaces` parent
+  to another artifact marks that artifact as retired by compaction or merge.
+  A `replaces` parent to the document's own `previous_version` marks a
+  compacted next version of a continuing artifact.
+- Section 8.3 (informative): adds the `carried` item state, orders chains by
+  `replaces` parents as well as `input` parents, keeps the prior state of
+  rejected, settled and carried items removed by a compacted next version,
+  and propagates supersession backward along `derived_from` chains across
+  repeated compactions.
+
 ## 0.2 (2026-11-24)
 
 No breaking change. A document of format 0.1 is a valid document of format

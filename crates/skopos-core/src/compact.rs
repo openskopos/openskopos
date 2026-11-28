@@ -164,7 +164,7 @@ fn reason(item: &Value, state: ItemState, accepted_superseded: bool) -> Option<R
         ItemState::Superseded if accepted_superseded => return Some(Reason::Superseded),
         // A dropped item is in no latest version, so it never gets here.
         ItemState::Dropped => return Some(Reason::Superseded),
-        ItemState::InForce | ItemState::Proposed | ItemState::Superseded => {}
+        ItemState::InForce | ItemState::Proposed | ItemState::Superseded | ItemState::Carried => {}
     }
     match s(item, "type") {
         "open_question"
@@ -478,8 +478,30 @@ pub fn compact(
             ));
         }
     }
+    // Artifacts already replaced by another artifact in `docs` or `context`
+    // are closed history and are not compacted again.
+    let mut replaced: BTreeSet<&str> = BTreeSet::new();
+    for doc in docs.iter().chain(options.context.iter()) {
+        let doc_id = s(doc, "id");
+        for p in doc
+            .get("parents")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+        {
+            if s(p, "rel") == "replaces" {
+                let target = s(p, "artifact");
+                if !target.is_empty() && target != doc_id {
+                    replaced.insert(target);
+                }
+            }
+        }
+    }
     let mut kinds: BTreeMap<&str, Vec<&Value>> = BTreeMap::new();
-    for doc in latest.values() {
+    for (id, doc) in &latest {
+        if replaced.contains(id) {
+            continue;
+        }
         kinds.entry(s(doc, "kind")).or_default().push(doc);
     }
 
@@ -866,6 +888,28 @@ pub fn compact(
                         nr.insert("artifact".into(), Value::String(d.artifact.clone()));
                     }
                 } else if s(r, "rel") == "supersedes" || !in_set.contains(target_artifact) {
+                    // When an item moves into a new artifact, its new
+                    // `derived_from` ref already links it to its immediate
+                    // predecessor (which links further back). Drop older
+                    // compaction `derived_from` refs pointing into replaced
+                    // artifacts outside the current set so repeated compaction
+                    // does not accumulate an unbounded list of `derived_from`
+                    // refs on every carried item.
+                    if moved
+                        && s(r, "rel") == "derived_from"
+                        && r.get("artifact").is_some()
+                        && r.get("version").is_some()
+                        && doc
+                            .get("parents")
+                            .and_then(Value::as_array)
+                            .into_iter()
+                            .flatten()
+                            .any(|p| {
+                                s(p, "rel") == "replaces" && s(p, "artifact") == target_artifact
+                            })
+                    {
+                        continue;
+                    }
                     // The old item stays in the record; point to it where it is.
                     if target_artifact != plan.artifact {
                         nr.insert(
@@ -950,12 +994,17 @@ fn write_draft(
         Some(prev) => {
             let mut d = prev.clone();
             let o = d.as_object_mut().expect("a document is an object");
+            o.insert(
+                "$schema".into(),
+                Value::String(crate::DRAFT_0_3_SCHEMA_URL.into()),
+            );
             o.insert("version".into(), Value::from(version_of(prev) + 1));
             o.remove("finalized_at");
             o.remove("method");
             o.remove("session");
             let mut parents = vec![
                 json!({"rel": "previous_version", "artifact": plan.artifact, "version": version_of(prev)}),
+                json!({"rel": "replaces", "artifact": plan.artifact, "version": version_of(prev)}),
             ];
             for p in prev
                 .get("parents")
@@ -963,7 +1012,10 @@ fn write_draft(
                 .into_iter()
                 .flatten()
             {
-                if s(p, "rel") != "previous_version" {
+                let rel = s(p, "rel");
+                if rel != "previous_version"
+                    && !(rel == "replaces" && s(p, "artifact") == plan.artifact)
+                {
                     parents.push(p.clone());
                 }
             }
@@ -1014,15 +1066,21 @@ fn write_draft(
                 .filter(|t| !t.is_empty())
                 .max()
                 .unwrap_or("");
-            let schema_url = main
-                .map(|d| s(d, "$schema"))
-                .filter(|x| !x.is_empty())
-                .or_else(|| {
-                    all_origin_docs()
-                        .map(|d| s(d, "$schema"))
-                        .find(|x| !x.is_empty())
-                })
-                .unwrap_or(crate::SCHEMA_URL);
+            // Drafts with `replaces` parents use draft format 0.3; a
+            // synthesized glossary with only `input` parents keeps the
+            // sources' `$schema` (or 0.2).
+            let schema_url = if !plan.sources.is_empty() {
+                crate::DRAFT_0_3_SCHEMA_URL
+            } else {
+                main.map(|d| s(d, "$schema"))
+                    .filter(|x| !x.is_empty())
+                    .or_else(|| {
+                        all_origin_docs()
+                            .map(|d| s(d, "$schema"))
+                            .find(|x| !x.is_empty())
+                    })
+                    .unwrap_or(crate::SCHEMA_URL)
+            };
             json!({
                 "$schema": schema_url,
                 "id": plan.artifact,
@@ -1041,27 +1099,40 @@ fn write_draft(
     if !participants.is_empty() {
         o.insert("participants".into(), Value::Array(participants));
     }
-    // An input parent for each source that is not the version before.
-    let mut inputs: Vec<(&str, u64, &str, &str)> = Vec::new();
+    // `replaces` parent for each source artifact of this kind folded into a
+    // new artifact, and `input` parent for any other artifact whose items
+    // (such as terms) were carried into this draft.
+    let mut parent_links: Vec<(&str, &str, u64, &str, &str)> = Vec::new();
     for d in &plan.sources {
         if Some(s(d, "id")) != plan.continues.map(|c| s(c, "id")) {
-            inputs.push((s(d, "id"), version_of(d), s(d, "kind"), s(d, "title")));
+            parent_links.push((
+                "replaces",
+                s(d, "id"),
+                version_of(d),
+                s(d, "kind"),
+                s(d, "title"),
+            ));
         }
     }
     for c in &plan.carried {
-        let i = (
-            s(c.doc, "id"),
-            version_of(c.doc),
-            s(c.doc, "kind"),
-            s(c.doc, "title"),
-        );
-        if i.0 != plan.artifact && !inputs.contains(&i) {
-            inputs.push(i);
+        let art = s(c.doc, "id");
+        let ver = version_of(c.doc);
+        if art != plan.artifact
+            && !parent_links
+                .iter()
+                .any(|(_, a, v, _, _)| *a == art && *v == ver)
+        {
+            parent_links.push(("input", art, ver, s(c.doc, "kind"), s(c.doc, "title")));
         }
         for (ed, _) in &c.extra_sources {
-            let ei = (s(ed, "id"), version_of(ed), s(ed, "kind"), s(ed, "title"));
-            if ei.0 != plan.artifact && !inputs.contains(&ei) {
-                inputs.push(ei);
+            let eart = s(ed, "id");
+            let ever = version_of(ed);
+            if eart != plan.artifact
+                && !parent_links
+                    .iter()
+                    .any(|(_, a, v, _, _)| *a == eart && *v == ever)
+            {
+                parent_links.push(("input", eart, ever, s(ed, "kind"), s(ed, "title")));
             }
         }
     }
@@ -1070,13 +1141,13 @@ fn write_draft(
         .or_insert(json!([]))
         .as_array_mut()
         .expect("parents is a list");
-    for (artifact, version, kind, title) in inputs {
-        let mut p = json!({"rel": "input", "artifact": artifact, "version": version, "kind": kind});
+    for (rel, artifact, version, kind, title) in parent_links {
+        let mut p = json!({"rel": rel, "artifact": artifact, "version": version, "kind": kind});
         if !title.is_empty() {
             p["title"] = title.into();
         }
         let exists = parents.iter().any(|q| {
-            s(q, "rel") == "input"
+            s(q, "rel") == rel
                 && s(q, "artifact") == artifact
                 && q.get("version") == p.get("version")
         });

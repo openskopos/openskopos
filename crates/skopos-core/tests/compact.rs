@@ -110,6 +110,11 @@ fn one_artifact_continues_with_its_ids() {
         d["parents"][0],
         json!({"rel": "previous_version", "artifact": "pa_a000000000000001", "version": 2})
     );
+    assert_eq!(
+        d["parents"][1],
+        json!({"rel": "replaces", "artifact": "pa_a000000000000001", "version": 2})
+    );
+    assert_eq!(d["$schema"], skopos_core::DRAFT_0_3_SCHEMA_URL);
     assert_eq!(d.get("method"), None, "stale method is cleared");
     assert_eq!(d.get("session"), None, "stale session is cleared");
     assert_eq!(
@@ -208,13 +213,19 @@ fn several_artifacts_fold_into_a_new_one_that_history_links() {
         ]),
         "refs follow the items to their new IDs"
     );
-    let inputs: Vec<&str> = spec["parents"]
+    let parent_rels: Vec<(&str, &str)> = spec["parents"]
         .as_array()
         .unwrap()
         .iter()
-        .map(|p| p["artifact"].as_str().unwrap())
+        .map(|p| (p["rel"].as_str().unwrap(), p["artifact"].as_str().unwrap()))
         .collect();
-    assert_eq!(inputs, ["pa_a000000000000001", "pa_b000000000000001"]);
+    assert_eq!(
+        parent_rels,
+        [
+            ("replaces", "pa_a000000000000001"),
+            ("replaces", "pa_b000000000000001")
+        ]
+    );
 
     let g = &c.drafts.iter().find(|d| d.kind == "glossary").unwrap();
     assert!(!g.new_artifact, "the one glossary continues");
@@ -256,8 +267,10 @@ fn several_artifacts_fold_into_a_new_one_that_history_links() {
     all.extend(c.drafts.iter().map(|d| d.doc.clone()));
     let h = history(&all);
     let b_d1 = h.item("pa_b000000000000001#D1").unwrap();
+    assert_eq!(b_d1.state, ItemState::Carried);
     assert_eq!(b_d1.derived_into, ["pa_new00000000000001@1#D2"]);
     let b_t1 = h.item("pa_b000000000000001#T1").unwrap();
+    assert_eq!(b_t1.state, ItemState::Carried);
     assert_eq!(
         b_t1.derived_into,
         ["pa_g000000000000001@3#T5"],
@@ -687,5 +700,138 @@ fn critique_target_is_rewritten_when_targeted_artifact_folds() {
     assert_eq!(
         crit.doc["items"][0]["target"],
         json!({"artifact": spec_id, "item": "D2"})
+    );
+}
+
+#[test]
+fn continued_compaction_preserves_states_and_repeated_compaction_propagates_supersession() {
+    // 1. Continued artifact: rejected, settled, and moved-term items do not
+    // become `dropped` in history.
+    let s1 = doc(
+        "pa_s000000000000001",
+        1,
+        "spec",
+        json!([
+            {"id": "D1", "type": "decision", "text": "Bad idea.", "status": "rejected"},
+            {"id": "D2", "type": "decision", "text": "Good idea.", "status": "accepted"},
+            {"id": "Q1", "type": "open_question", "text": "Which?", "status": "accepted", "answer": "This."},
+            {"id": "A1", "type": "assumption", "text": "Sky is green.", "status": "accepted", "confirmation": "refuted"},
+            {"id": "T1", "type": "term", "text": "Seat", "definition": "A user.", "status": "accepted"}
+        ]),
+    );
+    let c1 = run(std::slice::from_ref(&s1));
+    let mut all1 = vec![s1];
+    all1.extend(c1.drafts.iter().map(|d| d.doc.clone()));
+    let h1 = history(&all1);
+    assert_eq!(
+        h1.item("pa_s000000000000001#D1").unwrap().state,
+        ItemState::Rejected
+    );
+    assert_eq!(
+        h1.item("pa_s000000000000001#D2").unwrap().state,
+        ItemState::InForce
+    );
+    assert_eq!(
+        h1.item("pa_s000000000000001#Q1").unwrap().state,
+        ItemState::InForce
+    );
+    assert_eq!(
+        h1.item("pa_s000000000000001#A1").unwrap().state,
+        ItemState::InForce
+    );
+    assert_eq!(
+        h1.item("pa_s000000000000001#T1").unwrap().state,
+        ItemState::Carried
+    );
+
+    // 2. Repeated compaction: A+B -> C (replaces A, B), then D supersedes
+    // C#D1, then C+D -> E (replaces C, D). History over all five must show
+    // A#D1 as Superseded, A#D2 and C#D2 as Carried, and E does not accumulate
+    // duplicate derived_from refs back to A.
+    let a = doc(
+        "pa_a000000000000020",
+        1,
+        "spec",
+        json!([
+            {"id": "D1", "type": "decision", "text": "Decision 1.", "status": "accepted"},
+            {"id": "D2", "type": "decision", "text": "Decision 2.", "status": "accepted"}
+        ]),
+    );
+    let b = doc(
+        "pa_b000000000000020",
+        1,
+        "spec",
+        json!([
+            {"id": "D1", "type": "decision", "text": "Decision 3.", "status": "accepted"}
+        ]),
+    );
+    let comp1 = run(&[a.clone(), b.clone()]);
+    let mut c = comp1.drafts[0].doc.clone();
+    c["status"] = json!("final");
+    c["finalized_at"] = json!("2026-11-27T01:00:00Z");
+    let c_id = c["id"].as_str().unwrap().to_string();
+
+    let d = doc(
+        "pa_d000000000000020",
+        1,
+        "spec",
+        json!([
+            {"id": "D1", "type": "decision", "text": "Decision 1 replaced.", "status": "accepted",
+             "refs": [{"item": "D1", "artifact": c_id, "version": 1, "rel": "supersedes"}]}
+        ]),
+    );
+    let mut n = 10;
+    let comp2 = compact(
+        &[c.clone(), d.clone()],
+        &Options {
+            now: Some("2026-11-27T02:00:00Z".into()),
+            ..Default::default()
+        },
+        &mut || {
+            n += 1;
+            format!("pa_new000000000000{n:02}")
+        },
+    )
+    .unwrap();
+    let e = comp2.drafts[0].doc.clone();
+    assert_eq!(skopos_core::check(&e), vec![]);
+
+    // Carried item in E (originally A#D2 -> C#D2 -> E#D2) links only to C@1#D2,
+    // not also to A@1#D2.
+    let e_d2_derived: Vec<&str> = e["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|i| i["text"] == "Decision 2.")
+        .unwrap()["refs"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .filter(|r| r["rel"] == "derived_from")
+        .map(|r| r["artifact"].as_str().unwrap())
+        .collect();
+    assert_eq!(e_d2_derived, [c_id.as_str()]);
+
+    let h = history(&[a, b, c, d, e]);
+    let a_d1 = h.item("pa_a000000000000020#D1").unwrap();
+    assert_eq!(a_d1.state, ItemState::Superseded);
+    assert!(
+        a_d1.superseded_by
+            .iter()
+            .any(|s| s == "pa_d000000000000020@1#D1"),
+        "A#D1 must inherit superseder from C#D1: {:?}",
+        a_d1.superseded_by
+    );
+    assert_eq!(
+        h.item("pa_a000000000000020#D2").unwrap().state,
+        ItemState::Carried
+    );
+    assert_eq!(
+        h.item(&format!("{c_id}#D1")).unwrap().state,
+        ItemState::Superseded
+    );
+    assert_eq!(
+        h.item(&format!("{c_id}#D2")).unwrap().state,
+        ItemState::Carried
     );
 }

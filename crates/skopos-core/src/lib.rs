@@ -64,7 +64,7 @@ mod yaml;
 
 pub use ids::{assign_ids, parse_item_id, AssignedId, IdReport};
 pub use rules::check_rules;
-pub use schema::{check_schema, SCHEMA, SCHEMA_URL};
+pub use schema::{check_schema, DRAFT_0_3_SCHEMA, DRAFT_0_3_SCHEMA_URL, SCHEMA, SCHEMA_URL};
 pub use text::{parse, to_json, to_yaml, write, Format};
 
 /// One problem in a document.

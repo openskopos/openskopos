@@ -280,7 +280,7 @@ export interface HistoryLink {
 
 export interface HistoryWarning { artifact: string | null; message: string; }
 
-export type ItemState = "in_force" | "proposed" | "rejected" | "superseded" | "dropped";
+export type ItemState = "in_force" | "proposed" | "rejected" | "superseded" | "carried" | "dropped";
 
 /** One step in the life of an item. */
 export interface HistoryStep {
