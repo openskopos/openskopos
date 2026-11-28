@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.2.json",
+  "id": "pa_b000000000000001",
+  "version": 1,
+  "kind": "spec",
+  "title": "Seat limits B",
+  "status": "final",
+  "id_counters": {
+    "D": 1
+  },
+  "items": [
+    {
+      "id": "D1",
+      "type": "decision",
+      "text": "Show remaining seats on the billing page.",
+      "status": "accepted"
+    }
+  ],
+  "created_at": "2026-11-02T09:00:00Z",
+  "finalized_at": "2026-11-02T10:00:00Z"
+}

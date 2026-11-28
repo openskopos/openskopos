@@ -23,7 +23,8 @@ use skopos_core::fix::{fix_all, Fix};
 use skopos_core::markdown::Fill;
 use skopos_core::render::{self, HtmlOptions, TerminalOptions};
 use skopos_core::{
-    assign_ids, check, diff, history, markdown, merge, parse, write, Format, Problem, Value,
+    assign_ids, check, compact, diff, history, markdown, merge, parse, write, Format, Problem,
+    Value,
 };
 
 /// The file system and the terminal, as the commands see them.
@@ -252,6 +253,30 @@ enum Command {
         #[arg(long)]
         json: bool,
     },
+    /// Compact the documents of one area into their current state.
+    ///
+    /// Give every version of each artifact. The items that are in force or
+    /// proposed go into one draft per kind: the next version when a kind has
+    /// one artifact, or a new artifact with derived_from refs when it has
+    /// several. Terms go to the glossary draft. Rejected, superseded and
+    /// settled items are left out and listed. No file moves.
+    Compact {
+        /// JSON or YAML files: every version of each artifact of the area
+        #[arg(required = true)]
+        files: Vec<PathBuf>,
+        /// Read-only files from other areas, used to detect cross-area
+        /// supersession without compacting them
+        #[arg(long = "context", value_name = "FILE")]
+        context: Vec<PathBuf>,
+        /// Write each draft to this folder as <kind>.skopos.json. Without
+        /// it, nothing is written
+        #[arg(long, value_name = "DIR")]
+        out: Option<PathBuf>,
+        /// Write the whole result as JSON: the drafts, the items left out
+        /// and the conflicts
+        #[arg(long)]
+        json: bool,
+    },
     /// List the conflicts of a merged document that are still open.
     ///
     /// The exit code is 1 while a conflict is open.
@@ -442,6 +467,12 @@ where
             output.as_deref(),
             json,
         ),
+        Command::Compact {
+            files,
+            context,
+            out,
+            json,
+        } => cmd.compact(&files, &context, out.as_deref(), json),
         Command::Conflicts { file, json } => cmd.conflicts(&file, json),
         Command::Resolve { file, id } => cmd.resolve(&file, &id),
         Command::Render {
@@ -1168,6 +1199,62 @@ impl Commands<'_> {
             self.out(&text)
         } else {
             self.out(&h.trace_text(item))
+        }
+    }
+
+    fn compact(
+        &mut self,
+        files: &[PathBuf],
+        context: &[PathBuf],
+        out: Option<&Path>,
+        json: bool,
+    ) -> bool {
+        let Some(docs) = self.read_all_valid(files) else {
+            return false;
+        };
+        let Some(context_docs) = self.read_all_valid(context) else {
+            return false;
+        };
+        let now = self.host.fill().now;
+        let options = compact::Options {
+            now: Some(now),
+            context: &context_docs,
+            titles: Default::default(),
+        };
+        let result = match compact::compact(&docs, &options, &mut || self.host.fill().artifact_id) {
+            Ok(r) => r,
+            Err(problem) => {
+                self.err(&problem.to_string());
+                return false;
+            }
+        };
+        for d in &result.drafts {
+            let problems = check(&d.doc);
+            for p in &problems {
+                self.err(&format!("{} draft: {p}", d.kind));
+            }
+            if !problems.is_empty() {
+                return false;
+            }
+        }
+        if let Some(dir) = out {
+            if let Err(e) = self.host.create_dir_all(dir) {
+                self.err(&format!("{}: cannot make the folder: {e}", dir.display()));
+                return false;
+            }
+            for d in &result.drafts {
+                let path = dir.join(format!("{}.skopos.json", d.kind));
+                if !self.write_file(&path, &write(&d.doc, Format::Json)) {
+                    return false;
+                }
+            }
+        }
+        if json {
+            let mut text = serde_json::to_string_pretty(&result).expect("a compaction serializes");
+            text.push('\n');
+            self.out(&text)
+        } else {
+            self.out(&result.to_text())
         }
     }
 

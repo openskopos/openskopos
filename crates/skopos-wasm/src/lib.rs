@@ -280,7 +280,7 @@ export interface HistoryLink {
 
 export interface HistoryWarning { artifact: string | null; message: string; }
 
-export type ItemState = "in_force" | "proposed" | "rejected" | "superseded" | "dropped";
+export type ItemState = "in_force" | "proposed" | "rejected" | "superseded" | "carried" | "dropped";
 
 /** One step in the life of an item. */
 export interface HistoryStep {
@@ -332,6 +332,82 @@ export interface History {
 export interface HistoryTextOptions {
   /** Show only the versions after this version number. */
   since?: number;
+}
+
+/** One draft of `compact`. */
+export interface CompactDraft {
+  kind: string;
+  /** True for a new artifact, false for the next version of its only source. */
+  new_artifact: boolean;
+  /** The latest version of each source, as `<artifact>@<version>`. */
+  sources: string[];
+  items: number;
+  doc: Document;
+}
+
+/** An item that `compact` left out, and why. */
+export interface CompactLeftOut {
+  reference: string;
+  type: string;
+  reason: "rejected" | "superseded" | "answered" | "resolved" | "refuted" | "duplicate";
+  /** For a duplicate term: the term that is kept. */
+  kept?: string;
+}
+
+/** A kind that needed no draft. */
+export interface CompactUnchanged {
+  kind: string;
+  artifact: string;
+  version: number;
+}
+
+/** The result of `compact`. */
+export interface Compaction {
+  drafts: CompactDraft[];
+  /** Kinds that need no draft. */
+  unchanged: CompactUnchanged[];
+  left_out: CompactLeftOut[];
+  /** Terms with one name and conflicting definitions or detail, as IDs in the glossary draft. */
+  conflicts: { term: string; items: string[] }[];
+  warnings: HistoryWarning[];
+}
+
+/** Options for `compact` and `compactText`. */
+export interface CompactOptions {
+  /** The time for created_at of each draft. Default: now. */
+  now?: string;
+  /** Read-only documents from outside the compacted area for cross-area supersession. */
+  context?: Document[];
+  /** Optional titles for newly created artifacts, keyed by kind. */
+  titles?: Record<string, string>;
+}
+
+/** Where the newest known version of a search hit lives. */
+export type SearchSource = "current" | "archive";
+
+/** One matching item returned by `search` or `searchArchive`. */
+export interface SearchHit {
+  reference: string;
+  artifact: string;
+  item: string;
+  type: string;
+  status: string;
+  version: number;
+  source: SearchSource;
+  matched_version: number;
+  matched_source: SearchSource;
+  matched_in_latest: boolean;
+  versions_matched: number;
+  text: string;
+  removed_in_version?: number;
+}
+
+/** The result of `search` or `searchArchive`. */
+export interface SearchResult {
+  documents: number;
+  documents_parsed: number;
+  items_scanned: number;
+  hits: SearchHit[];
 }
 
 /** Options for `merge` and `mergeText`. */
@@ -1036,6 +1112,63 @@ pub fn merge_text(
     Ok(merge_of(&main, &other, &options)?.to_text())
 }
 
+fn compact_of(
+    docs: &JsValue,
+    options: &Option<JsValue>,
+) -> Result<skopos_core::compact::Compaction, JsValue> {
+    let docs = from_js(docs, "docs")?;
+    let docs = docs
+        .as_array()
+        .ok_or_else(|| type_error("docs must be a list of documents"))?;
+    let options = from_js_opt(options, "options")?;
+    let now = option_string(&options, "now").unwrap_or_else(now);
+    let context: Vec<Value> = match options.as_ref().and_then(|o| o.get("context")) {
+        None | Some(Value::Null) => Vec::new(),
+        Some(Value::Array(list)) => list.clone(),
+        Some(_) => return Err(type_error("options.context must be a list of documents")),
+    };
+    let mut titles = std::collections::BTreeMap::new();
+    match options.as_ref().and_then(|o| o.get("titles")) {
+        None | Some(Value::Null) => {}
+        Some(Value::Object(map)) => {
+            for (k, v) in map {
+                let title = v
+                    .as_str()
+                    .ok_or_else(|| type_error("options.titles values must be strings"))?;
+                titles.insert(k.clone(), title.to_string());
+            }
+        }
+        Some(_) => return Err(type_error("options.titles must be an object")),
+    }
+    let options = skopos_core::compact::Options {
+        now: Some(now),
+        context: &context,
+        titles,
+    };
+    skopos_core::compact::compact(docs, &options, &mut new_artifact_id)
+        .map_err(|p| problems_error(&[p]))
+}
+
+/// Compacts the documents of one area: every version of each artifact. The
+/// current items go into one draft per kind, and terms into the glossary
+/// draft. Returns the drafts, the items left out and the term conflicts.
+#[wasm_bindgen(unchecked_return_type = "Compaction")]
+pub fn compact(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "CompactOptions")] options: Option<JsValue>,
+) -> Result<JsValue, JsValue> {
+    Ok(to_js(&compact_of(&docs, &options)?))
+}
+
+/// `compact(docs, options)` as text, as `skopos compact` writes it.
+#[wasm_bindgen(js_name = compactText)]
+pub fn compact_text(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "CompactOptions")] options: Option<JsValue>,
+) -> Result<String, JsValue> {
+    Ok(compact_of(&docs, &options)?.to_text())
+}
+
 /// The open conflicts of a merged document.
 #[wasm_bindgen(unchecked_return_type = "OpenConflict[]")]
 pub fn conflicts(
@@ -1328,4 +1461,41 @@ pub fn render_terminal(
 #[wasm_bindgen]
 pub fn stylesheet() -> String {
     render::STYLESHEET.to_string()
+}
+
+/// Searches a `.skopos.jsonl.zst` archive, given as bytes, for a word or
+/// phrase. Each matching item appears once, with its newest version and
+/// whether it matched in the latest version or only an older one.
+/// Prototype for the 0.3 compaction plan.
+#[wasm_bindgen(js_name = searchArchive, unchecked_return_type = "SearchResult")]
+pub fn search_archive(bytes: &[u8], query: &str) -> Result<JsValue, JsValue> {
+    skopos_core::search::search_archive(bytes, query)
+        .map(|r| to_js(&r))
+        .map_err(|e| type_error(&e))
+}
+
+/// Searches current documents and zero or more `.skopos.jsonl.zst` archives
+/// together, highlighting which hits are `current` and which live only in
+/// `archive`. Prototype for the 0.3 compaction plan.
+#[wasm_bindgen(unchecked_return_type = "SearchResult")]
+pub fn search(
+    #[wasm_bindgen(unchecked_param_type = "Document[]")] docs: JsValue,
+    #[wasm_bindgen(unchecked_param_type = "Uint8Array[]")] archives: JsValue,
+    query: &str,
+) -> Result<JsValue, JsValue> {
+    let docs = from_js(&docs, "docs")?;
+    let docs = docs
+        .as_array()
+        .ok_or_else(|| type_error("docs must be a list of documents"))?;
+    let mut s = skopos_core::search::Search::new(query);
+    if !archives.is_undefined() && !archives.is_null() {
+        let list = Array::from(&archives);
+        for item in list.iter() {
+            let bytes = Uint8Array::new(&item).to_vec();
+            s.add_archive(bytes.as_slice())
+                .map_err(|e| type_error(&e))?;
+        }
+    }
+    s.add_docs(docs).map_err(|e| type_error(&e))?;
+    Ok(to_js(&s.finish()))
 }

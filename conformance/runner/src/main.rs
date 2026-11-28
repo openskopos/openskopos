@@ -92,6 +92,30 @@ fn run(root: &Path) -> Result<Run, String> {
     check_markdown(&mut run, &validator, &conf.join("markdown"))?;
     check_history(&mut run, &validator, &conf.join("history"))?;
     check_merge(&mut run, &validator, &conf.join("merge"))?;
+
+    // If a draft 0.3 schema exists, validate it and any draft 0.3 conformance
+    // cases under conformance/draft-0.3/.
+    let draft_schema_path = root.join("schema/artifact/0.3.json");
+    if draft_schema_path.is_file() {
+        let draft_schema = read_json(&draft_schema_path)?;
+        run.check(
+            jsonschema::meta::is_valid(&draft_schema),
+            "schema/artifact/0.3.json is a valid JSON Schema".into(),
+        );
+        run.check(
+            draft_schema["$id"] == "https://openskopos.org/schema/artifact/0.3.json",
+            "draft 0.3 schema $id is https://openskopos.org/schema/artifact/0.3.json".into(),
+        );
+        let draft_validator = jsonschema::options()
+            .with_draft(jsonschema::Draft::Draft202012)
+            .should_validate_formats(true)
+            .build(&draft_schema)
+            .map_err(|e| format!("cannot compile the 0.3 schema: {e}"))?;
+        let draft_conf = conf.join("draft-0.3");
+        if draft_conf.join("history").is_dir() {
+            check_history(&mut run, &draft_validator, &draft_conf.join("history"))?;
+        }
+    }
     Ok(run)
 }
 

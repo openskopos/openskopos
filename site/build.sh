@@ -51,9 +51,10 @@ docs/install.md|docs/install|Install the skopos tool||Install the skopos command
 docs/mcp.md|docs/mcp|Use OpenSkopos from an agent|toc|Connect Claude Code, Codex, Cursor, VS Code or another AI agent to the free OpenSkopos MCP server to check, fix, convert and merge documents.
 docs/editors.md|docs/editors|Editor support||Validation and completion for .skopos.json and .skopos.yaml files in VS Code and other editors.
 docs/exporters.md|docs/exporters|Export to OpenSpec, Kiro and Spec Kit|toc|Export an OpenSkopos document to OpenSpec, Kiro or GitHub Spec Kit, and see where each item type goes in each tool.
+docs/compaction.md|docs/compaction|Compaction|toc|Fold versions and parallel OpenSkopos documents into clean current drafts while keeping old decisions traceable and searchable.
 docs/render.md|docs/render|Readable views of a document|toc|Show an OpenSkopos document as text in the terminal or as an HTML page, and style the HTML with CSS custom properties.
 docs/skill.md|docs/skill|Agent skill||An agent skill that teaches Claude Code, Codex, Amp, Cursor and other AI coding agents to record decisions in the OpenSkopos format, and to check, version and merge them with the skopos tool.
-crates/skopos/README.md|docs/cli|The skopos command line tool|toc|The skopos commands: check, fmt, convert, import, ids, export, diff, history, trace, merge, conflicts, resolve and render.
+crates/skopos/README.md|docs/cli|The skopos command line tool|toc|The skopos commands: check, fmt, convert, import, ids, export, diff, history, trace, merge, conflicts, resolve, compact and render.
 crates/skopos-core/README.md|docs/rust|The skopos-core Rust library||Read, check, write, compare, merge and render OpenSkopos documents in Rust with the reference implementation.
 npm/core/README.md|docs/javascript|The @openskopos/core npm package||Read, check, write, compare, merge and render OpenSkopos documents in Node and in browsers, with the reference implementation built to WebAssembly.
 npm/cli/README.md|docs/npm-cli|The @openskopos/cli npm package||The skopos command line tool for Node on every platform, with the same commands and output as the native tool.

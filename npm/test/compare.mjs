@@ -188,6 +188,11 @@ const cases = [
   ["merge", "--pair", "G1=G1", "c/merge/05-two-drafts/main.json", "c/merge/05-two-drafts/other.json"],
   ["merge", "--pair", "G1", "c/merge/05-two-drafts/main.json", "c/merge/05-two-drafts/other.json"],
   ["resolve", "c/merge/02-edit-edit/expected.json", "G1"],
+  // compact: one artifact gives its next version, so no new random ID.
+  ["compact", "c/history/01-three-versions/v1.json", "c/history/01-three-versions/v2.json", "c/history/01-three-versions/v3.json", "--out", "compacted"],
+  ["compact", "--json", "c/history/01-three-versions/v1.json", "c/history/01-three-versions/v2.json", "c/history/01-three-versions/v3.json"],
+  ["compact", "c/history/03-missing-version/v1.json", "c/history/03-missing-version/v3.json"],
+  ["compact", "c/valid/minimal-draft.json"],
   // render
   ...valid.flatMap((f) => [["render", f], ["render", f, "--html"]]),
   ["render", valid[1], "--previous", valid[0], "--width", "60"],

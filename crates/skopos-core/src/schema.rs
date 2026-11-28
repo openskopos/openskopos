@@ -17,27 +17,50 @@ pub const SCHEMA: &str = include_str!("../schema/0.2.json");
 /// The `$schema` URL of format 0.2.
 pub const SCHEMA_URL: &str = "https://openskopos.org/schema/artifact/0.2.json";
 
-fn validator() -> &'static Validator {
-    static VALIDATOR: OnceLock<Validator> = OnceLock::new();
-    VALIDATOR.get_or_init(|| {
-        let schema: Value = serde_json::from_str(SCHEMA).expect("the embedded schema is JSON");
-        jsonschema::options()
-            .with_draft(jsonschema::Draft::Draft202012)
-            .should_validate_formats(true)
-            .build(&schema)
-            .expect("the embedded schema compiles")
-    })
+/// The draft JSON Schema of format 0.3, as text. It is the same file as
+/// `schema/artifact/0.3.json` in the repository.
+pub const DRAFT_0_3_SCHEMA: &str = include_str!("../schema/0.3.json");
+
+/// The `$schema` URL of draft format 0.3.
+pub const DRAFT_0_3_SCHEMA_URL: &str = "https://openskopos.org/schema/artifact/0.3.json";
+
+fn validator_for(doc: &Value) -> &'static Validator {
+    if doc.get("$schema").and_then(Value::as_str) == Some(DRAFT_0_3_SCHEMA_URL) {
+        static VALIDATOR_0_3: OnceLock<Validator> = OnceLock::new();
+        VALIDATOR_0_3.get_or_init(|| {
+            let schema: Value =
+                serde_json::from_str(DRAFT_0_3_SCHEMA).expect("the embedded 0.3 schema is JSON");
+            jsonschema::options()
+                .with_draft(jsonschema::Draft::Draft202012)
+                .should_validate_formats(true)
+                .build(&schema)
+                .expect("the embedded 0.3 schema compiles")
+        })
+    } else {
+        static VALIDATOR: OnceLock<Validator> = OnceLock::new();
+        VALIDATOR.get_or_init(|| {
+            let schema: Value = serde_json::from_str(SCHEMA).expect("the embedded schema is JSON");
+            jsonschema::options()
+                .with_draft(jsonschema::Draft::Draft202012)
+                .should_validate_formats(true)
+                .build(&schema)
+                .expect("the embedded schema compiles")
+        })
+    }
 }
 
 /// Finds the problems that the JSON Schema finds. Each problem has no rule
 /// name.
+///
+/// Documents whose `$schema` is [`DRAFT_0_3_SCHEMA_URL`] are validated against
+/// [`DRAFT_0_3_SCHEMA`]; all others validate against [`SCHEMA`] (format 0.2).
 ///
 /// Where the message of the validator is hard to read, the problem has a
 /// clearer message. One wrong field of an item does not give a second problem
 /// about the other fields of the item.
 pub fn check_schema(doc: &Value) -> Vec<Problem> {
     let mut seen = HashSet::new();
-    validator()
+    validator_for(doc)
         .iter_errors(doc)
         .filter_map(|e| explain(doc, &e))
         .filter(|p| seen.insert((p.path.clone(), p.message.clone())))

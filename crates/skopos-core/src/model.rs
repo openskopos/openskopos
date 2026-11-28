@@ -212,12 +212,13 @@ pub struct ExternalParent {
     pub source: Source,
 }
 
-/// `previous_version` or `input`.
+/// `previous_version`, `input` or `replaces` (draft 0.3).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ParentRel {
     PreviousVersion,
     Input,
+    Replaces,
 }
 
 /// The material of an external parent.

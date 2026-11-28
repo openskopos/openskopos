@@ -1,0 +1,36 @@
+{
+  "$schema": "https://openskopos.org/schema/artifact/0.2.json",
+  "id": "pa_d000000000000001",
+  "version": 1,
+  "kind": "spec",
+  "title": "Seat limits update",
+  "status": "final",
+  "parents": [
+    {
+      "rel": "input",
+      "artifact": "pa_c000000000000001",
+      "version": 1
+    }
+  ],
+  "id_counters": {
+    "D": 1
+  },
+  "items": [
+    {
+      "id": "D1",
+      "type": "decision",
+      "text": "Count seats inside the plan change.",
+      "status": "accepted",
+      "refs": [
+        {
+          "item": "D1",
+          "artifact": "pa_c000000000000001",
+          "version": 1,
+          "rel": "supersedes"
+        }
+      ]
+    }
+  ],
+  "created_at": "2026-11-15T09:00:00Z",
+  "finalized_at": "2026-11-15T10:00:00Z"
+}

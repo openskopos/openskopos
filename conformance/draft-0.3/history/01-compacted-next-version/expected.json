@@ -1,0 +1,100 @@
+{
+  "chains": [
+    {
+      "artifact": "pa_4Hs8Lm2Qx6Vr9Tc3",
+      "versions": [
+        1,
+        2
+      ]
+    },
+    {
+      "artifact": "pa_9Lp4Wd7Ks2Hq6Nb3",
+      "versions": [
+        1
+      ]
+    }
+  ],
+  "warnings": 0,
+  "items": {
+    "pa_4Hs8Lm2Qx6Vr9Tc3#D1": {
+      "state": "rejected",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          2,
+          "dropped"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#D2": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#Q1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          2,
+          "dropped"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#A1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          2,
+          "dropped"
+        ]
+      ],
+      "superseded_by": []
+    },
+    "pa_4Hs8Lm2Qx6Vr9Tc3#T1": {
+      "state": "carried",
+      "changes": [
+        [
+          1,
+          "added"
+        ],
+        [
+          2,
+          "dropped"
+        ]
+      ],
+      "derived_into": [
+        "pa_9Lp4Wd7Ks2Hq6Nb3@1#T1"
+      ]
+    },
+    "pa_9Lp4Wd7Ks2Hq6Nb3#T1": {
+      "state": "in_force",
+      "changes": [
+        [
+          1,
+          "added"
+        ]
+      ],
+      "derived_from": [
+        "pa_4Hs8Lm2Qx6Vr9Tc3@1#T1"
+      ]
+    }
+  }
+}

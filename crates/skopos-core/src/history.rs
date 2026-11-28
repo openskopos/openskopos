@@ -110,9 +110,11 @@ pub enum ItemState {
     /// Rejected in the latest version. It stays in the record.
     Rejected,
     /// An item that is not rejected replaces it with `supersedes`, in this
-    /// artifact or in another one.
+    /// artifact or in another one (directly or through a carried item).
     Superseded,
-    /// Removed, and no item replaces it.
+    /// Carried into another artifact by compaction via `derived_from` (0.3).
+    Carried,
+    /// Removed, and no item replaces or carries it.
     Dropped,
 }
 
@@ -124,6 +126,7 @@ impl ItemState {
             ItemState::Proposed => "proposed",
             ItemState::Rejected => "rejected",
             ItemState::Superseded => "superseded",
+            ItemState::Carried => "carried",
             ItemState::Dropped => "dropped",
         }
     }
@@ -240,19 +243,73 @@ fn push_new(list: &mut Vec<String>, value: String) {
     }
 }
 
-/// The artifact versions that a document has as `input` parents.
+/// The artifact versions that a document has as `input` or `replaces` parents.
 fn input_parents(doc: &Value) -> Vec<(String, u64)> {
     doc.get("parents")
         .and_then(Value::as_array)
         .into_iter()
         .flatten()
-        .filter(|p| str_of(p, "rel") == "input")
+        .filter(|p| matches!(str_of(p, "rel"), "input" | "replaces"))
         .filter_map(|p| {
             let artifact = p.get("artifact")?.as_str()?;
             let version = p.get("version").and_then(crate::whole_number)?;
             Some((artifact.to_string(), version))
         })
         .collect()
+}
+
+/// The artifact versions that a document has as `replaces` parents.
+fn replaces_parents(doc: &Value) -> Vec<(String, u64)> {
+    doc.get("parents")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter(|p| str_of(p, "rel") == "replaces")
+        .filter_map(|p| {
+            let artifact = p.get("artifact")?.as_str()?;
+            let version = p.get("version").and_then(crate::whole_number)?;
+            Some((artifact.to_string(), version))
+        })
+        .collect()
+}
+
+/// True if an item was already settled in its last version (an accepted
+/// answered question, a critique with a non-open resolution, or a refuted
+/// assumption), so removing it in a compacted next version is not a drop.
+fn is_settled(item: &Value) -> bool {
+    match str_of(item, "type") {
+        "open_question" => {
+            !str_of(item, "answer").trim().is_empty() && str_of(item, "status") == "accepted"
+        }
+        "critique" => item
+            .get("resolution")
+            .is_some_and(|r| !matches!(str_of(r, "outcome"), "" | "open")),
+        "assumption" => str_of(item, "confirmation") == "refuted",
+        _ => false,
+    }
+}
+
+/// True if a `derived_from` edge from `source` to `target` carries the item
+/// across a compaction (rather than an ordinary derivation such as a
+/// requirement derived from a decision):
+/// - `target`'s artifact has a `replaces` parent naming `source`'s artifact, or
+/// - `source` is a `term` carried into another `term` (in a glossary) after
+///   `source`'s artifact was replaced or compacted.
+fn is_carrying_link(
+    source: &ItemHistory,
+    target: &ItemHistory,
+    replaced_by: &BTreeMap<&str, BTreeSet<&str>>,
+    removed_by_compaction: bool,
+) -> bool {
+    if replaced_by
+        .get(source.artifact.as_str())
+        .is_some_and(|replacers| replacers.contains(target.artifact.as_str()))
+    {
+        return true;
+    }
+    let source_compacted =
+        removed_by_compaction || replaced_by.contains_key(source.artifact.as_str());
+    source_compacted && source.item_type == "term" && target.item_type == "term"
 }
 
 fn versions_words(artifact: &str, from: u64, to: u64) -> String {
@@ -333,17 +390,41 @@ pub fn history(docs: &[Value]) -> History {
             (artifact.as_str(), set)
         })
         .collect();
+    // Kahn's algorithm: each step takes the smallest artifact ID whose
+    // inputs are all placed, as the loop it replaces did.
+    let mut waiting: BTreeMap<&str, usize> =
+        inputs.iter().map(|(a, ins)| (*a, ins.len())).collect();
+    let mut users: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
+    for (a, ins) in &inputs {
+        for i in ins {
+            users.entry(*i).or_default().push(*a);
+        }
+    }
+    let mut ready: BTreeSet<&str> = waiting
+        .iter()
+        .filter(|(_, n)| **n == 0)
+        .map(|(a, _)| *a)
+        .collect();
+    let mut placed: BTreeSet<&str> = BTreeSet::new();
     let mut order: Vec<&str> = Vec::new();
     while order.len() < inputs.len() {
-        let open = |a: &&str| !order.contains(a);
-        let next = inputs
-            .iter()
-            .find(|(a, ins)| open(a) && ins.iter().all(|i| order.contains(i)))
-            .map(|(a, _)| *a)
+        let next = match ready.pop_first() {
+            Some(a) => a,
             // A loop of inputs: take the first artifact that is left.
-            .or_else(|| inputs.keys().copied().find(open))
-            .expect("an artifact is left");
+            None => *inputs
+                .keys()
+                .find(|a| !placed.contains(*a))
+                .expect("an artifact is left"),
+        };
+        placed.insert(next);
         order.push(next);
+        for u in users.get(next).into_iter().flatten() {
+            let n = waiting.get_mut(u).expect("a user waits");
+            *n = n.saturating_sub(1);
+            if *n == 0 && !placed.contains(u) {
+                ready.insert(*u);
+            }
+        }
     }
 
     let mut chains = Vec::new();
@@ -522,6 +603,31 @@ pub fn history(docs: &[Value]) -> History {
         }
     };
 
+    // Track which artifacts are replaced by which other artifacts (via a
+    // cross-artifact `replaces` parent), and which specific `(artifact, version)`
+    // pairs were compacted into their own next version (a self-`replaces` parent).
+    let mut replaced_by: BTreeMap<&str, BTreeSet<&str>> = BTreeMap::new();
+    let mut compacted_versions: BTreeSet<(&str, u64)> = BTreeSet::new();
+    for (artifact, versions) in &by_artifact {
+        for (&version, &doc) in versions {
+            for (rep_art, rep_ver) in replaces_parents(doc) {
+                if rep_art == *artifact && rep_ver < version {
+                    compacted_versions.insert((artifact.as_str(), version));
+                } else if let Some((k, _)) = by_artifact.get_key_value(&rep_art) {
+                    if rep_art != *artifact {
+                        replaced_by
+                            .entry(k.as_str())
+                            .or_default()
+                            .insert(artifact.as_str());
+                    }
+                }
+            }
+        }
+    }
+
+    // Track `derived_from` edges between artifacts so we can identify carried
+    // items and propagate supersession backward across repeated compactions.
+    let mut derived_edges: Vec<Vec<usize>> = vec![Vec::new(); items.len()];
     for i in 0..items.len() {
         let artifact = items[i].artifact.clone();
         let in_latest = items[i].last_version == latest_version[artifact.as_str()];
@@ -542,11 +648,16 @@ pub fn history(docs: &[Value]) -> History {
                 if let Some(t) = t {
                     let into = items[i].reference.clone();
                     push_new(&mut items[t].derived_into, into);
+                    if !derived_edges[t].contains(&i) {
+                        derived_edges[t].push(i);
+                    }
                 }
             }
         }
     }
 
+    // Add same-artifact supersession recorded on removal steps before
+    // propagating supersession backward across carried items.
     for i in 0..items.len() {
         let latest_v = latest_version[items[i].artifact.as_str()];
         let item = &items[i];
@@ -566,16 +677,83 @@ pub fn history(docs: &[Value]) -> History {
         for by in removed_by {
             push_new(&mut item.superseded_by, by);
         }
-        item.state = if item.last_version < latest_v {
-            if item.superseded_by.is_empty() {
-                ItemState::Dropped
+    }
+
+    // Precompute which items were removed by a compacted next version and
+    // which outgoing `derived_from` edges actually carry an item across a
+    // compaction (rather than an ordinary `derived_from` link such as FR1
+    // derived from D1).
+    let removed_by_compaction: Vec<bool> = (0..items.len())
+        .map(|i| {
+            let art = items[i].artifact.as_str();
+            let latest_v = latest_version[art];
+            items[i].last_version < latest_v
+                && items[i].steps.last().is_some_and(|s| {
+                    s.change == Change::Dropped && compacted_versions.contains(&(art, s.version))
+                })
+        })
+        .collect();
+    let carried_edges: Vec<Vec<usize>> = (0..items.len())
+        .map(|i| {
+            derived_edges[i]
+                .iter()
+                .copied()
+                .filter(|&j| {
+                    is_carrying_link(&items[i], &items[j], &replaced_by, removed_by_compaction[i])
+                })
+                .collect()
+        })
+        .collect();
+
+    // Propagate supersession backward across repeated compactions: if an item
+    // was carried into a downstream item that is superseded (directly or
+    // transitively), record those same superseders on the carried item.
+    loop {
+        let mut changed = false;
+        for i in 0..items.len() {
+            if carried_edges[i].is_empty() {
+                continue;
+            }
+            let downstream: Vec<String> = carried_edges[i]
+                .iter()
+                .flat_map(|&j| items[j].superseded_by.iter().cloned())
+                .collect();
+            for by in downstream {
+                if !items[i].superseded_by.contains(&by) {
+                    items[i].superseded_by.push(by);
+                    changed = true;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    for i in 0..items.len() {
+        let latest_v = latest_version[items[i].artifact.as_str()];
+        let carried = !carried_edges[i].is_empty();
+        let compacted = removed_by_compaction[i];
+        let settled = is_settled(&latest[i]);
+        let item = &mut items[i];
+        item.state = if !item.superseded_by.is_empty() {
+            ItemState::Superseded
+        } else if carried {
+            ItemState::Carried
+        } else if item.last_version < latest_v {
+            if compacted && item.status == "rejected" {
+                ItemState::Rejected
+            } else if compacted && settled {
+                if item.status == "accepted" {
+                    ItemState::InForce
+                } else {
+                    ItemState::Proposed
+                }
             } else {
-                ItemState::Superseded
+                ItemState::Dropped
             }
         } else if item.status == "rejected" {
             ItemState::Rejected
-        } else if !item.superseded_by.is_empty() {
-            ItemState::Superseded
         } else if item.status == "accepted" {
             ItemState::InForce
         } else {
@@ -984,5 +1162,41 @@ mod tests {
         let h = history(&[v1.clone(), v1.clone(), other, json!({"items": []})]);
         assert_eq!(h.warnings.len(), 2);
         assert_eq!(h.chains[0].title, "T");
+    }
+
+    #[test]
+    fn chains_order_inputs_first_with_lexicographic_ties_and_cycles() {
+        let make = |id: &str, inputs: &[&str]| {
+            let parents: Vec<Value> = inputs
+                .iter()
+                .map(|a| json!({"rel": "input", "artifact": a, "version": 1}))
+                .collect();
+            json!({
+                "id": id, "version": 1, "kind": "spec", "title": id,
+                "status": "final", "created_at": "2026-11-01T09:00:00Z",
+                "parents": parents, "items": []
+            })
+        };
+        // Diamond: d depends on b and c; both depend on a.
+        // Expected: a, b, c, d regardless of input order.
+        let h = history(&[
+            make("pa_d", &["pa_b", "pa_c"]),
+            make("pa_c", &["pa_a"]),
+            make("pa_b", &["pa_a"]),
+            make("pa_a", &[]),
+        ]);
+        let order: Vec<&str> = h.chains.iter().map(|c| c.artifact.as_str()).collect();
+        assert_eq!(order, ["pa_a", "pa_b", "pa_c", "pa_d"]);
+
+        // Cycle between pa_b and pa_c, plus pa_d depending on pa_c, plus independent pa_a.
+        // Expected: pa_a (ready), then cycle break picks smallest pa_b, which unlocks pa_c, then pa_d.
+        let h = history(&[
+            make("pa_d", &["pa_c"]),
+            make("pa_c", &["pa_b"]),
+            make("pa_b", &["pa_c"]),
+            make("pa_a", &[]),
+        ]);
+        let order: Vec<&str> = h.chains.iter().map(|c| c.artifact.as_str()).collect();
+        assert_eq!(order, ["pa_a", "pa_b", "pa_c", "pa_d"]);
     }
 }

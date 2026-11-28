@@ -192,6 +192,15 @@ fn embedded_schema_is_the_published_file() {
     );
     let schema: Value = serde_json::from_str(&file).unwrap();
     assert_eq!(schema["$id"], skopos_core::SCHEMA_URL);
+
+    let draft_file = fs::read_to_string(conformance().join("../schema/artifact/0.3.json")).unwrap();
+    assert_eq!(
+        skopos_core::DRAFT_0_3_SCHEMA,
+        draft_file,
+        "copy schema/artifact/0.3.json to crates/skopos-core/schema/0.3.json"
+    );
+    let draft_schema: Value = serde_json::from_str(&draft_file).unwrap();
+    assert_eq!(draft_schema["$id"], skopos_core::DRAFT_0_3_SCHEMA_URL);
 }
 
 #[test]
@@ -225,67 +234,76 @@ fn parents_message_follows_the_schema_branch() {
 
 #[test]
 fn history_cases_give_the_expected_history() {
-    for case in cases("history") {
-        let name = case["case"].as_str().unwrap();
-        let dir = conformance().join("history").join(name);
-        let mut docs = vec![];
-        for entry in fs::read_dir(&dir).unwrap() {
-            let path = entry.unwrap().path();
-            if !path.ends_with("expected.json") {
-                docs.push(read(&path));
+    for dir_name in ["history", "draft-0.3/history"] {
+        for case in cases(dir_name) {
+            let name = case["case"].as_str().unwrap();
+            let dir = conformance().join(dir_name).join(name);
+            let mut docs = vec![];
+            for entry in fs::read_dir(&dir).unwrap() {
+                let path = entry.unwrap().path();
+                if !path.ends_with("expected.json") {
+                    docs.push(read(&path));
+                }
             }
-        }
-        let expected = read(&dir.join("expected.json"));
-        // The order of the files must not matter.
-        let h = history(&docs);
-        docs.reverse();
-        assert_eq!(
-            h,
-            history(&docs),
-            "{name}: the order of the files changes the history"
-        );
-
-        let chains: Vec<Value> = h
-            .chains
-            .iter()
-            .map(|c| {
-                let versions: Vec<u64> = c.versions.iter().map(|v| v.version).collect();
-                serde_json::json!({"artifact": c.artifact, "versions": versions})
-            })
-            .collect();
-        assert_eq!(Value::from(chains), expected["chains"], "{name}: chains");
-        assert_eq!(
-            h.warnings.len() as u64,
-            expected["warnings"].as_u64().unwrap(),
-            "{name}: warnings {:?}",
-            h.warnings
-        );
-        let items = expected["items"].as_object().unwrap();
-        let keys: BTreeSet<&str> = h.items.iter().map(|i| i.key.as_str()).collect();
-        let want: BTreeSet<&str> = items.keys().map(String::as_str).collect();
-        assert_eq!(keys, want, "{name}: items");
-        for (key, want) in items {
-            let item = serde_json::to_value(h.item(key).unwrap()).unwrap();
-            let changes: Vec<Value> = item["steps"]
-                .as_array()
-                .unwrap()
-                .iter()
-                .map(|s| serde_json::json!([s["version"], s["change"]]))
-                .collect();
-            assert_eq!(item["state"], want["state"], "{name}: {key} state");
+            let expected = read(&dir.join("expected.json"));
+            // The order of the files must not matter.
+            let h = history(&docs);
+            docs.reverse();
             assert_eq!(
-                Value::from(changes),
-                want["changes"],
-                "{name}: {key} changes"
+                h,
+                history(&docs),
+                "{dir_name}/{name}: the order of the files changes the history"
             );
-            for list in [
-                "superseded_by",
-                "supersedes",
-                "derived_from",
-                "derived_into",
-            ] {
-                if let Some(w) = want.get(list) {
-                    assert_eq!(&item[list], w, "{name}: {key} {list}");
+
+            let chains: Vec<Value> = h
+                .chains
+                .iter()
+                .map(|c| {
+                    let versions: Vec<u64> = c.versions.iter().map(|v| v.version).collect();
+                    serde_json::json!({"artifact": c.artifact, "versions": versions})
+                })
+                .collect();
+            assert_eq!(
+                Value::from(chains),
+                expected["chains"],
+                "{dir_name}/{name}: chains"
+            );
+            assert_eq!(
+                h.warnings.len() as u64,
+                expected["warnings"].as_u64().unwrap(),
+                "{dir_name}/{name}: warnings {:?}",
+                h.warnings
+            );
+            let items = expected["items"].as_object().unwrap();
+            let keys: BTreeSet<&str> = h.items.iter().map(|i| i.key.as_str()).collect();
+            let want: BTreeSet<&str> = items.keys().map(String::as_str).collect();
+            assert_eq!(keys, want, "{dir_name}/{name}: items");
+            for (key, want) in items {
+                let item = serde_json::to_value(h.item(key).unwrap()).unwrap();
+                let changes: Vec<Value> = item["steps"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|s| serde_json::json!([s["version"], s["change"]]))
+                    .collect();
+                assert_eq!(
+                    item["state"], want["state"],
+                    "{dir_name}/{name}: {key} state"
+                );
+                assert_eq!(
+                    Value::from(changes),
+                    want["changes"],
+                    "{dir_name}/{name}: {key} changes"
+                );
+                for list in [
+                    "superseded_by",
+                    "supersedes",
+                    "derived_from",
+                    "derived_into",
+                ] {
+                    if let Some(w) = want.get(list) {
+                        assert_eq!(&item[list], w, "{dir_name}/{name}: {key} {list}");
+                    }
                 }
             }
         }
