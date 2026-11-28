@@ -475,15 +475,20 @@ spec: new artifact pa_5Cb8Nw2Rt6Lk9Qm3@1 (draft), 3 items, from pa_4Hs8Lm2Qx6Vr9
 left out: 2 (rejected 1, superseded 1)
 ```
 
-- Items in force or proposed are carried. Rejected and superseded items,
-  answered questions, critiques with a resolution and refuted assumptions
-  are left out and listed with `--json`.
+- Items in force or proposed are carried. Rejected items, items superseded by
+  an accepted item, answered questions, critiques with a non-open resolution
+  and refuted assumptions are left out and listed with `--json`. Pass
+  `--context <file>` for read-only documents from other areas so cross-area
+  supersessions are detected.
 - When a kind has one artifact, the draft is its next version and the items
   keep their IDs. When it has several, the draft is a new artifact: each item
   gets a new ID and a `derived_from` ref to its source, and each source is an
   `input` parent. `skopos trace` follows an old reference to the new item.
-- Terms go to the glossary draft. Two terms with one name and different
-  definitions both stay as `proposed`, with a `contradicts` ref.
+- Terms go to the glossary draft. Identical terms collapse into one (keeping
+  `accepted` over `proposed`, merging `aliases`, `code_names` and `evidence`,
+  and keeping `derived_from` refs to each source). Two terms with one name and
+  different definitions or detail both stay as `proposed`, with a
+  `contradicts` ref.
 - The command writes the drafts with `--out`, one `<kind>.skopos.json` each.
   It does not move or delete files. It stops if the latest version of an
   artifact is a draft.

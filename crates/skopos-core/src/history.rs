@@ -359,9 +359,7 @@ pub fn history(docs: &[Value]) -> History {
                 .find(|a| !placed.contains(*a))
                 .expect("an artifact is left"),
         };
-        if !placed.insert(next) {
-            continue;
-        }
+        placed.insert(next);
         order.push(next);
         for u in users.get(next).into_iter().flatten() {
             let n = waiting.get_mut(u).expect("a user waits");
@@ -1010,5 +1008,41 @@ mod tests {
         let h = history(&[v1.clone(), v1.clone(), other, json!({"items": []})]);
         assert_eq!(h.warnings.len(), 2);
         assert_eq!(h.chains[0].title, "T");
+    }
+
+    #[test]
+    fn chains_order_inputs_first_with_lexicographic_ties_and_cycles() {
+        let make = |id: &str, inputs: &[&str]| {
+            let parents: Vec<Value> = inputs
+                .iter()
+                .map(|a| json!({"rel": "input", "artifact": a, "version": 1}))
+                .collect();
+            json!({
+                "id": id, "version": 1, "kind": "spec", "title": id,
+                "status": "final", "created_at": "2026-11-01T09:00:00Z",
+                "parents": parents, "items": []
+            })
+        };
+        // Diamond: d depends on b and c; both depend on a.
+        // Expected: a, b, c, d regardless of input order.
+        let h = history(&[
+            make("pa_d", &["pa_b", "pa_c"]),
+            make("pa_c", &["pa_a"]),
+            make("pa_b", &["pa_a"]),
+            make("pa_a", &[]),
+        ]);
+        let order: Vec<&str> = h.chains.iter().map(|c| c.artifact.as_str()).collect();
+        assert_eq!(order, ["pa_a", "pa_b", "pa_c", "pa_d"]);
+
+        // Cycle between pa_b and pa_c, plus pa_d depending on pa_c, plus independent pa_a.
+        // Expected: pa_a (ready), then cycle break picks smallest pa_b, which unlocks pa_c, then pa_d.
+        let h = history(&[
+            make("pa_d", &["pa_c"]),
+            make("pa_c", &["pa_b"]),
+            make("pa_b", &["pa_c"]),
+            make("pa_a", &[]),
+        ]);
+        let order: Vec<&str> = h.chains.iter().map(|c| c.artifact.as_str()).collect();
+        assert_eq!(order, ["pa_a", "pa_b", "pa_c", "pa_d"]);
     }
 }

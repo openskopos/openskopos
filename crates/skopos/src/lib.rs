@@ -264,6 +264,10 @@ enum Command {
         /// JSON or YAML files: every version of each artifact of the area
         #[arg(required = true)]
         files: Vec<PathBuf>,
+        /// Read-only files from other areas, used to detect cross-area
+        /// supersession without compacting them
+        #[arg(long = "context", value_name = "FILE")]
+        context: Vec<PathBuf>,
         /// Write each draft to this folder as <kind>.skopos.json. Without
         /// it, nothing is written
         #[arg(long, value_name = "DIR")]
@@ -463,7 +467,12 @@ where
             output.as_deref(),
             json,
         ),
-        Command::Compact { files, out, json } => cmd.compact(&files, out.as_deref(), json),
+        Command::Compact {
+            files,
+            context,
+            out,
+            json,
+        } => cmd.compact(&files, &context, out.as_deref(), json),
         Command::Conflicts { file, json } => cmd.conflicts(&file, json),
         Command::Resolve { file, id } => cmd.resolve(&file, &id),
         Command::Render {
@@ -1193,12 +1202,25 @@ impl Commands<'_> {
         }
     }
 
-    fn compact(&mut self, files: &[PathBuf], out: Option<&Path>, json: bool) -> bool {
+    fn compact(
+        &mut self,
+        files: &[PathBuf],
+        context: &[PathBuf],
+        out: Option<&Path>,
+        json: bool,
+    ) -> bool {
         let Some(docs) = self.read_all_valid(files) else {
             return false;
         };
+        let Some(context_docs) = self.read_all_valid(context) else {
+            return false;
+        };
         let now = self.host.fill().now;
-        let options = compact::Options { now: Some(now) };
+        let options = compact::Options {
+            now: Some(now),
+            context: &context_docs,
+            titles: Default::default(),
+        };
         let result = match compact::compact(&docs, &options, &mut || self.host.fill().artifact_id) {
             Ok(r) => r,
             Err(problem) => {
